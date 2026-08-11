@@ -41,28 +41,37 @@ const groups: { statuses: InvoiceStatus[]; heading: string; blurb: string }[] = 
 export default async function InvoicesPage() {
   const supabase = await createClient();
 
-  // Cheap and idempotent: flips anything past its due date to overdue before
-  // the page reads it, so the figures below are never a day stale.
-  await supabase.rpc("mark_overdue_invoices");
-
-  const { data: invoices } = await supabase
-    .from("invoices")
-    .select(
-      `id, reference, status, issue_date, due_date, total_pence, paid_pence, job_id,
-       client:clients(id, full_name)`,
-    )
-    .is("deleted_at", null)
-    .order("issue_date", { ascending: false })
-    .order("created_at", { ascending: false });
+  // The housekeeping write now runs ALONGSIDE the read rather than in front of
+  // it. Awaiting it first put a full database round trip ahead of every load of
+  // the screen the owner opens most often.
+  const [, { data: invoices }] = await Promise.all([
+    supabase.rpc("mark_overdue_invoices"),
+    supabase
+      .from("invoices")
+      .select(
+        `id, reference, status, issue_date, due_date, total_pence, paid_pence, job_id,
+         client:clients(id, full_name)`,
+      )
+      .is("deleted_at", null)
+      .order("issue_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+  ]);
 
   const all = invoices ?? [];
+
+  // Because those two run concurrently, a just-lapsed invoice may still read as
+  // `sent`. "Overdue" is therefore decided by the due date, which is the actual
+  // fact — the stored status is only a cached copy of it.
+  const isOverdue = (invoice: { status: InvoiceStatus; due_date: string | null }) =>
+    invoice.status === "overdue" ||
+    (["sent", "part_paid"].includes(invoice.status) && isPast(invoice.due_date));
 
   const owed = all
     .filter((invoice) => ["sent", "part_paid", "overdue"].includes(invoice.status))
     .reduce((sum, invoice) => sum + (invoice.total_pence - invoice.paid_pence), 0);
 
   const overdue = all
-    .filter((invoice) => invoice.status === "overdue")
+    .filter(isOverdue)
     .reduce((sum, invoice) => sum + (invoice.total_pence - invoice.paid_pence), 0);
 
   const settled = all.filter((invoice) => ["paid", "void"].includes(invoice.status));

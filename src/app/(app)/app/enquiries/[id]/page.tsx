@@ -21,45 +21,47 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: enquiry } = await supabase
-    .from("enquiries")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  // This page used to make five sequential database round trips, each waiting
+  // on the one before it. Only two of the dependencies are real: the customer
+  // match needs the enquiry's email and phone, and the signed URLs need the
+  // photo paths. Everything else only ever needed the id from the URL.
+  //
+  // Two waves instead of five. `markEnquiryRead` rides along in the first —
+  // marking something read is not a fact the page renders, so nothing should
+  // wait on it. It is safe to call unconditionally because the action itself
+  // filters on `status = 'new'`.
+  const [{ data: enquiry }, { data: photos }] = await Promise.all([
+    supabase.from("enquiries").select("*").eq("id", id).maybeSingle(),
+    supabase
+      .from("job_photos")
+      .select("id, storage_path, created_at")
+      .eq("enquiry_id", id)
+      .order("created_at", { ascending: true }),
+    markEnquiryRead(id),
+  ]);
 
   if (!enquiry) notFound();
 
-  // Opening it counts as reading it, so the unread badge reflects reality
-  // without the owner having to tick anything.
-  if (enquiry.status === "new") {
-    await markEnquiryRead(id);
-  }
-
-  const { data: photos } = await supabase
-    .from("job_photos")
-    .select("id, storage_path, created_at")
-    .eq("enquiry_id", id)
-    .order("created_at", { ascending: true });
-
-  const photoUrls = await signedPhotoUrls(
-    "enquiry-photos",
-    (photos ?? []).map((photo) => photo.storage_path),
-  );
-
-  // Offer to reuse an existing customer rather than creating a duplicate
-  // (spec E-16). Matched on email or phone — the two things people give.
-  const { data: possibleMatches } = await supabase
-    .from("clients")
-    .select("id, full_name, email, phone")
-    .is("deleted_at", null)
-    .or(
-      [
-        enquiry.email ? `email.eq.${enquiry.email}` : null,
-        enquiry.phone ? `phone.eq.${enquiry.phone}` : null,
-      ]
-        .filter(Boolean)
-        .join(",") || "id.is.null",
-    );
+  const [photoUrls, { data: possibleMatches }] = await Promise.all([
+    signedPhotoUrls(
+      "enquiry-photos",
+      (photos ?? []).map((photo) => photo.storage_path),
+    ),
+    // Offer to reuse an existing customer rather than creating a duplicate
+    // (spec E-16). Matched on email or phone — the two things people give.
+    supabase
+      .from("clients")
+      .select("id, full_name, email, phone")
+      .is("deleted_at", null)
+      .or(
+        [
+          enquiry.email ? `email.eq.${enquiry.email}` : null,
+          enquiry.phone ? `phone.eq.${enquiry.phone}` : null,
+        ]
+          .filter(Boolean)
+          .join(",") || "id.is.null",
+      ),
+  ]);
 
   const address = [enquiry.address_line1, enquiry.address_line2, enquiry.city, enquiry.postcode]
     .filter(Boolean)

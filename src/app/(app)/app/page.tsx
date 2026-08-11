@@ -29,6 +29,7 @@ import {
   formatRelative,
   formatShortDate,
   formatTime,
+  isPast,
   londonDateOf,
   todayInLondon,
 } from "@/lib/dates";
@@ -50,22 +51,28 @@ export default async function OwnerDashboard() {
   const user = await getSessionUser();
   const supabase = await createClient();
 
-  // Cheap, idempotent housekeeping: flips invoices past their due date to
-  // overdue and expires stale quotes. Running it on dashboard load means the
-  // figures below are true without needing a scheduled job.
-  await supabase.rpc("mark_overdue_invoices");
-
   const today = todayInLondon();
   const dayStart = `${today}T00:00:00`;
   const dayEnd = `${today}T23:59:59`;
 
+  // `mark_overdue_invoices` is housekeeping — it flips past-due invoices to
+  // `overdue` and expires stale quotes. It used to be awaited on its own line
+  // above, which put a WRITE on the critical path of the busiest read in the
+  // app and delayed first paint by a full round trip on every single load.
+  //
+  // It now runs concurrently with the reads. The reads may therefore observe
+  // the pre-update status, which is why `overdueCount` below is derived from
+  // `due_date` rather than from the stored status — the figure on screen is
+  // correct immediately, and the write only has to catch up eventually.
   const [
+    ,
     { data: todayJobs },
     { data: newEnquiries },
     { data: openQuotes },
     { data: unpaidInvoices },
     { data: activeJobs },
   ] = await Promise.all([
+    supabase.rpc("mark_overdue_invoices"),
     supabase
       .from("jobs")
       .select(
@@ -162,8 +169,10 @@ export default async function OwnerDashboard() {
     0,
   );
 
+  // Derived from the due date, not the stored status, so it stays correct even
+  // on the load where the housekeeping write has not landed yet.
   const overdueCount = (unpaidInvoices ?? []).filter(
-    (invoice) => invoice.status === "overdue",
+    (invoice) => invoice.status === "overdue" || isPast(invoice.due_date),
   ).length;
 
   const firstName = user?.fullName?.split(" ")[0];

@@ -34,18 +34,21 @@ export default async function QuotesPage() {
   const supabase = await createClient();
 
   // Expires anything past its valid_until, so nothing here reads as live when
-  // it has quietly lapsed.
-  await supabase.rpc("mark_overdue_invoices");
-
-  const { data: quotes } = await supabase
-    .from("quotes")
-    .select(
-      `id, reference, status, total_pence, valid_until, sent_at, created_at, job_id,
-       client:clients(id, full_name),
-       job:jobs(id, title)`,
-    )
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+  // it has quietly lapsed. Run alongside the read, not before it — the render
+  // below already treats a lapsed valid_until as expired via `isPast`, so the
+  // screen is correct even on the load where this write has not landed.
+  const [, { data: quotes }] = await Promise.all([
+    supabase.rpc("mark_overdue_invoices"),
+    supabase
+      .from("quotes")
+      .select(
+        `id, reference, status, total_pence, valid_until, sent_at, created_at, job_id,
+         client:clients(id, full_name),
+         job:jobs(id, title)`,
+      )
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const all = quotes ?? [];
   const closed = all.filter((quote) => ["declined", "expired"].includes(quote.status));

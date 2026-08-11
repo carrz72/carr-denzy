@@ -23,15 +23,29 @@ export function SiteHeader() {
 
   // Route change closes the menu. Without this, tapping a link on mobile
   // navigates but leaves the overlay covering the page you just asked for.
+  //
+  // This alone is NOT enough: tapping the link for the page you are already on
+  // does not change `pathname`, so the effect never fires and the menu stays
+  // open with the page behind it still scroll-locked — which reads as "the
+  // menu is broken". Every link therefore also closes the menu on click; this
+  // effect remains as the backstop for browser back/forward.
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
 
   // While the overlay is open the page behind it must not scroll.
+  //
+  // The previous value is captured and restored rather than being blanked,
+  // because this header is not the only thing that touches body overflow — a
+  // blanket reset here would silently unlock a dialog's scroll lock.
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
+    if (!menuOpen) return;
+
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previous;
     };
   }, [menuOpen]);
 
@@ -177,6 +191,9 @@ export function SiteHeader() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                    // Closing here, not only in the pathname effect, is what
+                    // makes tapping the current page's own link work.
+                    onClick={() => setMenuOpen(false)}
                     aria-current={isActive(link.href) ? "page" : undefined}
                     className={cn(
                       "flex min-h-14 items-center justify-between border-b border-line/70 text-lg font-medium",
@@ -201,6 +218,7 @@ export function SiteHeader() {
             */}
             <Link
               href="/sign-in"
+              onClick={() => setMenuOpen(false)}
               className={cn(buttonClasses({ variant: "secondary", fullWidth: true }), "mt-5")}
             >
               <SignInIcon size={19} className="text-accent" aria-hidden="true" />
@@ -209,6 +227,9 @@ export function SiteHeader() {
 
             <a
               href={business.phoneHref}
+              // Dialling leaves the page; without this the menu is still open
+              // and the body still locked when they come back from the call.
+              onClick={() => setMenuOpen(false)}
               className={cn(buttonClasses({ variant: "secondary", fullWidth: true }), "mt-2.5")}
             >
               <PhoneIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
