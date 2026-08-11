@@ -63,12 +63,37 @@ export function BeforeAfter({
         ref={frameRef}
         className={cn(
           "relative overflow-hidden rounded-xl border border-line bg-surface-sunken shadow-subtle",
-          "aspect-[4/3] touch-none select-none",
+          // `touch-pan-y`, NOT `touch-none`.
+          //
+          // Both stop the browser claiming a HORIZONTAL swipe and cancelling the
+          // drag, which is the bug this component had. But `touch-none` also
+          // surrenders vertical scrolling, and on a phone these frames are full
+          // width and 4:3 — a finger landing on one to scroll the page would
+          // find the page frozen. `pan-y` gives vertical panning back to the
+          // browser and keeps horizontal movement for us, which is exactly the
+          // split this control wants.
+          //
+          // It only applies to the element actually hit, which is why the range
+          // input below must stay pointer-inert: otherwise IT is the hit target
+          // and this declaration does nothing on touch.
+          "aspect-[4/3] cursor-ew-resize touch-pan-y select-none",
         )}
         onPointerDown={(event) => {
           // Capture on the frame so a fast drag that leaves the element still
           // tracks, instead of stopping dead at the edge.
-          event.currentTarget.setPointerCapture(event.pointerId);
+          //
+          // Wrapped because setPointerCapture throws NotFoundError if the
+          // pointer is no longer active — a real possibility when a touch ends
+          // in the same tick it began. An exception here would abort the
+          // handler before `setDragging(true)` and the drag would die with no
+          // error anyone would ever see. Capture is an enhancement; losing it
+          // costs tracking past the edge, not the drag itself.
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // Carry on without capture.
+          }
+
           setDragging(true);
           setFromClientX(event.clientX);
         }}
@@ -77,10 +102,20 @@ export function BeforeAfter({
           setFromClientX(event.clientX);
         }}
         onPointerUp={(event) => {
-          event.currentTarget.releasePointerCapture(event.pointerId);
+          // Releasing a capture that was never taken throws. That happens on a
+          // pointerup with no matching pointerdown — a touch that began outside
+          // the frame and ended inside it.
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
           setDragging(false);
         }}
-        onPointerCancel={() => setDragging(false)}
+        onPointerCancel={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          setDragging(false);
+        }}
         style={{ ["--wipe" as string]: `${position}%` }}
       >
         {/* Base layer: the finished job. */}
@@ -135,9 +170,20 @@ export function BeforeAfter({
         </div>
 
         {/*
-          The accessible control. Invisible but not `hidden` — it is the real
-          input, sized to the whole frame so keyboard focus lands somewhere
-          sensible and a screen reader announces a slider with a percentage.
+          The accessible control — KEYBOARD AND SCREEN READER ONLY.
+
+          It is deliberately `pointer-events-none`. It used to sit on top of the
+          frame at full size and take every pointer, which broke dragging on
+          touch in two ways at once: the frame's `touch-none` stopped applying
+          (touch-action is read from the element actually hit, and that was this
+          input), so the browser treated a horizontal swipe as a page scroll and
+          fired `pointercancel` mid-drag; and a native range on touch only drags
+          from its thumb, which here is `opacity-0`. On a mouse the two code
+          paths happened to agree, so it looked fine on a desktop.
+
+          Pointer handling now lives solely on the frame, which is what the
+          Pointer Events approach was for. This input keeps everything else: Tab
+          focus, arrow keys, Home/End, and an announced percentage.
         */}
         <label htmlFor={labelId} className="sr-only">
           {caption} — drag to compare before and after
@@ -153,7 +199,8 @@ export function BeforeAfter({
           onChange={(event) => setPosition(Number(event.target.value))}
           aria-valuetext={`${Math.round(position)}% of the finished job showing`}
           className={cn(
-            "absolute inset-0 z-20 h-full w-full cursor-ew-resize appearance-none bg-transparent",
+            "pointer-events-none absolute inset-0 z-20 h-full w-full appearance-none bg-transparent",
+            // Focus still has to be visible even though the control is invisible.
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             // The native thumb is replaced by the styled handle above.
             "[&::-webkit-slider-thumb]:h-11 [&::-webkit-slider-thumb]:w-11",

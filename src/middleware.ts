@@ -10,23 +10,58 @@ import type { Database } from "@/types/database";
  *   2. Routes people to the half of the app that belongs to them. This is
  *      navigation convenience, NOT authorisation — Row Level Security is the
  *      real gate, and it holds even if this file is bypassed entirely.
- *   3. Sets a per-request Content-Security-Policy nonce that Next.js applies
- *      to its own inline hydration scripts.
+ *   3. Sets the Content-Security-Policy.
  */
 
 const OWNER_PREFIX = "/app";
 const PORTAL_PREFIX = "/portal";
 const SIGN_IN_PATH = "/sign-in";
 
-function buildCsp(nonce: string, supabaseOrigin: string, isDev: boolean) {
+/**
+ * Content-Security-Policy.
+ *
+ * This used to be nonce-based: `script-src 'self' 'nonce-…' 'strict-dynamic'`.
+ * It shipped a serious bug, and the reasoning is recorded here so nobody
+ * reinstates it.
+ *
+ * A nonce has to be unique per request. Eight pages on this site — the home
+ * page, services, work, about, contact, privacy, terms and the 404 — are
+ * prerendered to HTML at BUILD time, which is exactly once. Their script tags
+ * therefore carry no nonce, and Next has no opportunity to add one.
+ *
+ * `'strict-dynamic'` makes matters absolute rather than partial: when a browser
+ * sees it, it IGNORES `'self'` and every other host-source, and executes only
+ * scripts carrying the matching nonce. The result was that every one of those
+ * prerendered pages ran no JavaScript at all in production — 37 un-nonced
+ * inline scripts and every chunk, all blocked. The pages still looked correct,
+ * because they are server-rendered, so the failure was invisible until someone
+ * pressed something. The mobile menu was the thing that gave it away, and it
+ * looked intermittent purely because signing out drops you onto `/`.
+ *
+ * Nonces require dynamic rendering. Forcing all eight pages dynamic to keep the
+ * nonce would trade a real, measurable performance loss on the pages that
+ * matter most to a customer for a theoretical hardening — so the nonce goes and
+ * the static optimisation stays.
+ *
+ * What `'unsafe-inline'` costs here is small and worth stating plainly. It
+ * matters when an attacker can get markup into the page. In this application
+ * React escapes every interpolated value; the single `dangerouslySetInnerHTML`
+ * is the LocalBusiness JSON-LD, built from a hard-coded object in
+ * `src/lib/site.ts` that no user input reaches; and there is no `eval` and no
+ * `innerHTML` assignment anywhere. CSP is defence-in-depth here, not the
+ * primary control against XSS — that is React's escaping and the server-side
+ * validation in `src/lib/validation.ts`.
+ *
+ * Every other directive below still does real work and stays strict.
+ */
+function buildCsp(supabaseOrigin: string, isDev: boolean) {
   const directives = [
     `default-src 'self'`,
-    // 'strict-dynamic' lets the nonced Next bootstrap load its own chunks.
-    // Dev needs 'unsafe-eval' for React Refresh; production does not get it.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ""}`,
-    // Next injects critical CSS as inline <style>, which cannot carry a nonce
-    // reliably across streaming boundaries. Styles are not a script-execution
-    // vector here, and no user content reaches a style attribute.
+    // Dev additionally needs 'unsafe-eval' for React Refresh.
+    `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""}`,
+    // Next injects critical CSS as inline <style>. Styles are not a
+    // script-execution vector here, and no user content reaches a style
+    // attribute.
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' blob: data: ${supabaseOrigin}`,
     `font-src 'self' data:`,
@@ -43,7 +78,6 @@ function buildCsp(nonce: string, supabaseOrigin: string, isDev: boolean) {
 
 export async function middleware(request: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
 
   let supabaseOrigin = "";
   try {
@@ -52,11 +86,12 @@ export async function middleware(request: NextRequest) {
     supabaseOrigin = "";
   }
 
-  const csp = buildCsp(nonce, supabaseOrigin, isDev);
+  const csp = buildCsp(supabaseOrigin, isDev);
 
+  // The CSP is deliberately NOT set on the forwarded request headers. Next reads
+  // a request-side `content-security-policy` as a signal to inject nonces, and
+  // doing that here is what forced the broken pairing above.
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("content-security-policy", csp);
 
   let response = NextResponse.next({ request: { headers: requestHeaders } });
 
@@ -119,7 +154,6 @@ export async function middleware(request: NextRequest) {
   }
 
   response.headers.set("content-security-policy", csp);
-  response.headers.set("x-nonce", nonce);
 
   return response;
 }
