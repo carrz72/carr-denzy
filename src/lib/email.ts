@@ -1,0 +1,391 @@
+import "server-only";
+
+import { Resend } from "resend";
+
+/**
+ * Email.
+ *
+ * Two rules hold everywhere this is used:
+ *
+ *  1. A failed send NEVER fails the surrounding transaction. If a quote saves
+ *     but the email bounces, the owner gets a copyable link instead of losing
+ *     the quote (spec E-15). Every function here returns a result rather than
+ *     throwing.
+ *  2. With no RESEND_API_KEY set, mail is logged to the terminal instead of
+ *     sent, so local development works out of the box and nobody has to wire
+ *     up a mail provider before they can see the app run.
+ */
+
+export interface SendResult {
+  sent: boolean;
+  error?: string;
+}
+
+const from = process.env.EMAIL_FROM ?? "Carr Denzy <onboarding@resend.dev>";
+
+function siteUrl(): string {
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+}
+
+async function send(
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+  attachments?: EmailAttachment[],
+): Promise<SendResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    console.info(
+      [
+        "",
+        "──────────── email (not sent: RESEND_API_KEY is unset) ────────────",
+        `To:      ${to}`,
+        `Subject: ${subject}`,
+        attachments?.length ? `Attachments: ${attachments.map((a) => a.filename).join(", ")}` : "",
+        "",
+        text,
+        "───────────────────────────────────────────────────────────────────",
+        "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    return { sent: false, error: "RESEND_API_KEY is not configured" };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    // Resend's API takes attachment content as base64 over JSON — a raw
+    // Buffer serialises to `{type:"Buffer",data:[...]}` instead, which is
+    // silently useless, so the attachment never lands.
+    const encodedAttachments = attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content.toString("base64"),
+    }));
+    const { error } = await resend.emails.send({
+      from,
+      to,
+      subject,
+      html,
+      text,
+      attachments: encodedAttachments,
+    });
+
+    if (error) {
+      console.error("[email] send failed", error);
+      return { sent: false, error: error.message };
+    }
+
+    return { sent: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown email error";
+    console.error("[email] send threw", error);
+    return { sent: false, error: message };
+  }
+}
+
+/** Escapes user-supplied text before it goes anywhere near an HTML email. */
+function esc(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function layout(heading: string, bodyHtml: string): string {
+  return `<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:24px;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:24px 28px;border-bottom:3px solid #be4a33;">
+          <span style="font-size:15px;font-weight:700;letter-spacing:-0.01em;">Carr Denzy Plumbing &amp; Gas</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:28px;">
+          <h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;font-weight:700;">${esc(heading)}</h1>
+          ${bodyHtml}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:18px 28px;background:#f9f7f4;font-size:12px;color:#6b6055;">
+          Carr Denzy Plumbing &amp; Gas · 07934 633583
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+function button(href: string, label: string): string {
+  return `<p style="margin:24px 0;">
+    <a href="${href}" style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:8px;font-weight:600;font-size:15px;">${esc(label)}</a>
+  </p>`;
+}
+
+// ---------------------------------------------------------------------------
+// Enquiries
+// ---------------------------------------------------------------------------
+
+export interface EnquiryEmailData {
+  reference: string;
+  fullName: string;
+  description: string;
+  urgency: "emergency" | "soon" | "flexible";
+  phone?: string | null;
+  email?: string | null;
+  postcode?: string | null;
+  enquiryId: string;
+}
+
+const urgencyWords: Record<EnquiryEmailData["urgency"], string> = {
+  emergency: "Emergency — needs attention today",
+  soon: "Soon — within the next few days",
+  flexible: "Flexible — no particular rush",
+};
+
+export async function sendOwnerEnquiryNotification(data: EnquiryEmailData): Promise<SendResult> {
+  const to = process.env.OWNER_NOTIFICATION_EMAIL;
+  if (!to) return { sent: false, error: "OWNER_NOTIFICATION_EMAIL is not configured" };
+
+  const link = `${siteUrl()}/app/enquiries/${data.enquiryId}`;
+
+  const contactLines = [
+    data.phone ? `Phone: ${data.phone}` : null,
+    data.email ? `Email: ${data.email}` : null,
+    data.postcode ? `Postcode: ${data.postcode}` : null,
+  ].filter(Boolean) as string[];
+
+  const html = layout(
+    `New enquiry ${data.reference}`,
+    `<p style="margin:0 0 8px;font-size:15px;"><strong>${esc(data.fullName)}</strong></p>
+     <p style="margin:0 0 16px;font-size:14px;color:#6b6055;">${esc(urgencyWords[data.urgency])}</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;white-space:pre-wrap;">${esc(data.description)}</p>
+     ${contactLines.map((line) => `<p style="margin:0 0 4px;font-size:14px;">${esc(line)}</p>`).join("")}
+     ${button(link, "Open this enquiry")}`,
+  );
+
+  const text = [
+    `New enquiry ${data.reference}`,
+    "",
+    data.fullName,
+    urgencyWords[data.urgency],
+    "",
+    data.description,
+    "",
+    ...contactLines,
+    "",
+    link,
+  ].join("\n");
+
+  return send(to, `New enquiry ${data.reference} — ${data.fullName}`, html, text);
+}
+
+export async function sendEnquiryConfirmation(
+  to: string,
+  reference: string,
+  fullName: string,
+  urgency: EnquiryEmailData["urgency"],
+): Promise<SendResult> {
+  const when =
+    urgency === "emergency"
+      ? "We treat emergencies as a priority. If you have not heard from us within the hour, please call 07934 633583."
+      : "We usually reply the same working day, and always within one working day.";
+
+  const html = layout(
+    "We have your request",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(fullName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Thanks for getting in touch. Your reference is <strong>${esc(reference)}</strong> — quote it if you call us.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(when)}</p>`,
+  );
+
+  const text = [
+    `Hello ${fullName},`,
+    "",
+    `Thanks for getting in touch. Your reference is ${reference} — quote it if you call us.`,
+    "",
+    when,
+    "",
+    "Carr Denzy Plumbing & Gas · 07934 633583",
+  ].join("\n");
+
+  return send(to, `We have your request — ${reference}`, html, text);
+}
+
+// ---------------------------------------------------------------------------
+// Quotes and invoices
+// ---------------------------------------------------------------------------
+
+/**
+ * Invites a customer to see their jobs online.
+ *
+ * Sent through Resend rather than Supabase's own mailer so it looks like the
+ * business rather than a login system — this lands with somebody who rang up
+ * about a boiler and has never heard of any of this.
+ *
+ * The link is a one-time sign-in link. Deliberately not described as a
+ * "password" or an "account to set up", because there is neither.
+ */
+export async function sendPortalInvite(
+  to: string,
+  clientName: string,
+  signInLink: string,
+): Promise<SendResult> {
+  const firstName = clientName.split(" ")[0] ?? clientName;
+
+  const html = layout(
+    "See your jobs online",
+    `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Hello ${esc(firstName)},</p>
+     <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">
+       We have set up a page where you can see the work we are doing for you — what is
+       booked, any prices we have sent you, and your invoices.
+     </p>
+     ${button(signInLink, "Open my jobs")}
+     <p style="margin:0;font-size:14px;line-height:1.6;color:#6b6055;">
+       There is no password to remember. This link signs you in, and afterwards you can
+       always get back in from the website. The link works once and lasts an hour — if it
+       has expired, use <a href="${siteUrl()}/sign-in" style="color:#be4a33;">Sign in</a>
+       on the website and we will send you a fresh one.
+     </p>`,
+  );
+
+  const text = [
+    `Hello ${firstName},`,
+    "",
+    "We have set up a page where you can see the work we are doing for you — what is booked, any prices we have sent you, and your invoices.",
+    "",
+    signInLink,
+    "",
+    "There is no password. The link works once and lasts an hour.",
+    "",
+    "Carr Denzy Plumbing & Gas · 07934 633583",
+  ].join("\n");
+
+  return send(to, "See your jobs with Carr Denzy online", html, text);
+}
+
+export async function sendQuoteToClient(
+  to: string,
+  clientName: string,
+  reference: string,
+  totalFormatted: string,
+  quoteId: string,
+  validUntil: string | null,
+): Promise<SendResult> {
+  const link = `${siteUrl()}/portal/quotes/${quoteId}`;
+
+  const validLine = validUntil ? `This quote is open until ${validUntil}.` : "";
+
+  const html = layout(
+    `Your quote ${reference}`,
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Your quote is ready. The total is <strong>${esc(totalFormatted)}</strong>.</p>
+     ${validLine ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(validLine)}</p>` : ""}
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">You can see the full breakdown and accept or decline it here:</p>
+     ${button(link, "View your quote")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `Your quote ${reference} is ready. The total is ${totalFormatted}.`,
+    validLine,
+    "",
+    `View it here: ${link}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return send(to, `Your quote ${reference} — ${totalFormatted}`, html, text);
+}
+
+export async function sendInvoiceToClient(
+  to: string,
+  clientName: string,
+  reference: string,
+  totalFormatted: string,
+  invoiceId: string,
+  dueDate: string | null,
+  pdf?: Buffer,
+): Promise<SendResult> {
+  // Not the portal link: that requires signing in, which locks out anyone in
+  // a payments department who isn't the named account holder. This page is a
+  // capability link — no login, gated only by the invoice's own unguessable
+  // id — so whoever the customer forwards the email to can still open it.
+  const link = `${siteUrl()}/invoices/view/${invoiceId}`;
+
+  const dueLine = dueDate ? `Payment is due by ${dueDate}.` : "";
+  const attachmentLine = pdf
+    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">A PDF copy is attached to this email.</p>`
+    : "";
+
+  const html = layout(
+    `Invoice ${reference}`,
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Your invoice for <strong>${esc(totalFormatted)}</strong> is attached to your account.</p>
+     ${dueLine ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(dueLine)}</p>` : ""}
+     ${attachmentLine}
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Bank details and a printable copy are on the invoice page. Please use <strong>${esc(reference)}</strong> as your payment reference.</p>
+     ${button(link, "View your invoice")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `Invoice ${reference} for ${totalFormatted}.`,
+    dueLine,
+    pdf ? "A PDF copy is attached to this email." : "",
+    "",
+    `Please use ${reference} as your payment reference.`,
+    "",
+    `View it here: ${link}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const attachments = pdf ? [{ filename: `Invoice-${reference}.pdf`, content: pdf }] : undefined;
+
+  return send(to, `Invoice ${reference} — ${totalFormatted}`, html, text, attachments);
+}
+
+export async function sendQuoteResponseToOwner(
+  reference: string,
+  clientName: string,
+  accepted: boolean,
+  reason: string | null,
+  jobId: string,
+): Promise<SendResult> {
+  const to = process.env.OWNER_NOTIFICATION_EMAIL;
+  if (!to) return { sent: false, error: "OWNER_NOTIFICATION_EMAIL is not configured" };
+
+  const link = `${siteUrl()}/app/jobs/${jobId}`;
+  const verb = accepted ? "accepted" : "declined";
+
+  const html = layout(
+    `${esc(clientName)} ${verb} quote ${esc(reference)}`,
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(clientName)} has ${verb} quote ${esc(reference)}.</p>
+     ${reason ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Reason given: ${esc(reason)}</p>` : ""}
+     ${button(link, "Open the job")}`,
+  );
+
+  const text = [
+    `${clientName} has ${verb} quote ${reference}.`,
+    reason ? `Reason given: ${reason}` : "",
+    "",
+    link,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return send(to, `Quote ${reference} ${verb}`, html, text);
+}

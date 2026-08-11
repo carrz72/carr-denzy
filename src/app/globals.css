@@ -1,0 +1,482 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   Carr Denzy — design tokens
+
+   Decisions made deliberately, and the reasoning, so the next person editing
+   this does not undo them by accident:
+
+   * Warm off-white base, not white and never pure #000. Pure black on pure
+     white is the harshest possible contrast to read all day, and the old site
+     used #000000 throughout.
+   * ONE accent. The original brand red was #fc2020 — hsl(0, 97%, 56%) — which
+     is close to the most saturated red a screen can produce. It is kept in
+     spirit but taken to hsl(8, 59%, 47%): still unmistakably the same brand,
+     no longer shouting, and legible as text at 4.5:1 on the base.
+   * Every grey is warm-tinted from the same hue family. Mixing warm and cool
+     greys is what makes an interface look assembled rather than designed.
+   * Light only, declared. `color-scheme: light` stops mobile browsers
+     auto-inverting the app into an unreadable half-dark state, which matters
+     more than a dark theme for a user who will not go looking for a setting.
+   =========================================================================== */
+
+@theme {
+  /* --- Surfaces --------------------------------------------------------- */
+  --color-surface: #faf7f2;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f1ece4;
+  --color-surface-inverse: #211d18;
+
+  /* --- Lines ------------------------------------------------------------ */
+  --color-line: #e6ded2;
+  --color-line-strong: #cfc3b2;
+
+  /* --- Text ------------------------------------------------------------- */
+  --color-ink: #1a1714;
+  --color-ink-muted: #6b6055;
+  --color-ink-subtle: #948676;
+  --color-ink-inverse: #faf7f2;
+
+  /* --- Accent (single, desaturated brick) ------------------------------- */
+  --color-accent: #be4a33;
+  --color-accent-hover: #a63e29;
+  --color-accent-press: #8f3421;
+  --color-accent-soft: #f7e9e5;
+  --color-accent-line: #e8cfc7;
+  --color-accent-ink: #7a2a1b;
+
+  /* --- Semantic --------------------------------------------------------- */
+  --color-positive: #3f6b47;
+  --color-positive-soft: #e8efe6;
+  --color-positive-ink: #2b4c31;
+
+  --color-caution: #8a6415;
+  --color-caution-soft: #f8efdc;
+  --color-caution-ink: #654a0f;
+
+  --color-critical: #8f2e20;
+  --color-critical-soft: #f9e6e2;
+
+  --color-info: #3a5a6b;
+  --color-info-soft: #e5edf1;
+  --color-info-ink: #2a4351;
+
+  /* --- Type ------------------------------------------------------------- */
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Display sizes carry negative tracking; small labels carry positive. */
+  --text-display: 4rem;
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 700;
+
+  --text-title: 2.5rem;
+  --text-title--line-height: 1.08;
+  --text-title--letter-spacing: -0.028em;
+  --text-title--font-weight: 700;
+
+  --text-heading: 1.625rem;
+  --text-heading--line-height: 1.18;
+  --text-heading--letter-spacing: -0.02em;
+  --text-heading--font-weight: 650;
+
+  --text-subheading: 1.1875rem;
+  --text-subheading--line-height: 1.32;
+  --text-subheading--letter-spacing: -0.012em;
+  --text-subheading--font-weight: 600;
+
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.07em;
+  --text-label--font-weight: 600;
+
+  /* --- Radii: tighter inside, softer outside --------------------------- */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+
+  /* --- Shadows: warm-tinted, single light source from above ------------ */
+  --shadow-subtle: 0 1px 2px rgba(58, 43, 28, 0.05);
+  --shadow-raised:
+    0 1px 2px rgba(58, 43, 28, 0.05), 0 4px 12px -4px rgba(58, 43, 28, 0.09);
+  --shadow-float:
+    0 2px 4px rgba(58, 43, 28, 0.05), 0 14px 32px -12px rgba(58, 43, 28, 0.16);
+  --shadow-lifted:
+    0 4px 8px rgba(58, 43, 28, 0.06), 0 28px 56px -20px rgba(58, 43, 28, 0.24);
+
+  /* --- Layering: a named scale, so nobody reaches for z-index: 9999 ---- */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-header: 20;
+  --z-overlay: 30;
+  --z-panel: 40;
+  --z-toast: 50;
+
+  /* --- Motion ----------------------------------------------------------
+     Two curves, no overshoot. `out-soft` is an ease-out-quint for entrances;
+     `standard` is the short curve for hover and press. Bouncy easing was
+     tried and dropped: a physical overshoot on an invoice button reads as a
+     toy, and this app is used by someone billing for their week's work. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===========================================================================
+   Base
+   =========================================================================== */
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --header-height: 4.5rem;
+  }
+
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    /* Anchored sections must not hide under the sticky header. */
+    scroll-padding-top: calc(var(--header-height) + 1.5rem);
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Room for the iPhone home indicator in standalone mode. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  p, li {
+    text-wrap: pretty;
+  }
+
+  /* Figures line up in columns and stop shifting as they change. */
+  .tabular,
+  table td,
+  table th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One focus treatment for the whole application. Visible, high contrast,
+     and never removed — it is the only way a keyboard user knows where they
+     are (spec NFR-7). */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Mouse users do not need it; keyboard users always do. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+    color: var(--color-accent-ink);
+  }
+
+  /* Native controls inherit the warm palette rather than the OS blue. */
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+    accent-color: var(--color-accent);
+  }
+
+  /* iOS zooms the page when a field under 16px receives focus. */
+  input,
+  textarea,
+  select {
+    font-size: max(1rem, 16px);
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Honour the OS setting rather than insisting on our animation
+     (spec NFR-10). */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ===========================================================================
+   Utilities
+   =========================================================================== */
+
+@layer utilities {
+  /* Every page is constrained; nothing stretches edge to edge on a 27" screen. */
+  .container-page {
+    width: 100%;
+    max-width: 78rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .container-page {
+      padding-inline: 2rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .container-page {
+      padding-inline: 2.5rem;
+    }
+  }
+
+  .container-prose {
+    width: 100%;
+    /* ~65 characters. Longer lines are measurably harder to track back from. */
+    max-width: 38rem;
+  }
+
+  /* Optical, not mathematical: a section needs slightly more room beneath it
+     than above to look evenly spaced. */
+  .section-y {
+    padding-block: 4.5rem 5rem;
+  }
+
+  @media (min-width: 768px) {
+    .section-y {
+      padding-block: 7rem 7.75rem;
+    }
+  }
+
+  /* Breaks the digital flatness of large solid areas. Fixed, so it does not
+     swim as the page scrolls, and inert to the pointer. */
+  .grain::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-base);
+    pointer-events: none;
+    opacity: 0.028;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Every interactive target clears 44px (spec NFR-5), including the ones that
+     look smaller than they are. */
+  .tap-target {
+    position: relative;
+  }
+
+  .tap-target::before {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    translate: -50% -50%;
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -100%;
+    z-index: var(--z-toast);
+    background: var(--color-ink);
+    color: var(--color-ink-inverse);
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    transition: top 180ms var(--ease-out-soft);
+  }
+
+  .skip-link:focus {
+    top: 1rem;
+  }
+
+  /* Wide content scrolls inside its own box; the page body never scrolls
+     sideways. */
+  .scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hide-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ===========================================================================
+   Motion
+   =========================================================================== */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -180% 0;
+  }
+  to {
+    background-position: 180% 0;
+  }
+}
+
+@keyframes slide-up-panel {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer utilities {
+  /* Transform and opacity only — both run on the compositor. Animating top,
+     left, width or height forces layout on every frame. */
+  .animate-rise {
+    animation: rise-in 520ms var(--ease-out-soft) both;
+  }
+
+  .animate-fade {
+    animation: fade-in 320ms var(--ease-out-soft) both;
+  }
+
+  .animate-panel {
+    animation: slide-up-panel 260ms var(--ease-out-soft) both;
+  }
+
+  /* Staggered entry — elements cascade rather than all landing at once. */
+  .stagger > * {
+    animation: rise-in 520ms var(--ease-out-soft) both;
+  }
+
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 70ms; }
+  .stagger > *:nth-child(3) { animation-delay: 140ms; }
+  .stagger > *:nth-child(4) { animation-delay: 210ms; }
+  .stagger > *:nth-child(5) { animation-delay: 280ms; }
+  .stagger > *:nth-child(6) { animation-delay: 350ms; }
+  .stagger > *:nth-child(7) { animation-delay: 420ms; }
+  .stagger > *:nth-child(8) { animation-delay: 490ms; }
+
+  .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-surface-sunken) 25%,
+      #f7f3ec 50%,
+      var(--color-surface-sunken) 75%
+    );
+    background-size: 220% 100%;
+    animation: shimmer 1500ms linear infinite;
+  }
+}
+
+/* ===========================================================================
+   Print — invoices and quotes are printed and posted, so this is a real
+   surface, not an afterthought. Browser "Save as PDF" is what produces the
+   PDF the client downloads (spec FR-26).
+   =========================================================================== */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000;
+    font-size: 11pt;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Underlining every link and printing its href is noise on an invoice. */
+  a {
+    text-decoration: none !important;
+    color: #000000 !important;
+  }
+
+  /* A table row split across two pages is unreadable on a paper invoice. */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+}
+
+.print-only {
+  display: none;
+}

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>No signal · Carr Denzy</title>
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <!--
+      Deliberately a plain, self-contained page with no build step and no font
+      request: it is served by the service worker at the exact moment the
+      network is unavailable, so anything it needs to fetch would defeat it.
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: #faf7f2;
+        color: #1a1714;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        max-width: 30rem;
+        text-align: center;
+      }
+
+      .mark {
+        display: block;
+        width: 4rem;
+        height: 4rem;
+        margin: 0 auto 1.75rem;
+        border-radius: 0.875rem;
+      }
+
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.625rem;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+
+      p {
+        margin: 0 0 1rem;
+        color: #6b6055;
+      }
+
+      ul {
+        margin: 0 0 1.75rem;
+        padding: 0;
+        list-style: none;
+        text-align: left;
+        color: #6b6055;
+      }
+
+      li {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      li::before {
+        content: "";
+        position: absolute;
+        left: 0.375rem;
+        top: 0.75rem;
+        width: 0.375rem;
+        height: 0.375rem;
+        border-radius: 50%;
+        background: #be4a33;
+      }
+
+      button {
+        min-height: 3.25rem;
+        padding: 0 1.75rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: #be4a33;
+        color: #fff;
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #a63e29;
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .call {
+        display: block;
+        margin-top: 1.5rem;
+        color: #6b6055;
+        font-size: 0.9375rem;
+      }
+
+      .call a {
+        color: #be4a33;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <!-- The icon file itself, not an inline copy: /icons/icon-192.png is
+           precached by the service worker, so it is already on the device at
+           the exact moment this page is needed. -->
+      <img class="mark" src="/icons/icon-192.png" width="64" height="64" alt="" />
+
+      <h1>You have no signal</h1>
+
+      <p>
+        This page needs the network and cannot reach it. Nothing you have typed has been
+        lost.
+      </p>
+
+      <ul>
+        <li>Notes you saved on a job are held on this phone and will send themselves the
+          moment you have a bar of signal.</li>
+        <li>Pages you have already opened will still work.</li>
+      </ul>
+
+      <button type="button" onclick="window.location.reload()">Try again</button>
+
+      <span class="call">
+        Urgent? Ring <a href="tel:+447934633583">07934 633583</a>.
+      </span>
+    </main>
+  </body>
+</html>
