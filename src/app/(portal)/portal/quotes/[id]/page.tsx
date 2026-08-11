@@ -61,7 +61,7 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:gap-8">
-        <Card className="print-avoid-break">
+        <Card className="min-w-0 print-avoid-break">
           {quote.intro_note ? (
             <p className="whitespace-pre-wrap leading-relaxed text-ink">{quote.intro_note}</p>
           ) : null}
@@ -94,7 +94,7 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
           ) : null}
         </Card>
 
-        <div className="no-print flex flex-col gap-6">
+        <div className="no-print flex min-w-0 flex-col gap-6">
           {open ? (
             <QuoteResponse quoteId={quote.id} totalLabel={formatPence(quote.total_pence)} />
           ) : null}

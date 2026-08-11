@@ -121,7 +121,7 @@ export default async function PublicInvoicePage({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:gap-8">
-        <Card className="print-avoid-break">
+        <Card className="min-w-0 print-avoid-break">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <BusinessBlock snapshot={snapshot} />
 
@@ -211,7 +211,7 @@ export default async function PublicInvoicePage({
           ) : null}
         </Card>
 
-        <div className="no-print flex flex-col gap-6">
+        <div className="no-print flex min-w-0 flex-col gap-6">
           {paid ? (
             <Card className="border-positive/25 bg-positive-soft">
               <h2 className="flex items-center gap-2 text-label uppercase text-positive-ink">
