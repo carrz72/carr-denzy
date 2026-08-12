@@ -8,6 +8,7 @@ import { QuoteStatusBadge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { DocumentLines, TotalsPanel } from "@/components/money-document";
 import { SendQuoteButton } from "@/components/owner/quote-actions";
+import { ShareLink } from "@/components/owner/share-link";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
 import { formatDate, formatDateTime, isPast } from "@/lib/dates";
@@ -113,6 +114,26 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                   totalLabel={formatPence(quote.total_pence)}
                 />
               </div>
+            </Card>
+          ) : null}
+
+          {/*
+            Sent, but no answer yet. This is where a phone-only customer is
+            handled: they have no email, so nothing was sent — the owner texts
+            them this link and they can accept it from their phone.
+          */}
+          {quote.status === "sent" ? (
+            <Card>
+              <ShareLink
+                path={`/quotes/view/${quote.id}`}
+                label="Send it to the customer"
+                shareTitle={`Quote ${quote.reference}`}
+                hint={
+                  quote.client?.email
+                    ? "Already emailed to them. Use this if they would rather have it by text, or if they cannot find the email."
+                    : "This customer has no email address on file, so nothing was sent automatically. Text them this link — they can accept it without signing in."
+                }
+              />
             </Card>
           ) : null}
 

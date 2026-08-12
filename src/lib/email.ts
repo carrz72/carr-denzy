@@ -294,18 +294,27 @@ export async function sendQuoteToClient(
   totalFormatted: string,
   quoteId: string,
   validUntil: string | null,
+  pdf?: Buffer,
 ): Promise<SendResult> {
-  const link = `${siteUrl()}/portal/quotes/${quoteId}`;
+  // Not the portal link. Most of this business's customers arrive by phone and
+  // have no login, so a portal link put a sign-in wall at exactly the moment
+  // they were about to agree to the work. This is a capability link — no
+  // account, gated only by the quote's own unguessable id — matching how
+  // invoices are already sent, and it survives being forwarded to a partner or
+  // a landlord who will never have an account here.
+  const link = `${siteUrl()}/quotes/view/${quoteId}`;
 
-  const validLine = validUntil ? `This quote is open until ${validUntil}.` : "";
+  const validLine = validUntil ? `This price is held until ${validUntil}.` : "";
 
   const html = layout(
     `Your quote ${reference}`,
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Your quote is ready. The total is <strong>${esc(totalFormatted)}</strong>.</p>
      ${validLine ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(validLine)}</p>` : ""}
-     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">You can see the full breakdown and accept or decline it here:</p>
-     ${button(link, "View your quote")}`,
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Tap below to see what it covers. You can accept or decline it right there — there is nothing to sign up for.</p>
+     ${button(link, "View and accept your quote")}
+     ${pdf ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#6b6055;">A copy is attached as a PDF if you would rather keep one or pass it on.</p>` : ""}
+     <p style="margin:0;font-size:14px;line-height:1.6;color:#6b6055;">This is a quote, not a bill. Nothing is payable until the work is done.</p>`,
   );
 
   const text = [
@@ -314,12 +323,17 @@ export async function sendQuoteToClient(
     `Your quote ${reference} is ready. The total is ${totalFormatted}.`,
     validLine,
     "",
-    `View it here: ${link}`,
+    "See it, and accept or decline it, here — no account needed:",
+    link,
+    "",
+    "This is a quote, not a bill. Nothing is payable until the work is done.",
   ]
     .filter(Boolean)
     .join("\n");
 
-  return send(to, `Your quote ${reference} — ${totalFormatted}`, html, text);
+  return send(to, `Your quote ${reference} — ${totalFormatted}`, html, text, [
+    ...(pdf ? [{ filename: `${reference}.pdf`, content: pdf }] : []),
+  ]);
 }
 
 export async function sendInvoiceToClient(

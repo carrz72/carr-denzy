@@ -20,7 +20,7 @@ import {
 } from "@/lib/validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendInvoiceToClient, sendPortalInvite, sendQuoteToClient } from "@/lib/email";
-import { renderInvoicePdf } from "@/lib/invoice-pdf";
+import { renderInvoicePdf, renderQuotePdf } from "@/lib/invoice-pdf";
 import { formatPence } from "@/lib/money";
 import { addDaysToToday, formatDate } from "@/lib/dates";
 
@@ -726,6 +726,14 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
   let warning: string | undefined;
 
   if (quote.client?.email) {
+    // Best-effort. A PDF that fails to render must not stop the quote being
+    // sent — the link in the email is the thing that actually wins the job,
+    // and the attachment is a convenience for people who forward it on.
+    const pdf = await buildQuotePdf(quoteId).catch((pdfError) => {
+      console.error("[quote] pdf render failed", pdfError);
+      return undefined;
+    });
+
     const sent = await sendQuoteToClient(
       quote.client.email,
       quote.client.full_name,
@@ -733,6 +741,7 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
       formatPence(quote.total_pence),
       quote.id,
       quote.valid_until ? formatDate(quote.valid_until) : null,
+      pdf,
     );
 
     // The quote is sent either way — the status is already updated. The owner
@@ -748,6 +757,63 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
   revalidatePath("/app", "layout");
 
   return { ok: true, warning };
+}
+
+/**
+ * Renders a quote as a PDF, using the same document as invoices.
+ *
+ * Reads the business details live from `settings` rather than from a snapshot,
+ * because unlike an invoice a quote is not a permanent financial record — it is
+ * an offer, and if the phone number changed between quoting and the customer
+ * opening the PDF, the newer one is the more useful of the two.
+ */
+async function buildQuotePdf(quoteId: string): Promise<Buffer | undefined> {
+  const supabase = await createClient();
+
+  const [{ data: quote }, { data: business }] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select(
+        `reference, sent_at, valid_until, subtotal_pence, tax_pence, total_pence, intro_note,
+         client:clients(full_name, company_name),
+         job:jobs(property:properties(address_line1, address_line2, city, postcode)),
+         items:quote_items(description, kind, quantity_milli, unit_price_pence, vat_rate_bp, sort_order)`,
+      )
+      .eq("id", quoteId)
+      .maybeSingle(),
+    supabase.from("settings").select("*").maybeSingle(),
+  ]);
+
+  if (!quote) return undefined;
+
+  const address = quote.job?.property;
+
+  return renderQuotePdf({
+    reference: quote.reference,
+    issueDate: quote.sent_at,
+    dueDate: quote.valid_until,
+    business: business as Record<string, unknown> | null,
+    customerName: quote.client?.full_name ?? "your customer",
+    customerCompany: quote.client?.company_name ?? null,
+    customerAddress: address
+      ? [address.address_line1, address.address_line2, address.city, address.postcode]
+          .filter(Boolean)
+          .join(", ")
+      : null,
+    items: [...(quote.items ?? [])].sort((a, b) => a.sort_order - b.sort_order),
+    subtotalPence: quote.subtotal_pence,
+    vatPence: quote.tax_pence,
+    cisDeductionPence: 0,
+    cisDeductionRateBp: business?.cis_deduction_rate_bp ?? 0,
+    totalPence: quote.total_pence,
+    vatRegistered: business?.vat_registered ?? false,
+    // CIS is deducted when an invoice is paid, never on a quote — the customer
+    // is being shown the price of the work, not a subcontractor settlement.
+    cisEnabled: false,
+    reverseCharge: false,
+    notes: quote.intro_note,
+    footerNote: null,
+  });
 }
 
 // ---------------------------------------------------------------------------

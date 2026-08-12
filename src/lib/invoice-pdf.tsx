@@ -24,8 +24,16 @@ export interface InvoicePdfItem {
 }
 
 export interface InvoicePdfData {
+  /**
+   * Which document this is. Quotes and invoices are the same object with a
+   * different word at the top, a different date label, and no bank details —
+   * so they share this renderer rather than drifting into two layouts that
+   * gradually stop looking like they came from the same business.
+   */
+  documentKind?: "invoice" | "quote";
   reference: string;
   issueDate: string | null;
+  /** Invoices: payment due. Quotes: the date the price is held until. */
   dueDate: string | null;
   business: Record<string, unknown> | null;
   customerName: string;
@@ -124,9 +132,12 @@ function text(source: Record<string, unknown> | null, key: string): string | nul
 }
 
 function InvoiceDocument(data: InvoicePdfData) {
+  const isQuote = data.documentKind === "quote";
   const showVat = data.vatRegistered && !data.reverseCharge;
   const showBreakdown = data.vatRegistered || data.cisEnabled;
   const outstanding = data.totalPence - data.paidPence;
+
+  const docLabel = isQuote ? "Quote" : "Invoice";
 
   const businessLines = [
     text(data.business, "address_line1"),
@@ -138,10 +149,13 @@ function InvoiceDocument(data: InvoicePdfData) {
   const accountName = text(data.business, "bank_account_name");
   const sortCode = text(data.business, "bank_sort_code");
   const accountNumber = text(data.business, "bank_account_number");
-  const showBankDetails = !data.settled && (accountName || sortCode || accountNumber);
+  // A quote is not a request for money, so it never carries bank details. The
+  // one thing a quote PDF must not do is look like something to pay.
+  const showBankDetails =
+    !isQuote && !data.settled && (accountName || sortCode || accountNumber);
 
   return (
-    <Document title={`Invoice ${data.reference}`}>
+    <Document title={`${docLabel} ${data.reference}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View>
@@ -169,24 +183,30 @@ function InvoiceDocument(data: InvoicePdfData) {
           </View>
 
           <View>
-            <Text style={styles.docTitle}>Invoice</Text>
+            <Text style={styles.docTitle}>{docLabel}</Text>
             <Text style={styles.reference}>{data.reference}</Text>
           </View>
         </View>
 
         <View style={styles.metaRow}>
           <View>
-            <Text style={styles.metaLabel}>Billed to</Text>
+            <Text style={styles.metaLabel}>{isQuote ? "Prepared for" : "Billed to"}</Text>
             <Text style={styles.metaValue}>{data.customerName}</Text>
             {data.customerCompany ? <Text>{data.customerCompany}</Text> : null}
             {data.customerAddress ? <Text style={styles.muted}>{data.customerAddress}</Text> : null}
           </View>
 
           <View>
-            <Text style={styles.metaLabel}>Invoice date</Text>
+            <Text style={styles.metaLabel}>{isQuote ? "Quoted on" : "Invoice date"}</Text>
             <Text style={styles.metaValue}>{formatDate(data.issueDate)}</Text>
-            <Text style={[styles.metaLabel, { marginTop: 8 }]}>Payment due</Text>
-            <Text style={styles.metaValue}>{formatDate(data.dueDate)}</Text>
+            {data.dueDate ? (
+              <>
+                <Text style={[styles.metaLabel, { marginTop: 8 }]}>
+                  {isQuote ? "Price held until" : "Payment due"}
+                </Text>
+                <Text style={styles.metaValue}>{formatDate(data.dueDate)}</Text>
+              </>
+            ) : null}
           </View>
         </View>
 
@@ -248,11 +268,13 @@ function InvoiceDocument(data: InvoicePdfData) {
           ) : null}
 
           <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>Invoice total</Text>
+            <Text style={styles.grandTotalLabel}>
+              {isQuote ? "Total for the work" : "Invoice total"}
+            </Text>
             <Text style={styles.grandTotalValue}>{formatPence(data.totalPence)}</Text>
           </View>
 
-          {data.paidPence > 0 ? (
+          {!isQuote && data.paidPence > 0 ? (
             <>
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Paid so far</Text>
@@ -300,6 +322,17 @@ function InvoiceDocument(data: InvoicePdfData) {
           </View>
         ) : null}
 
+        {/* Said outright on a quote, because a PDF with a total on it is the
+            single easiest thing in this system to mistake for a bill. */}
+        {isQuote ? (
+          <View style={styles.section}>
+            <Text style={styles.muted}>
+              This is a quote, not a bill. Nothing is payable until the work is done and
+              invoiced.
+            </Text>
+          </View>
+        ) : null}
+
         {data.footerNote ? (
           <View style={styles.section}>
             <Text style={styles.muted}>{data.footerNote}</Text>
@@ -311,5 +344,20 @@ function InvoiceDocument(data: InvoicePdfData) {
 }
 
 export async function renderInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
-  return renderToBuffer(<InvoiceDocument {...data} />);
+  return renderToBuffer(<InvoiceDocument {...{ documentKind: "invoice", ...data }} />);
+}
+
+/**
+ * The same document, rendered as a quote.
+ *
+ * Quotes have no payment state, so `paidPence` and `settled` are pinned rather
+ * than accepted from the caller — a quote PDF must never be able to display a
+ * "still to pay" line.
+ */
+export async function renderQuotePdf(
+  data: Omit<InvoicePdfData, "documentKind" | "paidPence" | "settled">,
+): Promise<Buffer> {
+  return renderToBuffer(
+    <InvoiceDocument {...data} documentKind="quote" paidPence={0} settled={false} />,
+  );
 }
