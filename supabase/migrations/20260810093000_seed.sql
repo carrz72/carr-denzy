@@ -18,10 +18,14 @@ insert into settings (
   true,
   'Carr Denzy Plumbing & Gas',
   'Carr Denzy Plumbing & Gas Ltd',
+  -- Placeholders. The real trading address must be set on /app/settings before
+  -- the first invoice is issued: an invoice snapshots these values at the moment
+  -- it is sent, so a wrong address here becomes a wrong address on a permanent
+  -- financial record rather than something a later edit can correct.
   '123 Main Street',
-  'London',
-  'SE1 2AB',
-  '01234 567890',
+  'Nottingham',
+  'NG1 1AA',
+  '07934 633583',
   'carrdenzy@gmail.com',
   false,   -- not VAT-registered: invoices carry no VAT lines at all
   false,   -- no CIS work

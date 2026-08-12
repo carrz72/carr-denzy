@@ -38,9 +38,20 @@ export const business = {
   },
   serviceAreas: ["Nottingham", "Nottinghamshire", "Derbyshire", "Leicestershire"],
   hours: {
-    weekdays: "8:00am – 5:00pm",
-    saturday: "8:00am – 5:00pm",
-    sunday: "Emergency call-outs only",
+    weekdays: "9:00am – 5:00pm",
+    saturday: "9:00am – 5:00pm",
+    /**
+     * Sunday is closed. Not "emergencies only" — closed.
+     *
+     * The request form still accepts submissions, because a burst pipe on a
+     * Sunday afternoon should not be met with a disabled form, but they are
+     * answered Monday and the wording says so. Out-of-hours emergency call-outs
+     * run Monday to Saturday only.
+     *
+     * The failure this line exists to prevent is somebody sitting by the phone
+     * on a Sunday waiting for a reply that was never coming.
+     */
+    sunday: "Closed — enquiries answered Monday",
   },
   established: 2004,
   credentials: [
@@ -245,11 +256,18 @@ export function localBusinessJsonLd(siteUrl: string) {
       addressCountry: business.address.country,
     },
     areaServed: business.serviceAreas.map((area) => ({ "@type": "Place", name: area })),
+    /**
+     * These are the hours Google prints next to the business in search and on
+     * Maps, so they have to match `business.hours` above exactly. Sunday is
+     * deliberately absent rather than listed with hours — omitting a day is how
+     * schema.org says "closed", and claiming a Sunday opening the business does
+     * not keep is the version of this that costs a customer.
+     */
     openingHoursSpecification: [
       {
         "@type": "OpeningHoursSpecification",
         dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-        opens: "08:00",
+        opens: "09:00",
         closes: "17:00",
       },
     ],

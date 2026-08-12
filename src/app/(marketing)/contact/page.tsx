@@ -104,18 +104,19 @@ export default function ContactPage() {
                   <p className="text-sm text-ink-muted">Opening hours</p>
                   <dl className="mt-1.5 flex flex-col gap-1">
                     <div className="flex justify-between gap-4">
-                      <dt className="text-ink-muted">Mon–Fri</dt>
+                      <dt className="text-ink-muted">Mon–Sat</dt>
                       <dd className="tabular font-medium text-ink">{business.hours.weekdays}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-ink-muted">Saturday</dt>
-                      <dd className="tabular font-medium text-ink">{business.hours.saturday}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-muted">Sunday</dt>
                       <dd className="font-medium text-ink">{business.hours.sunday}</dd>
                     </div>
                   </dl>
+
+                  <p className="mt-2.5 text-sm leading-relaxed text-ink-subtle">
+                    Emergency call-outs run outside these hours Monday to Saturday. We do
+                    not attend on Sundays.
+                  </p>
                 </div>
               </div>
             </div>

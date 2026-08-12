@@ -1,0 +1,75 @@
+<!--
+  Supabase → Authentication → Email Templates → "Change Email Address"
+
+  Sent when someone changes the email on their account from /portal/details.
+  Supabase sends it to BOTH the old and the new address, which is deliberate on
+  their part and worth keeping: if an account is taken over, the message landing
+  at the old address is the owner's only warning.
+
+  {{ .Email }}    the current address
+  {{ .NewEmail }} the address being changed to
+-->
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:24px;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+      Confirm the change of email address on your Carr Denzy account.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:24px 28px;border-bottom:3px solid #be4a33;">
+          <span style="font-size:15px;font-weight:700;letter-spacing:-0.01em;color:#1a1714;">Carr Denzy Plumbing &amp; Gas</span>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:28px;">
+          <h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;font-weight:700;color:#1a1714;">
+            Confirm your new email address
+          </h1>
+
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1a1714;">
+            Someone asked to change the email address on your account from
+            <strong>{{ .Email }}</strong> to <strong>{{ .NewEmail }}</strong>.
+          </p>
+
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1a1714;">
+            If that was you, confirm it below. Your sign-in links will go to the new
+            address from then on.
+          </p>
+
+          <p style="margin:24px 0;">
+            <a href="{{ .ConfirmationURL }}"
+               style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:600;font-size:15px;">
+              Confirm the change
+            </a>
+          </p>
+
+          <!--
+            Colour alone would not carry this on a monochrome print or for a
+            colour-blind reader, so the warning is stated in words as well.
+          -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0;background:#f9e6e2;border-radius:8px;">
+            <tr>
+              <td style="padding:16px 20px;">
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#8f2e20;">
+                  <strong>If this was not you, do not tap the button.</strong>
+                  Ring us on 07934 633583 straight away — somebody may be trying to take
+                  over your account.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:18px 28px;background:#f9f7f4;font-size:12px;line-height:1.6;color:#6b6055;">
+          Carr Denzy Plumbing &amp; Gas &middot; Nottingham &middot;
+          <a href="tel:+447934633583" style="color:#6b6055;text-decoration:none;">07934 633583</a>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

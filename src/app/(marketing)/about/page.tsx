@@ -129,18 +129,20 @@ export default function AboutPage() {
               <h2 className="font-display text-subheading text-ink">Opening hours</h2>
               <dl className="mt-2 flex flex-col gap-1 text-ink-muted">
                 <div className="flex justify-between gap-4">
-                  <dt>Monday to Friday</dt>
+                  <dt>Monday to Saturday</dt>
                   <dd className="tabular text-ink">{business.hours.weekdays}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt>Saturday</dt>
-                  <dd className="tabular text-ink">{business.hours.saturday}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt>Sunday</dt>
                   <dd className="text-ink">{business.hours.sunday}</dd>
                 </div>
               </dl>
+
+              <p className="mt-3 leading-relaxed">
+                Emergency call-outs run outside those hours Monday to Saturday. We do not
+                attend on Sundays — if you send the form we will pick it up first thing
+                Monday.
+              </p>
             </div>
 
             <div>

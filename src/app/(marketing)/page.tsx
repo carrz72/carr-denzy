@@ -547,11 +547,13 @@ export default async function HomePage() {
                   <div>
                     <dt className="font-medium text-white">Opening hours</dt>
                     <dd className="mt-0.5 text-sm text-[#c9bcb2]">
-                      Mon–Fri {business.hours.weekdays}
+                      Mon–Sat {business.hours.weekdays}
                       <br />
-                      Sat {business.hours.saturday}
+                      Sun · {business.hours.sunday}
                       <br />
-                      Sun — {business.hours.sunday}
+                      <span className="text-[#a89a8e]">
+                        Emergency call-outs Mon–Sat, outside these hours
+                      </span>
                     </dd>
                   </div>
                 </div>

@@ -141,7 +141,7 @@ export default async function RequestPage({
               >
                 {business.phone}
               </a>{" "}
-              — {business.hours.weekdays} on weekdays.
+              — {business.hours.weekdays}, Monday to Saturday.
             </p>
           </div>
         </div>

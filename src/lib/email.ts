@@ -197,10 +197,23 @@ export async function sendEnquiryConfirmation(
   fullName: string,
   urgency: EnquiryEmailData["urgency"],
 ): Promise<SendResult> {
+  // Sunday is closed, so the standing "within the hour" promise cannot hold.
+  // Saying so plainly is better than a promise that quietly breaks — somebody
+  // with water coming in needs to know to stop waiting and start ringing round.
+  // Computed in Europe/London, because the server is not necessarily there.
+  const isSunday =
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", weekday: "long" }).format(
+      new Date(),
+    ) === "Sunday";
+
   const when =
     urgency === "emergency"
-      ? "We treat emergencies as a priority. If you have not heard from us within the hour, please call 07934 633583."
-      : "We usually reply the same working day, and always within one working day.";
+      ? isSunday
+        ? "We are closed on Sundays and will pick this up first thing on Monday. If it cannot wait, please ring 07934 633583 — and if you can smell gas, call 0800 111 999 straight away."
+        : "We treat emergencies as a priority. If you have not heard from us within the hour, please call 07934 633583."
+      : isSunday
+        ? "We are closed on Sundays. We will come back to you on Monday morning."
+        : "We usually reply the same working day, and always within one working day.";
 
   const html = layout(
     "We have your request",

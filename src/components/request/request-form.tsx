@@ -285,10 +285,20 @@ export function RequestForm({
           Quote it if you ring us. We have sent a copy to your email if you gave us one.
         </p>
 
+        {/*
+          Sunday is closed, so the "within the hour" promise cannot hold. It is
+          computed at render, on the client, from the reader's own clock — this
+          screen only ever appears immediately after a submission, so "today"
+          is unambiguous and there is no cached-page staleness to worry about.
+        */}
         <p className="container-prose mt-4 leading-relaxed text-ink-muted">
-          {urgency === "emergency"
-            ? "You marked this as an emergency, so we will come back to you as a priority. If you have not heard within the hour, please ring — the phone gets answered faster than the inbox."
-            : "We usually reply the same working day, and always within one working day."}
+          {new Date().getDay() === 0
+            ? urgency === "emergency"
+              ? "We are closed on Sundays, so we will pick this up first thing Monday. If it cannot wait until then, please ring rather than wait on this — and if you can smell gas, call 0800 111 999 straight away."
+              : "We are closed on Sundays. We will come back to you on Monday morning."
+            : urgency === "emergency"
+              ? "You marked this as an emergency, so we will come back to you as a priority. If you have not heard within the hour, please ring — the phone gets answered faster than the inbox."
+              : "We usually reply the same working day, and always within one working day."}
         </p>
 
         {/*
