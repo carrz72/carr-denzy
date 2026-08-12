@@ -6,6 +6,7 @@ import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, PhoneIcon } from "@phosphor-i
 import { buttonClasses } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/service-icon";
 import { business, getService, services } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
 // Eight services, known at build time — every one is a static page.
@@ -35,6 +36,8 @@ export default async function ServiceDetailPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const contact = await getBusiness();
+
   const { slug } = await params;
   const service = getService(slug);
 
@@ -149,14 +152,14 @@ export default async function ServiceDetailPage({
                 </Link>
 
                 <a
-                  href={business.phoneHref}
+                  href={contact.phoneHref}
                   className={cn(
                     buttonClasses({ variant: "secondary", fullWidth: true }),
                     "mt-2.5",
                   )}
                 >
                   <PhoneIcon size={18} weight="fill" className="text-accent" aria-hidden="true" />
-                  <span className="tabular">{business.phone}</span>
+                  <span className="tabular">{contact.phone}</span>
                 </a>
 
                 <p className="mt-5 border-t border-line pt-5 text-sm leading-relaxed text-ink-subtle">

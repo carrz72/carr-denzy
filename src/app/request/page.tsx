@@ -6,6 +6,7 @@ import { ClosureNotice } from "@/components/marketing/closure-notice";
 import { getClosureNotice } from "@/lib/closures";
 import { getMyClient, getSessionUser } from "@/lib/auth";
 import { business, getService } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Request a job",
@@ -27,6 +28,8 @@ export default async function RequestPage({
 }: {
   searchParams: Promise<{ service?: string; problem?: string }>;
 }) {
+  const contact = await getBusiness();
+
   const params = await searchParams;
 
   // Nobody is required to sign in to use this page — that is the whole point of
@@ -70,11 +73,11 @@ export default async function RequestPage({
           </Link>
 
           <a
-            href={business.phoneHref}
+            href={contact.phoneHref}
             className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-medium text-ink hover:bg-surface-sunken"
           >
             <PhoneIcon size={18} weight="fill" className="text-accent" aria-hidden="true" />
-            <span className="tabular">{business.phone}</span>
+            <span className="tabular">{contact.phone}</span>
           </a>
         </div>
       </header>
@@ -82,7 +85,7 @@ export default async function RequestPage({
       {/* Especially here: this is the page where somebody is about to expect a
           reply, and being told first is the difference between a patient
           customer and a lost one. */}
-      <ClosureNotice notice={closure} />
+      <ClosureNotice notice={closure} contact={contact} />
 
       <main id="main" className="flex-1">
         <div className="container-page py-10 md:py-14">
@@ -120,6 +123,7 @@ export default async function RequestPage({
               <RequestForm
                 initialServiceSlug={service?.slug}
                 initialProblem={problem}
+                contact={contact}
                 isSignedIn={isSignedInClient}
                 signedInAs={
                   client
@@ -136,10 +140,10 @@ export default async function RequestPage({
             <p className="mt-8 text-center text-sm leading-relaxed text-ink-subtle">
               Would rather talk to someone? Ring{" "}
               <a
-                href={business.phoneHref}
+                href={contact.phoneHref}
                 className="font-medium tabular text-ink underline underline-offset-4 hover:text-accent"
               >
-                {business.phone}
+                {contact.phone}
               </a>{" "}
               — {business.hours.weekdays}, Monday to Saturday.
             </p>

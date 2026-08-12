@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ListIcon, PhoneIcon, SignInIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/cn";
-import { business } from "@/lib/site";
+import type { BusinessContact } from "@/lib/business";
 import { buttonClasses } from "@/components/ui/button";
 
 const links = [
@@ -17,7 +17,14 @@ const links = [
   { href: "/contact", label: "Contact" },
 ];
 
-export function SiteHeader() {
+/**
+ * Contact details arrive as a prop rather than being imported.
+ *
+ * They live in Settings now, so the owner can change the phone number
+ * without a developer — and a client component cannot read the database
+ * itself. The marketing layout fetches once and passes it down.
+ */
+export function SiteHeader({ contact }: { contact: BusinessContact }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -72,7 +79,7 @@ export function SiteHeader() {
           <Link
             href="/"
             className="group flex items-center gap-2.5 rounded-sm"
-            aria-label={`${business.name} — home`}
+            aria-label={`${contact.name} — home`}
           >
             {/* The business's own mark — a tap over a gas flame. It carries its
                 own red and its own transparency, so it needs no tile behind it. */}
@@ -128,14 +135,14 @@ export function SiteHeader() {
 
           <div className="flex items-center gap-2">
             <a
-              href={business.phoneHref}
+              href={contact.phoneHref}
               className={cn(
                 "hidden min-h-11 items-center gap-2 rounded-md px-3 font-medium text-ink",
                 "transition-colors duration-200 hover:bg-surface-sunken sm:flex",
               )}
             >
               <PhoneIcon size={18} weight="fill" className="text-accent" aria-hidden="true" />
-              <span className="tabular">{business.phone}</span>
+              <span className="tabular">{contact.phone}</span>
             </a>
 
             {/*
@@ -226,14 +233,14 @@ export function SiteHeader() {
             </Link>
 
             <a
-              href={business.phoneHref}
+              href={contact.phoneHref}
               // Dialling leaves the page; without this the menu is still open
               // and the body still locked when they come back from the call.
               onClick={() => setMenuOpen(false)}
               className={cn(buttonClasses({ variant: "secondary", fullWidth: true }), "mt-2.5")}
             >
               <PhoneIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
-              Call {business.phone}
+              Call {contact.phone}
             </a>
           </nav>
         </div>

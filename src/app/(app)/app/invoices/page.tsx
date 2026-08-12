@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRightIcon, PlusIcon, ReceiptIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowRightIcon,
+  FileTextIcon,
+  PlusIcon,
+  ReceiptIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
 import { InvoiceStatusBadge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
@@ -44,7 +49,7 @@ export default async function InvoicesPage() {
   // The housekeeping write now runs ALONGSIDE the read rather than in front of
   // it. Awaiting it first put a full database round trip ahead of every load of
   // the screen the owner opens most often.
-  const [, { data: invoices }] = await Promise.all([
+  const [, { data: invoices }, { data: openQuotes }] = await Promise.all([
     supabase.rpc("mark_overdue_invoices"),
     supabase
       .from("invoices")
@@ -55,7 +60,19 @@ export default async function InvoicesPage() {
       .is("deleted_at", null)
       .order("issue_date", { ascending: false })
       .order("created_at", { ascending: false }),
+    // Quotes live on their own screen, but it had exactly one way in — a tile
+    // on Today. From here or from Jobs there was no route to it at all. Money
+    // is the right home for the link: quotes and invoices are the same thing in
+    // the owner's head, money coming in, just at different stages.
+    supabase
+      .from("quotes")
+      .select("total_pence")
+      .eq("status", "sent")
+      .is("deleted_at", null),
   ]);
+
+  const openQuoteCount = (openQuotes ?? []).length;
+  const openQuoteValue = (openQuotes ?? []).reduce((sum, quote) => sum + quote.total_pence, 0);
 
   const all = invoices ?? [];
 
@@ -91,6 +108,54 @@ export default async function InvoicesPage() {
           </Link>
         }
       />
+
+      {/*
+        Always rendered, even at zero — the point is that the quotes screen is
+        always reachable from here, not that it is advertised only when busy.
+      */}
+      <Link
+        href="/app/quotes"
+        className={cn(
+          "group mb-8 flex items-center gap-4 rounded-lg border p-5 shadow-subtle",
+          "transition-[border-color,box-shadow,transform] duration-200",
+          "[transition-timing-function:var(--ease-standard)]",
+          "hover:-translate-y-0.5 hover:border-line-strong hover:shadow-float",
+          openQuoteCount > 0
+            ? "border-accent-line bg-accent-soft"
+            : "border-line bg-surface-raised",
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-md",
+            openQuoteCount > 0 ? "bg-accent text-white" : "bg-surface-sunken text-ink-muted",
+          )}
+        >
+          <FileTextIcon size={22} weight="duotone" />
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-ink">
+            {openQuoteCount === 0
+              ? "Quotes"
+              : `${openQuoteCount} quote${openQuoteCount === 1 ? "" : "s"} waiting on an answer`}
+          </span>
+
+          <span className="mt-0.5 block text-sm text-ink-muted">
+            {openQuoteCount === 0
+              ? "Nothing waiting on a customer. Drafts and past quotes are in here too."
+              : `${formatPence(openQuoteValue)} of work you have priced but not won yet.`}
+          </span>
+        </span>
+
+        <ArrowRightIcon
+          size={18}
+          weight="bold"
+          aria-hidden="true"
+          className="shrink-0 text-ink-subtle transition-transform duration-300 group-hover:translate-x-1 group-hover:text-accent"
+        />
+      </Link>
 
       {all.length === 0 ? (
         <EmptyState

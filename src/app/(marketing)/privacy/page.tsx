@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
@@ -16,7 +17,9 @@ export const metadata: Metadata = {
  * in a code comment, because the business owner is the one who carries the
  * risk of it being wrong.
  */
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const contact = await getBusiness();
+
   return (
     <article className="section-y">
       <div className="container-page">
@@ -31,9 +34,9 @@ export default function PrivacyPage() {
             <section>
               <h2 className="font-display text-subheading">Who we are</h2>
               <p className="mt-2 text-ink-muted">
-                {business.name}, {business.address.city}, {business.address.region}. We are
+                {contact.name}, {business.address.city}, {business.address.region}. We are
                 the data controller for the information described here. You can reach us on{" "}
-                {business.phone} or at {business.email}, and we will give you a postal
+                {contact.phone} or at {contact.email}, and we will give you a postal
                 address on request.
               </p>
             </section>
@@ -100,7 +103,7 @@ export default function PrivacyPage() {
               <h2 className="font-display text-subheading">Your rights</h2>
               <p className="mt-2 text-ink-muted">
                 You can ask for a copy of what we hold, ask us to correct it, ask us to
-                delete it, or object to how we use it. Email {business.email} and we will
+                delete it, or object to how we use it. Email {contact.email} and we will
                 respond within one month. Note that we cannot delete an invoice inside the
                 six-year retention period, as we are legally required to keep it. If you are
                 unhappy with our response you can complain to the Information

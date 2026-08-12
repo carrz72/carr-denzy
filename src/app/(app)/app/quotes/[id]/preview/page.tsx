@@ -11,6 +11,7 @@ import { requireOwner } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = { title: "Quote preview", robots: { index: false } };
 
@@ -32,6 +33,8 @@ export default async function QuotePreviewPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const contact = await getBusiness();
+
   const { id } = await params;
 
   await requireOwner();
@@ -196,7 +199,7 @@ export default async function QuotePreviewPage({
           </p>
           <p className="mt-2">
             Questions? Ring{" "}
-            <span className="font-medium tabular text-ink">{business.phone}</span>.
+            <span className="font-medium tabular text-ink">{contact.phone}</span>.
           </p>
         </footer>
       </article>

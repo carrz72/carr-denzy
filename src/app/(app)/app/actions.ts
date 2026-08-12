@@ -1317,5 +1317,15 @@ export async function updateSettings(formData: FormData): Promise<ActionResult> 
   revalidatePath("/app/settings");
   revalidatePath("/app", "layout");
 
+  // The public site reads the phone number and email from this same row, so a
+  // change here has to reach the marketing pages too. Without this the owner
+  // would update their number, see it correct in the app, and the website would
+  // keep showing the old one until the hourly revalidate happened to fire —
+  // which is precisely the sort of "it didn't work" that erodes trust in the
+  // whole tool. The layout scope covers the header and footer on every page.
+  revalidatePath("/", "layout");
+  revalidatePath("/request");
+  revalidatePath("/sign-in");
+
   return { ok: true };
 }

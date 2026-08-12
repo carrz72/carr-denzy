@@ -10,15 +10,27 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description:
-    "Call Carr Denzy Plumbing & Gas on 07934 633583, or send details of the job with photos. Covering Nottingham and the surrounding areas.",
-};
+/**
+ * Built at request time rather than declared as a constant, because the phone
+ * number lives in Settings. This description is what Google prints under the
+ * result — a stale number here sends callers to a dead line, and nobody would
+ * notice for months.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const contact = await getBusiness();
 
-export default function ContactPage() {
+  return {
+    title: "Contact",
+    description: `Call ${contact.name} on ${contact.phone}, or send details of the job with photos. Covering Nottingham and the surrounding areas.`,
+  };
+}
+
+export default async function ContactPage() {
+  const contact = await getBusiness();
+
   return (
     <section className="section-y">
       <div className="container-page">
@@ -38,7 +50,7 @@ export default function ContactPage() {
 
             <div className="mt-10 flex flex-col gap-3">
               <a
-                href={business.phoneHref}
+                href={contact.phoneHref}
                 className={cn(
                   "flex items-start gap-4 rounded-xl border border-line bg-surface-raised p-5",
                   "shadow-subtle transition-[border-color,box-shadow,transform] duration-200",
@@ -53,13 +65,13 @@ export default function ContactPage() {
                 <span>
                   <span className="block text-sm text-ink-muted">Call us</span>
                   <span className="mt-0.5 block font-display text-subheading tabular text-ink">
-                    {business.phone}
+                    {contact.phone}
                   </span>
                 </span>
               </a>
 
               <a
-                href={`mailto:${business.email}`}
+                href={`mailto:${contact.email}`}
                 className={cn(
                   "flex items-start gap-4 rounded-xl border border-line bg-surface-raised p-5",
                   "shadow-subtle transition-[border-color,box-shadow,transform] duration-200",
@@ -74,7 +86,7 @@ export default function ContactPage() {
                 <span className="min-w-0">
                   <span className="block text-sm text-ink-muted">Email us</span>
                   <span className="mt-0.5 block break-words font-medium text-ink">
-                    {business.email}
+                    {contact.email}
                   </span>
                 </span>
               </a>

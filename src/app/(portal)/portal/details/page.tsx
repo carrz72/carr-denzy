@@ -7,10 +7,13 @@ import { DetailsForm } from "@/components/portal/details-form";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient, requireUser } from "@/lib/auth";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = { title: "Your details", robots: { index: false } };
 
 export default async function PortalDetailsPage() {
+  const contact = await getBusiness();
+
   const user = await requireUser("/portal/details");
   const client = await getMyClient();
 
@@ -99,7 +102,7 @@ export default async function PortalDetailsPage() {
 
             <p className="mt-4 text-sm leading-relaxed text-ink-muted">
               Addresses are tied to work already done, so we change those at our end —
-              ring {business.phone} and we will sort it.
+              ring {contact.phone} and we will sort it.
             </p>
           </Card>
 
@@ -112,7 +115,7 @@ export default async function PortalDetailsPage() {
             </p>
             <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-muted">
               Changing the email you sign in with is a different thing from the email we
-              send invoices to. Ring us on {business.phone} and we will move it across.
+              send invoices to. Ring us on {contact.phone} and we will move it across.
             </p>
           </Card>
         </div>

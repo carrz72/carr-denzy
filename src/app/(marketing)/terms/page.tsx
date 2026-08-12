@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Terms of service",
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
  * A working draft, not legal advice. Same caveat as the privacy policy, and
  * it is stated on the page for the same reason.
  */
-export default function TermsPage() {
+export default async function TermsPage() {
+  const contact = await getBusiness();
+
   return (
     <article className="section-y">
       <div className="container-page">
@@ -90,7 +93,7 @@ export default function TermsPage() {
             <section>
               <h2 className="font-display text-subheading">Complaints</h2>
               <p className="mt-2 text-ink-muted">
-                Tell us first, on {business.phone} or at {business.email}. We would rather
+                Tell us first, on {contact.phone} or at {contact.email}. We would rather
                 come back and put something right than argue about it. Gas work complaints
                 can also be raised with the Gas Safe Register.
               </p>

@@ -59,10 +59,13 @@ export default async function QuotesPage() {
 
   return (
     <>
+      {/* Back to Money, not Today. This screen is now reached from Money, and
+          a Back link that lands somewhere other than where you came from is
+          the kind of small wrongness that makes an app feel untrustworthy. */}
       <PageHeader
         title="Quotes"
         description="Everything you have priced, and where each one stands."
-        back={{ href: "/app", label: "Today" }}
+        back={{ href: "/app/invoices", label: "Money" }}
       />
 
       {all.length === 0 ? (

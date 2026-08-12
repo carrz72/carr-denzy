@@ -1,5 +1,5 @@
 import { PhoneIcon, SunHorizonIcon } from "@phosphor-icons/react/dist/ssr";
-import { business } from "@/lib/site";
+import type { BusinessContact } from "@/lib/business";
 import { cn } from "@/lib/cn";
 import type { ClosureNotice as Notice } from "@/lib/closures";
 
@@ -17,9 +17,12 @@ import type { ClosureNotice as Notice } from "@/lib/closures";
 export function ClosureNotice({
   notice,
   className,
+  contact,
 }: {
   notice: Notice | null;
   className?: string;
+  /** From Settings, so the owner can change the number without a redeploy. */
+  contact: BusinessContact;
 }) {
   if (!notice) return null;
 
@@ -52,7 +55,7 @@ export function ClosureNotice({
 
         {notice.active && notice.emergenciesOnly ? (
           <a
-            href={business.phoneHref}
+            href={contact.phoneHref}
             className={cn(
               "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-caution/40",
               "bg-surface-raised px-4 font-medium text-ink",
@@ -60,7 +63,7 @@ export function ClosureNotice({
             )}
           >
             <PhoneIcon size={17} weight="fill" className="text-accent" aria-hidden="true" />
-            <span className="tabular">{business.phone}</span>
+            <span className="tabular">{contact.phone}</span>
           </a>
         ) : null}
       </div>

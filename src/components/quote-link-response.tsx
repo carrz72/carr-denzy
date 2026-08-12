@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FormError, TextAreaField } from "@/components/ui/field";
 import { acceptQuoteViaLink, declineQuoteViaLink } from "@/app/quotes/view/[id]/actions";
 import { formatPence } from "@/lib/money";
-import { business } from "@/lib/site";
+import type { BusinessContact } from "@/lib/business";
 
 /**
  * Accept or decline, from the emailed link, with no account.
@@ -24,10 +24,13 @@ export function QuoteLinkResponse({
   quoteId,
   totalPence,
   validUntil,
+  contact,
 }: {
   quoteId: string;
   totalPence: number;
   validUntil: string | null;
+  /** From Settings, so the owner can change the number without a redeploy. */
+  contact: BusinessContact;
 }) {
   const [isPending, startTransition] = useTransition();
   const [showDecline, setShowDecline] = useState(false);
@@ -74,10 +77,10 @@ export function QuoteLinkResponse({
         <p className="mt-4 text-[0.9375rem] text-ink-muted">
           Anything to add before we come out? Ring us on{" "}
           <a
-            href={business.phoneHref}
+            href={contact.phoneHref}
             className="font-medium tabular text-ink underline underline-offset-4"
           >
-            {business.phone}
+            {contact.phone}
           </a>
           .
         </p>
@@ -94,10 +97,10 @@ export function QuoteLinkResponse({
           We will not chase you about it. If you change your mind, or if it was the price
           rather than the work, ring us on{" "}
           <a
-            href={business.phoneHref}
+            href={contact.phoneHref}
             className="font-medium tabular text-ink underline underline-offset-4"
           >
-            {business.phone}
+            {contact.phone}
           </a>{" "}
           — we would rather talk than lose the job over a number.
         </p>

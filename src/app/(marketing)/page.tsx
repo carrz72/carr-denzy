@@ -12,6 +12,7 @@ import {
 import { buttonClasses } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/service-icon";
 import { business, services } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 import { createPublicClient } from "@/lib/supabase/public";
 import { portfolioImageUrl } from "@/lib/portfolio";
 import { cn } from "@/lib/cn";
@@ -57,6 +58,8 @@ const steps = [
 ];
 
 export default async function HomePage() {
+  const contact = await getBusiness();
+
   const [lead, ...rest] = services;
 
   // Anonymous client on purpose — see src/lib/supabase/public.ts.
@@ -127,7 +130,7 @@ export default async function HomePage() {
                 </Link>
 
                 <a
-                  href={business.phoneHref}
+                  href={contact.phoneHref}
                   className={cn(
                     buttonClasses({ variant: "secondary", size: "lg" }),
                     "border-white/25 bg-white/10 text-white backdrop-blur-sm",
@@ -135,7 +138,7 @@ export default async function HomePage() {
                   )}
                 >
                   <PhoneIcon size={19} weight="fill" aria-hidden="true" />
-                  <span className="tabular">{business.phone}</span>
+                  <span className="tabular">{contact.phone}</span>
                 </a>
               </div>
 
@@ -525,14 +528,14 @@ export default async function HomePage() {
                   </Link>
 
                   <a
-                    href={business.phoneHref}
+                    href={contact.phoneHref}
                     className={cn(
                       buttonClasses({ variant: "secondary", size: "lg" }),
                       "border-white/25 bg-white/10 text-white hover:border-white/40 hover:bg-white/20",
                     )}
                   >
                     <PhoneIcon size={19} weight="fill" aria-hidden="true" />
-                    <span className="tabular">{business.phone}</span>
+                    <span className="tabular">{contact.phone}</span>
                   </a>
                 </div>
               </div>

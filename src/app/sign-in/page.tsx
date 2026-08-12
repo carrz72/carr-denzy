@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ArrowLeftIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -15,6 +16,8 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<{ next?: string; error?: string }>;
 }) {
+  const contact = await getBusiness();
+
   const params = await searchParams;
 
   // Only ever accept a relative path. An absolute URL here would turn the
@@ -37,11 +40,11 @@ export default async function SignInPage({
           </Link>
 
           <a
-            href={business.phoneHref}
+            href={contact.phoneHref}
             className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-medium text-ink hover:bg-surface-sunken"
           >
             <PhoneIcon size={18} weight="fill" className="text-accent" aria-hidden="true" />
-            <span className="tabular">{business.phone}</span>
+            <span className="tabular">{contact.phone}</span>
           </a>
         </div>
       </header>

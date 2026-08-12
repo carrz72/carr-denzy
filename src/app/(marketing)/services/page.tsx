@@ -5,6 +5,7 @@ import { ArrowRightIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/service-icon";
 import { business, services } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
     "Plumbing, gas and boilers, heating, bathrooms, electrical, building repairs, property maintenance and extensions across Nottingham.",
 };
 
-export default function ServicesPage() {
+export default async function ServicesPage() {
+  const contact = await getBusiness();
+
   return (
     <>
       <section className="border-b border-line bg-surface-sunken">
@@ -131,11 +134,11 @@ export default function ServicesPage() {
             </Link>
 
             <a
-              href={business.phoneHref}
+              href={contact.phoneHref}
               className={buttonClasses({ variant: "secondary", size: "lg" })}
             >
               <PhoneIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
-              <span className="tabular">{business.phone}</span>
+              <span className="tabular">{contact.phone}</span>
             </a>
           </div>
         </div>

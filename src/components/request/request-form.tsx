@@ -31,7 +31,8 @@ import {
   type PreparedPhoto,
 } from "@/lib/photos";
 import { submitEnquiry } from "@/app/request/actions";
-import { business, services } from "@/lib/site";
+import {services} from "@/lib/site";
+import type { BusinessContact } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
 /**
@@ -54,11 +55,14 @@ const stepTitles = ["What has happened?", "Where and when", "How to reach you"];
 export function RequestForm({
   initialServiceSlug,
   initialProblem,
+  contact,
   signedInAs = null,
   isSignedIn = Boolean(signedInAs),
 }: {
   initialServiceSlug?: string;
   initialProblem?: string;
+  /** From Settings, so the owner can change the number without a redeploy. */
+  contact: BusinessContact;
   /**
    * Set when the visitor already has an account. Their details are prefilled
    * and the enquiry is attached to it server-side — the id is never taken from
@@ -329,9 +333,9 @@ export function RequestForm({
             </>
           ) : (
             <>
-              <a href={business.phoneHref} className={buttonClasses({ size: "lg" })}>
+              <a href={contact.phoneHref} className={buttonClasses({ size: "lg" })}>
                 <PhoneIcon size={19} weight="fill" aria-hidden="true" />
-                <span className="tabular">{business.phone}</span>
+                <span className="tabular">{contact.phone}</span>
               </a>
 
               <Link href="/" className={buttonClasses({ variant: "secondary", size: "lg" })}>
@@ -482,10 +486,10 @@ export function RequestForm({
                     For a genuine emergency the phone is much faster than this form.
                     Call{" "}
                     <a
-                      href={business.phoneHref}
+                      href={contact.phoneHref}
                       className="font-semibold tabular underline underline-offset-4"
                     >
-                      {business.phone}
+                      {contact.phone}
                     </a>
                     . If you can smell gas, ring 0800 111 999 first.
                   </p>

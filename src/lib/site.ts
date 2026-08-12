@@ -237,14 +237,23 @@ export function getService(slug: string): ServiceDefinition | undefined {
  * uses dangerouslySetInnerHTML, and it stays safe precisely because nothing
  * dynamic reaches it.
  */
-export function localBusinessJsonLd(siteUrl: string) {
+export function localBusinessJsonLd(
+  siteUrl: string,
+  /**
+   * The owner's live contact details from Settings. Optional so this stays
+   * usable without a database round trip; omitting it falls back to the static
+   * values below. These are the details Google prints beside the business in
+   * search, so a stale number here is a customer ringing nobody.
+   */
+  contact?: { name: string; phone: string; email: string },
+) {
   return {
     "@context": "https://schema.org",
     "@type": "Plumber",
-    name: business.name,
+    name: contact?.name ?? business.name,
     url: siteUrl,
-    telephone: business.phone,
-    email: business.email,
+    telephone: contact?.phone ?? business.phone,
+    email: contact?.email ?? business.email,
     image: `${siteUrl}/images/work-33.webp`,
     priceRange: "££",
     // Locality and region, no streetAddress. Schema.org permits this, and for a

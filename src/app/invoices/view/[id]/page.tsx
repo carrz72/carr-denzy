@@ -14,6 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, isPast } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 import type { PaymentMethod } from "@/types/database";
 
 export const metadata: Metadata = { title: "Invoice", robots: { index: false } };
@@ -52,6 +53,8 @@ export default async function PublicInvoicePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const contact = await getBusiness();
+
   const { id } = await params;
 
   const supabase = createAdminClient();
@@ -103,7 +106,7 @@ export default async function PublicInvoicePage({
   const footerNote =
     typeof snapshot?.invoice_footer_note === "string" ? snapshot.invoice_footer_note : null;
 
-  const phone = settings?.phone ?? business.phone;
+  const phone = settings?.phone ?? contact.phone;
   const customerName = (clientSnapshot.full_name as string | null) ?? "the customer";
 
   return (

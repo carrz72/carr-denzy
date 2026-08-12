@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EnvelopeSimpleIcon, MapPinIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { business, services } from "@/lib/site";
+import type { BusinessContact } from "@/lib/business";
 
 /**
  * Footer.
@@ -10,7 +11,7 @@ import { business, services } from "@/lib/site";
  * find the page they missed. Everything else is filler that makes those three
  * harder to spot.
  */
-export function SiteFooter() {
+export function SiteFooter({ contact }: { contact: BusinessContact }) {
   const year = new Date().getFullYear();
 
   return (
@@ -27,22 +28,22 @@ export function SiteFooter() {
 
             <div className="mt-6 flex flex-col gap-3">
               <a
-                href={business.phoneHref}
+                href={contact.phoneHref}
                 className="group inline-flex min-h-11 items-center gap-2.5 self-start font-medium text-ink"
               >
                 <PhoneIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
                 <span className="tabular group-hover:underline group-hover:underline-offset-4">
-                  {business.phone}
+                  {contact.phone}
                 </span>
               </a>
 
               <a
-                href={`mailto:${business.email}`}
+                href={`mailto:${contact.email}`}
                 className="group inline-flex min-h-11 items-center gap-2.5 self-start text-ink-muted"
               >
                 <EnvelopeSimpleIcon size={19} className="text-accent" aria-hidden="true" />
                 <span className="group-hover:underline group-hover:underline-offset-4">
-                  {business.email}
+                  {contact.email}
                 </span>
               </a>
 
@@ -102,7 +103,7 @@ export function SiteFooter() {
 
         <div className="mt-12 flex flex-col gap-4 border-t border-line pt-7 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-ink-subtle">
-            © {year} {business.name}. Gas Safe registered.
+            © {year} {contact.name}. Gas Safe registered.
           </p>
 
           <ul className="flex flex-wrap items-center gap-x-6 gap-y-2">

@@ -8,6 +8,7 @@ import { QuoteLinkResponse } from "@/components/quote-link-response";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, isPast } from "@/lib/dates";
 import { business } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = { title: "Quote", robots: { index: false, follow: false } };
 
@@ -29,6 +30,8 @@ export const metadata: Metadata = { title: "Quote", robots: { index: false, foll
  * half-written price must not be readable while it is still being decided.
  */
 export default async function PublicQuotePage({ params }: { params: Promise<{ id: string }> }) {
+  const contact = await getBusiness();
+
   const { id } = await params;
 
   const supabase = createAdminClient();
@@ -80,6 +83,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ id
                 quoteId={quote.id}
                 totalPence={quote.total_pence}
                 validUntil={quote.valid_until ? formatDate(quote.valid_until) : null}
+                contact={contact}
               />
             </div>
           ) : null}
@@ -104,11 +108,11 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ id
               </p>
 
               <a
-                href={business.phoneHref}
+                href={contact.phoneHref}
                 className="mt-4 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:underline hover:underline-offset-4"
               >
                 <PhoneIcon size={18} weight="fill" aria-hidden="true" />
-                <span className="tabular">{business.phone}</span>
+                <span className="tabular">{contact.phone}</span>
               </a>
             </div>
           ) : null}
@@ -189,8 +193,8 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ id
               </p>
               <p className="mt-2">
                 Questions? Ring{" "}
-                <a href={business.phoneHref} className="font-medium tabular text-ink">
-                  {business.phone}
+                <a href={contact.phoneHref} className="font-medium tabular text-ink">
+                  {contact.phone}
                 </a>
                 .
               </p>

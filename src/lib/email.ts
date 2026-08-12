@@ -2,6 +2,8 @@ import "server-only";
 
 import { Resend } from "resend";
 
+import { getBusiness } from "@/lib/business";
+
 /**
  * Email.
  *
@@ -91,6 +93,18 @@ async function send(
   }
 }
 
+/**
+ * The business phone number, from Settings.
+ *
+ * Emails outlive the moment they are sent — a customer digs one out six months
+ * later to ring about a boiler. Baking the number in at write time means every
+ * old email points at a dead line the day it changes.
+ */
+async function businessPhone(): Promise<string> {
+  const contact = await getBusiness();
+  return contact.phone;
+}
+
 /** Escapes user-supplied text before it goes anywhere near an HTML email. */
 function esc(value: string): string {
   return value
@@ -101,7 +115,7 @@ function esc(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function layout(heading: string, bodyHtml: string): string {
+async function layout(heading: string, bodyHtml: string): Promise<string> {
   return `<!doctype html>
 <html lang="en">
   <body style="margin:0;padding:24px;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;">
@@ -119,7 +133,7 @@ function layout(heading: string, bodyHtml: string): string {
       </tr>
       <tr>
         <td style="padding:18px 28px;background:#f9f7f4;font-size:12px;color:#6b6055;">
-          Carr Denzy Plumbing &amp; Gas · 07934 633583
+          Carr Denzy Plumbing &amp; Gas · ${esc(await businessPhone())}
         </td>
       </tr>
     </table>
@@ -166,7 +180,7 @@ export async function sendOwnerEnquiryNotification(data: EnquiryEmailData): Prom
     data.postcode ? `Postcode: ${data.postcode}` : null,
   ].filter(Boolean) as string[];
 
-  const html = layout(
+  const html = await layout(
     `New enquiry ${data.reference}`,
     `<p style="margin:0 0 8px;font-size:15px;"><strong>${esc(data.fullName)}</strong></p>
      <p style="margin:0 0 16px;font-size:14px;color:#6b6055;">${esc(urgencyWords[data.urgency])}</p>
@@ -206,16 +220,18 @@ export async function sendEnquiryConfirmation(
       new Date(),
     ) === "Sunday";
 
+  const phone = await businessPhone();
+
   const when =
     urgency === "emergency"
       ? isSunday
-        ? "We are closed on Sundays and will pick this up first thing on Monday. If it cannot wait, please ring 07934 633583 — and if you can smell gas, call 0800 111 999 straight away."
-        : "We treat emergencies as a priority. If you have not heard from us within the hour, please call 07934 633583."
+        ? `We are closed on Sundays and will pick this up first thing on Monday. If it cannot wait, please ring ${phone} — and if you can smell gas, call 0800 111 999 straight away.`
+        : `We treat emergencies as a priority. If you have not heard from us within the hour, please call ${phone}.`
       : isSunday
         ? "We are closed on Sundays. We will come back to you on Monday morning."
         : "We usually reply the same working day, and always within one working day.";
 
-  const html = layout(
+  const html = await layout(
     "We have your request",
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(fullName)},</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Thanks for getting in touch. Your reference is <strong>${esc(reference)}</strong> — quote it if you call us.</p>
@@ -229,7 +245,7 @@ export async function sendEnquiryConfirmation(
     "",
     when,
     "",
-    "Carr Denzy Plumbing & Gas · 07934 633583",
+    `Carr Denzy Plumbing & Gas · ${await businessPhone()}`,
   ].join("\n");
 
   return send(to, `We have your request — ${reference}`, html, text);
@@ -256,7 +272,7 @@ export async function sendPortalInvite(
 ): Promise<SendResult> {
   const firstName = clientName.split(" ")[0] ?? clientName;
 
-  const html = layout(
+  const html = await layout(
     "See your jobs online",
     `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Hello ${esc(firstName)},</p>
      <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">
@@ -281,7 +297,7 @@ export async function sendPortalInvite(
     "",
     "There is no password. The link works once and lasts an hour.",
     "",
-    "Carr Denzy Plumbing & Gas · 07934 633583",
+    `Carr Denzy Plumbing & Gas · ${await businessPhone()}`,
   ].join("\n");
 
   return send(to, "See your jobs with Carr Denzy online", html, text);
@@ -306,7 +322,7 @@ export async function sendQuoteToClient(
 
   const validLine = validUntil ? `This price is held until ${validUntil}.` : "";
 
-  const html = layout(
+  const html = await layout(
     `Your quote ${reference}`,
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Your quote is ready. The total is <strong>${esc(totalFormatted)}</strong>.</p>
@@ -356,7 +372,7 @@ export async function sendInvoiceToClient(
     ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">A PDF copy is attached to this email.</p>`
     : "";
 
-  const html = layout(
+  const html = await layout(
     `Invoice ${reference}`,
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Your invoice for <strong>${esc(totalFormatted)}</strong> is attached to your account.</p>
@@ -398,7 +414,7 @@ export async function sendQuoteResponseToOwner(
   const link = `${siteUrl()}/app/jobs/${jobId}`;
   const verb = accepted ? "accepted" : "declined";
 
-  const html = layout(
+  const html = await layout(
     `${esc(clientName)} ${verb} quote ${esc(reference)}`,
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(clientName)} has ${verb} quote ${esc(reference)}.</p>
      ${reason ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Reason given: ${esc(reason)}</p>` : ""}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRightIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { business, services } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
 /**
@@ -12,7 +13,9 @@ import { cn } from "@/lib/cn";
  * back to the thing they wanted in one tap — including the phone number, since
  * a proportion of the people who reach it have a leak running right now.
  */
-export default function NotFound() {
+export default async function NotFound() {
+  const contact = await getBusiness();
+
   return (
     <div className="flex min-h-dvh flex-col">
       <main id="main" className="flex flex-1 items-center">
@@ -36,11 +39,11 @@ export default function NotFound() {
               </Link>
 
               <a
-                href={business.phoneHref}
+                href={contact.phoneHref}
                 className={buttonClasses({ variant: "secondary", size: "lg" })}
               >
                 <PhoneIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
-                <span className="tabular">{business.phone}</span>
+                <span className="tabular">{contact.phone}</span>
               </a>
             </div>
 
