@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ReceiptIcon } from "@phosphor-icons/react/dist/ssr";
+import { EyeIcon, ReceiptIcon } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
 import { Card, DetailRow } from "@/components/ui/surface";
 import { QuoteStatusBadge } from "@/components/ui/badge";
@@ -107,7 +107,21 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                 Read it back as the customer will. Nothing has left your account yet.
               </p>
 
-              <div className="mt-5">
+              {/* Preview first, send second — deliberately in that order. This
+                  is the last point at which a wrong price is still private. */}
+              <Link
+                href={`/app/quotes/${quote.id}/preview`}
+                className={buttonClasses({
+                  variant: "secondary",
+                  fullWidth: true,
+                  className: "mt-5",
+                })}
+              >
+                <EyeIcon size={18} aria-hidden="true" />
+                See it as the customer will
+              </Link>
+
+              <div className="mt-2.5">
                 <SendQuoteButton
                   quoteId={quote.id}
                   clientEmail={quote.client?.email ?? null}
