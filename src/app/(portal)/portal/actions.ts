@@ -231,7 +231,7 @@ export async function postMessage(formData: FormData): Promise<ActionResult> {
   try {
     const { data: job } = await supabase
       .from("jobs")
-      .select("title")
+      .select("title, reference, client:clients(full_name)")
       .eq("id", parsed.data.job_id)
       .maybeSingle();
 
@@ -241,16 +241,37 @@ export async function postMessage(formData: FormData): Promise<ActionResult> {
       const { notifyClientMessage } = await import("@/lib/notify-client");
       await notifyClientMessage(parsed.data.job_id, jobTitle, parsed.data.body);
     } else {
-      const { pushToStaff } = await import("@/lib/push");
-      await pushToStaff({
-        title: "Message from a customer",
-        body:
-          parsed.data.body.length > 120
-            ? `${parsed.data.body.slice(0, 117).trimEnd()}…`
-            : parsed.data.body,
-        url: `/app/jobs/${parsed.data.job_id}`,
-        tag: `job-${parsed.data.job_id}`,
-      });
+      // Email AND push, matching the other direction. Push alone meant a
+      // customer's reply reached nothing at all on any device where
+      // notifications had not been switched on — the same silent failure the
+      // enquiry alert already had. Email is the floor; push makes it immediate.
+      const [{ sendOwnerMessageNotification }, { pushToStaff }] = await Promise.all([
+        import("@/lib/email"),
+        import("@/lib/push"),
+      ]);
+
+      const preview =
+        parsed.data.body.length > 120
+          ? `${parsed.data.body.slice(0, 117).trimEnd()}…`
+          : parsed.data.body;
+
+      const clientName = job?.client?.full_name ?? "A customer";
+
+      await Promise.all([
+        sendOwnerMessageNotification(
+          clientName,
+          jobTitle,
+          job?.reference ?? "",
+          parsed.data.body,
+          parsed.data.job_id,
+        ),
+        pushToStaff({
+          title: `${clientName} replied`,
+          body: preview,
+          url: `/app/jobs/${parsed.data.job_id}`,
+          tag: `job-${parsed.data.job_id}`,
+        }),
+      ]);
     }
   } catch (notifyError) {
     // The message is already saved. Failing to announce it must not lose it.

@@ -32,9 +32,15 @@ export default async function PortalDetailsPage() {
 
   return (
     <>
+      {/*
+        "Your account", not "Your details". The page holds contact details,
+        addresses AND notification settings, and a customer hunting for the
+        latter would never guess they were filed under "details" — nor scroll
+        past two cards of addresses to find out.
+      */}
       <PageHeader
-        title="Your details"
-        description="What we have on file for you, and where to change it."
+        title="Your account"
+        description="Your contact details, your addresses, and what we get in touch about."
       />
 
       <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">

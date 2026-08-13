@@ -590,3 +590,48 @@ export async function sendJobCompleted(
 
   return send(to, `Finished — ${jobTitle}`, html, text);
 }
+
+/**
+ * A customer replied on a job thread.
+ *
+ * Push alone was not enough: it only reaches a device where notifications
+ * have been switched on, so on any other device a customer's message arrived
+ * nowhere at all. Email is the floor — it always works — and push is the thing
+ * that makes it immediate. Goes to the same recipients as a new enquiry.
+ */
+export async function sendOwnerMessageNotification(
+  clientName: string,
+  jobTitle: string,
+  jobReference: string,
+  messageBody: string,
+  jobId: string,
+): Promise<SendResult> {
+  const recipients = await notificationRecipients();
+  if (recipients.length === 0) {
+    return { sent: false, error: "No notification recipients configured" };
+  }
+
+  const to = recipients.length === 1 ? recipients[0]! : recipients;
+  const link = `${siteUrl()}/app/jobs/${jobId}`;
+
+  const html = await layout(
+    `${clientName} replied`,
+    `<p style="margin:0 0 8px;font-size:14px;color:#6b6055;">${esc(jobReference)} — ${esc(jobTitle)}</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
+       <tr><td style="padding:18px 20px;">
+         <p style="margin:0;font-size:15px;line-height:1.6;white-space:pre-wrap;">${esc(messageBody)}</p>
+       </td></tr>
+     </table>
+     ${button(link, "Open the job and reply")}`,
+  );
+
+  const text = [
+    `${clientName} replied on ${jobReference} — ${jobTitle}:`,
+    "",
+    messageBody,
+    "",
+    link,
+  ].join("\n");
+
+  return send(to, `${clientName} replied — ${jobReference}`, html, text);
+}

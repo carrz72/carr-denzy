@@ -25,7 +25,9 @@ export default async function PortalLayout({ children }: { children: React.React
         { href: "/portal", label: "Jobs", icon: <HouseIcon size={21} /> },
         { href: "/portal/quotes", label: "Quotes", icon: <FileTextIcon size={21} /> },
         { href: "/portal/invoices", label: "Invoices", icon: <ReceiptIcon size={21} /> },
-        { href: "/portal/details", label: "Details", icon: <UserCircleIcon size={21} /> },
+        // "Account" rather than "Details": the tab holds notification settings
+        // too, and nobody looking for those would tap "Details".
+        { href: "/portal/details", label: "Account", icon: <UserCircleIcon size={21} /> },
       ]}
     >
       {/*
