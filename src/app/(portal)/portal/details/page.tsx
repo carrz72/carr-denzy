@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/app-shell";
 import { Card } from "@/components/ui/surface";
 import { EmptyState } from "@/components/ui/states";
 import { DetailsForm } from "@/components/portal/details-form";
+import { NotificationPreferences } from "@/components/portal/notification-preferences";
+import { PushToggle } from "@/components/owner/push-toggle";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient, requireUser } from "@/lib/auth";
 import { business } from "@/lib/site";
@@ -131,6 +133,23 @@ export default async function PortalDetailsPage() {
           />
         </div>
       ) : null}
+      {/*
+        Only shown once there is a customer record — preferences on a record
+        that does not exist yet would save nowhere, and the empty state above
+        already explains why it is missing.
+      */}
+      {client ? (
+        <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
+          <NotificationPreferences
+            notifyBooking={client.notify_booking}
+            notifyMessages={client.notify_messages}
+            notifyCompletion={client.notify_completion}
+          />
+
+          <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+        </div>
+      ) : null}
+
     </>
   );
 }

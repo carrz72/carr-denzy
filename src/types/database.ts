@@ -66,6 +66,8 @@ export type Settings = {
   payment_terms_days: number;
   quote_valid_days: number;
   invoice_footer_note: string | null;
+  /** Everyone who gets new-enquiry alerts. Empty falls back to OWNER_NOTIFICATION_EMAIL. */
+  notification_emails: string[];
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +93,10 @@ export type Client = {
   phone: string | null;
   company_name: string | null;
   notes: string | null;
+  /** Customer-controlled. All default true — these concern work they asked for. */
+  notify_booking: boolean;
+  notify_messages: boolean;
+  notify_completion: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -323,6 +329,18 @@ export type Closure = {
   updated_at: string;
 }
 
+export type PushSubscriptionRow = {
+  id: string;
+  profile_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  failure_count: number;
+}
+
 export type AuditLogEntry = {
   id: number;
   actor_id: string | null;
@@ -488,6 +506,11 @@ export type Database = {
 
       closures: Table<Closure, "starts_on" | "ends_on">;
 
+      push_subscriptions: Table<
+        PushSubscriptionRow,
+        "profile_id" | "endpoint" | "p256dh" | "auth",
+        [Rel<"push_subscriptions_profile_id_fkey", "profile_id", "profiles">]
+      >;
       audit_log: Table<AuditLogEntry, "action">;
     };
     Views: Record<string, never>;

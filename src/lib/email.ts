@@ -35,7 +35,8 @@ export interface EmailAttachment {
 }
 
 async function send(
-  to: string,
+  /** One address, or several — Resend takes an array and sends once. */
+  to: string | string[],
   subject: string,
   html: string,
   text: string,
@@ -48,7 +49,7 @@ async function send(
       [
         "",
         "──────────── email (not sent: RESEND_API_KEY is unset) ────────────",
-        `To:      ${to}`,
+        `To:      ${Array.isArray(to) ? to.join(", ") : to}`,
         `Subject: ${subject}`,
         attachments?.length ? `Attachments: ${attachments.map((a) => a.filename).join(", ")}` : "",
         "",
@@ -168,9 +169,44 @@ const urgencyWords: Record<EnquiryEmailData["urgency"], string> = {
   flexible: "Flexible — no particular rush",
 };
 
+/**
+ * Everyone who should be told about a new enquiry.
+ *
+ * Read from Settings so the owner can add a partner, an office number or a
+ * second engineer without a developer. The environment variable stays as the
+ * fallback: an empty list must never mean silence — it means "nobody has
+ * customised this yet", and a missed enquiry is a lost job.
+ */
+async function notificationRecipients(): Promise<string[]> {
+  const fallback = process.env.OWNER_NOTIFICATION_EMAIL;
+
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+
+    const { data } = await admin.from("settings").select("notification_emails").maybeSingle();
+
+    const configured = (data?.notification_emails ?? [])
+      .map((address) => address.trim())
+      .filter(Boolean);
+
+    if (configured.length > 0) return configured;
+  } catch (error) {
+    console.error("[email] could not read notification recipients", error);
+  }
+
+  return fallback ? [fallback] : [];
+}
+
 export async function sendOwnerEnquiryNotification(data: EnquiryEmailData): Promise<SendResult> {
-  const to = process.env.OWNER_NOTIFICATION_EMAIL;
-  if (!to) return { sent: false, error: "OWNER_NOTIFICATION_EMAIL is not configured" };
+  const recipients = await notificationRecipients();
+
+  if (recipients.length === 0) {
+    return { sent: false, error: "No notification recipients configured" };
+  }
+
+  // Resend accepts an array; one call, one send, everyone gets it.
+  const to = recipients.length === 1 ? recipients[0]! : recipients;
 
   const link = `${siteUrl()}/app/enquiries/${data.enquiryId}`;
 
@@ -431,4 +467,126 @@ export async function sendQuoteResponseToOwner(
     .join("\n");
 
   return send(to, `Quote ${reference} ${verb}`, html, text);
+}
+
+// ---------------------------------------------------------------------------
+// Keeping the customer informed
+//
+// These three cover the gap between "we have your request" and "here is your
+// invoice", which was previously silent. All are transactional — they concern
+// work the customer asked for — so they carry no unsubscribe footer, but each
+// is gated on a per-customer preference they control in their account.
+// ---------------------------------------------------------------------------
+
+export async function sendBookingConfirmation(
+  to: string,
+  clientName: string,
+  jobTitle: string,
+  whenLabel: string,
+  arrivalWindow: string | null,
+  address: string | null,
+  jobId: string,
+): Promise<SendResult> {
+  const link = `${siteUrl()}/portal/jobs/${jobId}`;
+  const phone = await businessPhone();
+
+  const html = await layout(
+    "You are booked in",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We have you booked in for <strong>${esc(jobTitle)}</strong>.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
+       <tr><td style="padding:18px 20px;">
+         <p style="margin:0 0 4px;font-size:13px;color:#6b6055;">When</p>
+         <p style="margin:0 0 14px;font-size:17px;font-weight:700;">${esc(whenLabel)}</p>
+         ${arrivalWindow ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6055;">Arriving</p><p style="margin:0 0 14px;font-size:15px;">${esc(arrivalWindow)}</p>` : ""}
+         ${address ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6055;">Where</p><p style="margin:0;font-size:15px;">${esc(address)}</p>` : ""}
+       </td></tr>
+     </table>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">If that no longer suits, ring us on <strong>${esc(phone)}</strong> and we will move it — the earlier the better for both of us.</p>
+     ${button(link, "See the job")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `We have you booked in for ${jobTitle}.`,
+    "",
+    `When: ${whenLabel}`,
+    arrivalWindow ? `Arriving: ${arrivalWindow}` : "",
+    address ? `Where: ${address}` : "",
+    "",
+    `If that no longer suits, ring us on ${phone}.`,
+    "",
+    link,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return send(to, `Booked in — ${whenLabel}`, html, text);
+}
+
+export async function sendJobMessageToClient(
+  to: string,
+  clientName: string,
+  jobTitle: string,
+  messageBody: string,
+  jobId: string,
+): Promise<SendResult> {
+  const link = `${siteUrl()}/portal/jobs/${jobId}`;
+
+  const html = await layout(
+    "A message about your job",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 8px;font-size:14px;color:#6b6055;">About ${esc(jobTitle)}:</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
+       <tr><td style="padding:18px 20px;">
+         <p style="margin:0;font-size:15px;line-height:1.6;white-space:pre-wrap;">${esc(messageBody)}</p>
+       </td></tr>
+     </table>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">You can reply in your account — we see it against the job.</p>
+     ${button(link, "Reply")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `About ${jobTitle}:`,
+    "",
+    messageBody,
+    "",
+    `Reply here: ${link}`,
+  ].join("\n");
+
+  return send(to, `Message about ${jobTitle}`, html, text);
+}
+
+export async function sendJobCompleted(
+  to: string,
+  clientName: string,
+  jobTitle: string,
+  jobId: string,
+): Promise<SendResult> {
+  const link = `${siteUrl()}/portal/jobs/${jobId}`;
+  const phone = await businessPhone();
+
+  const html = await layout(
+    "That is finished",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We have finished <strong>${esc(jobTitle)}</strong>. Your invoice will follow shortly — nothing is payable until then.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Any photographs we took are on the job in your account, and they stay there for whenever you need them.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">If anything is not right, ring us on <strong>${esc(phone)}</strong>. We would far rather come back and sort it than have you live with it.</p>
+     ${button(link, "See the job")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `We have finished ${jobTitle}. Your invoice will follow shortly — nothing is payable until then.`,
+    "",
+    `If anything is not right, ring us on ${phone}.`,
+    "",
+    link,
+  ].join("\n");
+
+  return send(to, `Finished — ${jobTitle}`, html, text);
 }

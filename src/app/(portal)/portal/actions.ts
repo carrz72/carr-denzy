@@ -221,7 +221,83 @@ export async function postMessage(formData: FormData): Promise<ActionResult> {
     };
   }
 
+  // Tell the OTHER side. This one action serves both the owner's job page and
+  // the customer's portal — same component, same thread — so who to notify
+  // depends on who sent it, not on which screen it came from.
+  //
+  // Without this the thread is silent in both directions: the owner writes
+  // "move the car off the drive before Tuesday" and reasonably assumes it was
+  // read, while the customer never knew it existed.
+  try {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("title")
+      .eq("id", parsed.data.job_id)
+      .maybeSingle();
+
+    const jobTitle = job?.title ?? "your job";
+
+    if (user.role === "owner" || user.role === "staff") {
+      const { notifyClientMessage } = await import("@/lib/notify-client");
+      await notifyClientMessage(parsed.data.job_id, jobTitle, parsed.data.body);
+    } else {
+      const { pushToStaff } = await import("@/lib/push");
+      await pushToStaff({
+        title: "Message from a customer",
+        body:
+          parsed.data.body.length > 120
+            ? `${parsed.data.body.slice(0, 117).trimEnd()}…`
+            : parsed.data.body,
+        url: `/app/jobs/${parsed.data.job_id}`,
+        tag: `job-${parsed.data.job_id}`,
+      });
+    }
+  } catch (notifyError) {
+    // The message is already saved. Failing to announce it must not lose it.
+    console.error("[portal] message notification failed", notifyError);
+  }
+
   revalidatePath(`/portal/jobs/${parsed.data.job_id}`);
+
+  return { ok: true };
+}
+
+/**
+ * The customer's own notification preferences.
+ *
+ * Written with the caller's session client, so the "client updates own contact
+ * details" RLS policy is what scopes it to their own row — there is no client
+ * id in the payload for a crafted request to swap.
+ */
+export async function updateNotificationPreferences(
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const supabase = await createClient();
+
+  // An unchecked box submits nothing at all, so absence means false. Reading
+  // them positively rather than trusting a hidden companion field keeps the
+  // form honest even if the markup changes.
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      notify_booking: formData.get("notify_booking") === "on",
+      notify_messages: formData.get("notify_messages") === "on",
+      notify_completion: formData.get("notify_completion") === "on",
+    })
+    // Scoped explicitly, not left to RLS alone. The policy would catch it, but
+    // a filter that reads "every client with a login" is one policy change away
+    // from rewriting everybody's preferences at once.
+    .eq("profile_id", user.id)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("[portal] preferences failed", error.message);
+    return { ok: false, formError: "Could not save that. Try again." };
+  }
+
+  revalidatePath("/portal/details");
 
   return { ok: true };
 }

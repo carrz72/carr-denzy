@@ -21,6 +21,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendInvoiceToClient, sendPortalInvite, sendQuoteToClient } from "@/lib/email";
 import { renderInvoicePdf, renderQuotePdf } from "@/lib/invoice-pdf";
+import { notifyClientBooked, notifyClientCompleted } from "@/lib/notify-client";
 import { formatPence } from "@/lib/money";
 import { addDaysToToday, formatDate } from "@/lib/dates";
 
@@ -393,6 +394,20 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
     };
   }
 
+  // Only completion is worth telling the customer about. Every other move —
+  // quoted, accepted, in progress — is either already covered by its own email
+  // or is internal bookkeeping, and a notification per status change would
+  // train them to ignore all of them.
+  if (parsed.data.status === "completed") {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("title")
+      .eq("id", parsed.data.job_id)
+      .maybeSingle();
+
+    if (job) await notifyClientCompleted(parsed.data.job_id, job.title);
+  }
+
   revalidatePath(`/app/jobs/${parsed.data.job_id}`);
   revalidatePath("/app", "layout");
 
@@ -458,6 +473,35 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
 
   if (error) {
     return { ok: false, formError: friendly(error.message, "Could not book that in. Try again.") };
+  }
+
+  // Tell the customer. "When are you coming?" is the question they ring about
+  // most, and until now the app knew the answer and never volunteered it.
+  const { data: booked } = await supabase
+    .from("jobs")
+    .select(`title, property:properties(address_line1, address_line2, city, postcode)`)
+    .eq("id", parsed.data.job_id)
+    .maybeSingle();
+
+  if (booked) {
+    const address = booked.property
+      ? [
+          booked.property.address_line1,
+          booked.property.address_line2,
+          booked.property.city,
+          booked.property.postcode,
+        ]
+          .filter(Boolean)
+          .join(", ")
+      : null;
+
+    await notifyClientBooked(
+      parsed.data.job_id,
+      booked.title,
+      startsAt,
+      parsed.data.duration_minutes,
+      address,
+    );
   }
 
   revalidatePath(`/app/jobs/${parsed.data.job_id}`);

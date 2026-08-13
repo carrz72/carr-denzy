@@ -3,7 +3,7 @@
 /**
  * Carr Denzy service worker.
  *
- * Two jobs, and deliberately no more:
+ * Three jobs, and deliberately no more:
  *
  *   1. Keep the app openable with no signal. Static assets are cached so the
  *      shell paints, and a failed navigation lands on a written offline page
@@ -14,13 +14,18 @@
  *      That is the promise made in src/lib/outbox.ts, and it can only be kept
  *      from here — the page is gone by then.
  *
+ *   3. Receive push notifications, so a new enquiry buzzes the phone rather
+ *      than waiting in an inbox nobody checks on a job. This too can only
+ *      happen here: the app is closed at the moment it matters.
+ *
  * What it deliberately does NOT do is cache HTML. Every page behind /app and
  * /portal is specific to who is signed in, and a cached page served to the next
  * visitor on a shared device would be a data leak. Documents are always fetched
  * from the network; only assets and the offline page come from the cache.
  */
 
-const VERSION = "v1";
+// Bumped when the cached asset set changes. Old caches are swept on activate.
+const VERSION = "v2";
 const ASSET_CACHE = `carr-denzy-assets-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
@@ -197,4 +202,102 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "flush-outbox") {
     event.waitUntil(replayOutbox());
   }
+});
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+
+self.addEventListener("push", (event) => {
+  // A push with no readable payload still has to show something. Browsers
+  // penalise — and on some platforms forcibly display a generic notification
+  // for — a push event that shows nothing at all, so there is no silent path.
+  let data = {
+    title: "Carr Denzy",
+    body: "Something needs your attention.",
+    url: "/app",
+    tag: "carr-denzy",
+    urgent: false,
+  };
+
+  if (event.data) {
+    try {
+      data = { ...data, ...event.data.json() };
+    } catch {
+      const text = event.data.text();
+      if (text) data.body = text;
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      // The tag collapses repeats: three enquiries in a minute become one
+      // updated notification rather than three separate buzzes. Emergencies
+      // get their own tag so they are never collapsed into routine ones.
+      tag: data.urgent ? `${data.tag}-urgent` : data.tag,
+      renotify: Boolean(data.urgent),
+      requireInteraction: Boolean(data.urgent),
+      // Vibration only fires on Android; iOS ignores it silently.
+      vibrate: data.urgent ? [200, 100, 200, 100, 200] : [150],
+      data: { url: data.url },
+      actions: [{ action: "open", title: "Open" }],
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const target = (event.notification.data && event.notification.data.url) || "/app";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      // Reuse an already-open window rather than stacking a second copy of the
+      // app on top of the one the owner already had. Tapping a notification
+      // should feel like switching to the app, not launching a new one.
+      for (const client of clients) {
+        if ("focus" in client) {
+          client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+
+      return self.clients.openWindow(target);
+    }),
+  );
+});
+
+/**
+ * Fires when the push service rotates a subscription out from under us.
+ *
+ * Without this the phone quietly stops receiving notifications and nobody
+ * finds out until an enquiry is missed. Re-subscribing and telling the server
+ * keeps it alive.
+ */
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const old = event.oldSubscription || (await self.registration.pushManager.getSubscription());
+        const applicationServerKey = old?.options?.applicationServerKey;
+        if (!applicationServerKey) return;
+
+        const fresh = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription: fresh, replaces: old?.endpoint ?? null }),
+        });
+      } catch {
+        // Nothing useful to do from here — the app re-registers on next open.
+      }
+    })(),
+  );
 });

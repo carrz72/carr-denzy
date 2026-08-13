@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sendEnquiryConfirmation, sendOwnerEnquiryNotification } from "@/lib/email";
+import { pushToStaff } from "@/lib/push";
 import { enquirySchema, fieldErrors } from "@/lib/validation";
 import { getMyClient } from "@/lib/auth";
 import { getService } from "@/lib/site";
@@ -177,16 +178,39 @@ export async function submitEnquiry(formData: FormData): Promise<EnquiryResult> 
     // --- 6. Notify ------------------------------------------------------
     // Email failure never fails the submission (spec E-15). The enquiry is
     // already saved and visible in the owner's inbox either way.
-    await sendOwnerEnquiryNotification({
-      reference: enquiry.reference,
-      fullName: input.full_name,
-      description: input.description,
-      urgency: input.urgency,
-      phone: input.phone || null,
-      email: input.email || null,
-      postcode: input.postcode || null,
-      enquiryId: enquiry.id,
-    });
+    // Email and push go out together rather than one after the other — an
+    // emergency enquiry should not wait on an SMTP round trip before the phone
+    // buzzes. Neither can fail the submission; the enquiry is already saved.
+    await Promise.all([
+      sendOwnerEnquiryNotification({
+        reference: enquiry.reference,
+        fullName: input.full_name,
+        description: input.description,
+        urgency: input.urgency,
+        phone: input.phone || null,
+        email: input.email || null,
+        postcode: input.postcode || null,
+        enquiryId: enquiry.id,
+      }),
+
+      pushToStaff({
+        title:
+          input.urgency === "emergency"
+            ? `Emergency — ${input.full_name}`
+            : `New job request from ${input.full_name}`,
+        // Trimmed, because a notification is read at a glance on a lock screen.
+        // Enough to decide whether to stop what you are doing.
+        body:
+          input.description.length > 120
+            ? `${input.description.slice(0, 117).trimEnd()}…`
+            : input.description,
+        url: `/app/enquiries/${enquiry.id}`,
+        tag: "enquiry",
+        // An emergency overrides the phone's grouping and stays on screen
+        // until dismissed. Everything else waits politely for the next unlock.
+        urgent: input.urgency === "emergency",
+      }),
+    ]);
 
     if (input.email) {
       await sendEnquiryConfirmation(
