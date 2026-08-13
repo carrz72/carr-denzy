@@ -16,8 +16,12 @@
 export const business = {
   name: "Carr Denzy Plumbing & Gas",
   shortName: "Carr Denzy",
-  phone: "07934 633583",
-  phoneHref: "tel:+447934633583",
+  // Fallback only — the live value comes from Settings via getBusiness().
+  // Kept in step with it deliberately: this is what the public site shows if
+  // the database is ever unreachable, so a wrong number here is a silent
+  // failure that only appears on the worst day.
+  phone: "07938 463358",
+  phoneHref: "tel:+447938463358",
   email: "carrdenzy@gmail.com",
   /**
    * Locality and region only, with no street address — deliberately.
