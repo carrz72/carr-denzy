@@ -140,21 +140,37 @@ export default async function PortalDetailsPage() {
         </div>
       ) : null}
       {/*
-        Only shown once there is a customer record — preferences on a record
-        that does not exist yet would save nowhere, and the empty state above
-        already explains why it is missing.
+        These two used to be hidden together behind `client`, which was wrong.
+        Push subscriptions key off `profiles`, and anybody reading this page has
+        one — so the toggle works perfectly well for somebody who has signed in
+        but not yet had a job taken on. Hiding it meant a blank section and no
+        explanation, which reads as broken rather than as "not yet".
       */}
-      {client ? (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
+        {client ? (
           <NotificationPreferences
             notifyBooking={client.notify_booking}
             notifyMessages={client.notify_messages}
             notifyCompletion={client.notify_completion}
           />
+        ) : (
+          // The email preferences genuinely need the customer record — the
+          // columns live on it. Say so rather than rendering nothing.
+          <Card>
+            <h2 className="font-display text-subheading text-ink">What we email you about</h2>
+            <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-ink-muted">
+              Once we have taken a job on for you, you can choose here what we get in
+              touch about — when a date is booked, when we message you, and when the work
+              is finished.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-ink-subtle">
+              Quotes and invoices are always sent, whatever you choose.
+            </p>
+          </Card>
+        )}
 
-          <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
-        </div>
-      ) : null}
+        <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+      </div>
 
     </>
   );
