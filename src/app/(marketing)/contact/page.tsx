@@ -23,6 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const contact = await getBusiness();
 
   return {
+    alternates: { canonical: "/contact" },
     title: "Contact",
     description: `Call ${contact.name} on ${contact.phone}, or send details of the job with photos. Covering Nottingham and the surrounding areas.`,
   };

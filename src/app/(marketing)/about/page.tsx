@@ -6,6 +6,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { business } from "@/lib/site";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/about" },
   title: "About us",
   description:
     "Gas Safe registered plumbers and builders working across Nottingham since 2004. How we quote, how we work, and what you can expect.",

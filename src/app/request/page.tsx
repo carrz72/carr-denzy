@@ -9,6 +9,7 @@ import { business, getService } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/request" },
   title: "Request a job",
   description:
     "Tell us what has gone wrong, attach photos from your phone, and get a written quote. No account needed.",

@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import type { PortfolioItem } from "@/types/database";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/work" },
   title: "Our work",
   description:
     "Photographs of completed plumbing, heating, bathroom and building jobs across Nottingham and Nottinghamshire.",

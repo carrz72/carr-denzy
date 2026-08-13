@@ -9,6 +9,7 @@ import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/services" },
   title: "What we do",
   description:
     "Plumbing, gas and boilers, heating, bathrooms, electrical, building repairs, property maintenance and extensions across Nottingham.",

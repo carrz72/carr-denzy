@@ -18,6 +18,7 @@ import { portfolioImageUrl } from "@/lib/portfolio";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/" },
   title: "Plumbers, heating and building repairs across Nottingham",
   description:
     "Gas Safe registered plumbers covering Nottingham and Nottinghamshire. Leaks and repairs, boiler servicing, heating, bathrooms and building work. Send photos of the problem and get a written quote.",

@@ -3,6 +3,7 @@ import { business } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/terms" },
   title: "Terms of service",
   description: "The terms on which Carr Denzy Plumbing & Gas quotes for and carries out work.",
   robots: { index: false, follow: true },

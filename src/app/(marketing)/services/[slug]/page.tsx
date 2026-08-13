@@ -25,6 +25,9 @@ export async function generateMetadata({
   if (!service) return { title: "Service not found" };
 
   return {
+    // Each service page is a separate landing target for searches like
+    // "boiler repair Nottingham", so each needs its own canonical.
+    alternates: { canonical: `/services/${service.slug}` },
     title: service.name,
     description: service.blurb,
     openGraph: { title: `${service.name} · Carr Denzy`, description: service.blurb },

@@ -63,8 +63,8 @@ while the built-in service is in use.
 
 Dashboard → **Authentication** → **URL Configuration**:
 
-- **Site URL** — the live domain, e.g. `https://carrdenzy.co.uk`
-- **Redirect URLs** — must include `https://carrdenzy.co.uk/auth/callback`, and
+- **Site URL** — the live domain, e.g. `https://www.carrdenzy.com`
+- **Redirect URLs** — must include `https://www.carrdenzy.com/auth/callback`, and
   `http://localhost:3000/auth/callback` for local work
 
 If the production callback is missing, sign-in links silently redirect to
