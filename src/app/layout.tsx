@@ -80,12 +80,28 @@ export const metadata: Metadata = {
     title: "Carr Denzy",
     statusBarStyle: "default",
   },
+  /**
+   * Icons, ordered for Google as much as for browsers.
+   *
+   * Google shows a site icon beside the search result, and it has two
+   * requirements this used to fail. It looks for a root-level `/favicon.ico`
+   * first — there wasn't one, so the result showed the grey globe. And the
+   * icon it picks must be square with sides a MULTIPLE OF 48px; the 32x32 that
+   * was declared first is not, so even once found it was not a candidate.
+   *
+   * 48, 96 and 144 are all multiples of 48. The 32 is kept last, purely for
+   * browser tabs, where it is the right size and Google is not looking.
+   */
   icons: {
     icon: [
-      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon.ico", sizes: "32x32 48x48", type: "image/x-icon" },
+      { url: "/icons/favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icons/favicon-96.png", sizes: "96x96", type: "image/png" },
+      { url: "/icons/favicon-144.png", sizes: "144x144", type: "image/png" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
     ],
+    shortcut: "/favicon.ico",
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
   },
   robots: { index: true, follow: true },
