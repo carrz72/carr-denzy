@@ -238,7 +238,17 @@ self.addEventListener("push", (event) => {
       // updated notification rather than three separate buzzes. Emergencies
       // get their own tag so they are never collapsed into routine ones.
       tag: data.urgent ? `${data.tag}-urgent` : data.tag,
-      renotify: Boolean(data.urgent),
+      // Always re-alert, even when replacing a notification with the same tag.
+      //
+      // This was `Boolean(data.urgent)`, which meant a second enquiry arriving
+      // while the first was still sitting in the notification shade replaced it
+      // SILENTLY — no sound, no buzz, no banner. The count on screen went up
+      // and nothing told anybody. For a one-man trade business the second
+      // enquiry is a second job, and a job nobody hears about is a job lost.
+      //
+      // Collapsing still happens, so the shade stays tidy; it just never
+      // happens quietly.
+      renotify: true,
       requireInteraction: Boolean(data.urgent),
       // Vibration only fires on Android; iOS ignores it silently.
       vibrate: data.urgent ? [200, 100, 200, 100, 200] : [150],
