@@ -102,14 +102,22 @@ export default async function QuotePreviewPage({
         <div className="mt-6 flex flex-col gap-3">
           {/* Disabled rather than omitted: the owner needs to see the weight
               these two give the page, since they are the whole point of it. */}
+          {/* Stacked to match the customer's page exactly — see the comment in
+              quote-link-response.tsx. A preview that differs from the real
+              thing is worse than no preview. */}
           <button
             type="button"
             disabled
             aria-disabled="true"
-            className={buttonClasses({ size: "lg", fullWidth: true })}
+            className={buttonClasses({ size: "lg", fullWidth: true, className: "py-3.5" })}
           >
             <CheckIcon size={20} weight="bold" aria-hidden="true" />
-            Accept this quote — {formatPence(quote.total_pence)}
+            <span className="flex flex-col items-center leading-tight">
+              <span>Accept this quote</span>
+              <span className="mt-0.5 text-sm font-semibold opacity-90 tabular-nums">
+                {formatPence(quote.total_pence)}
+              </span>
+            </span>
           </button>
 
           <button

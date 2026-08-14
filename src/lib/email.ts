@@ -72,9 +72,20 @@ async function send(
       filename: a.filename,
       content: a.content.toString("base64"),
     }));
+    // Sent FROM the verified domain, but replies go to a mailbox that actually
+    // exists.
+    //
+    // The `from` address only has to be on a domain verified with Resend — it
+    // needs no inbox, and `hello@carrdenzy.com` has none: the apex MX points at
+    // Resend's inbound handler, so a customer replying to a quote would be
+    // writing into a void. Reply-To sends those to the business email held in
+    // Settings, which is a real inbox somebody reads.
+    const { email: replyTo } = await getBusiness();
+
     const { error } = await resend.emails.send({
       from,
       to,
+      replyTo,
       subject,
       html,
       text,

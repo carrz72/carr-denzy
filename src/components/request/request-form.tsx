@@ -92,6 +92,27 @@ export function RequestForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
 
+  /**
+   * Clears one field's error as soon as the person starts fixing it.
+   *
+   * Errors are raised on Continue and on submit. Without this they persisted
+   * while somebody typed the very answer they had been asked for, so the field
+   * sat red the entire time they were correcting it — which reads as "typing
+   * is causing an error" rather than "this needed attention".
+   *
+   * Deliberately clears rather than re-validating on each keystroke: telling
+   * somebody their half-typed sentence is too short, on every letter, is worse
+   * than saying nothing until they are done.
+   */
+  const clearError = (name: string) => {
+    setErrors((current) => {
+      if (!current[name]) return current;
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
+  };
+
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -411,7 +432,10 @@ export function RequestForm({
               required
               rows={6}
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                clearError("description");
+              }}
               error={errors.description}
             />
 
@@ -505,13 +529,24 @@ export function RequestForm({
                 without a visit. Up to {MAX_PHOTOS}.
               </p>
 
+              {/*
+                No `capture` attribute, deliberately.
+
+                It used to say `capture="environment"`, which does not mean
+                "offer the camera" — it means "go straight to the camera and
+                do not show anything else". On a phone that removed the photo
+                library entirely, so somebody who had already photographed the
+                leak before finding the site could not attach those pictures.
+
+                Without it the OS shows its normal chooser: take a photo, pick
+                from the library, or browse files. Which is what people expect.
+              */}
               <input
                 ref={fileInputRef}
                 id="field-photos"
                 type="file"
                 accept={ACCEPTED_TYPES.join(",")}
                 multiple
-                capture="environment"
                 onChange={(event) => void handleFiles(event.target.files)}
                 className="sr-only"
               />
@@ -594,6 +629,7 @@ export function RequestForm({
               label="Address"
               placeholder="14 Rye Lane"
               autoComplete="address-line1"
+              onChange={() => clearError("address_line1")}
               error={errors.address_line1}
             />
 
@@ -602,6 +638,7 @@ export function RequestForm({
               label="Address line 2"
               placeholder="Flat 2"
               autoComplete="address-line2"
+              onChange={() => clearError("address_line2")}
               error={errors.address_line2}
             />
 
@@ -611,7 +648,8 @@ export function RequestForm({
                 label="Town or city"
                 placeholder="Nottingham"
                 autoComplete="address-level2"
-                error={errors.city}
+                onChange={() => clearError("city")}
+              error={errors.city}
               />
 
               <TextField
@@ -620,7 +658,8 @@ export function RequestForm({
                 placeholder="NG1 5AA"
                 autoComplete="postal-code"
                 autoCapitalize="characters"
-                error={errors.postcode}
+                onChange={() => clearError("postcode")}
+              error={errors.postcode}
               />
             </div>
 
@@ -630,6 +669,7 @@ export function RequestForm({
               hint="For example: any weekday morning, or Tuesdays and Thursdays after 2pm."
               placeholder="Weekday mornings are best. I work from home on Wednesdays."
               rows={3}
+              onChange={() => clearError("preferred_dates")}
               error={errors.preferred_dates}
             />
           </div>
@@ -652,6 +692,7 @@ export function RequestForm({
               autoComplete="name"
               placeholder="Marcus Adeyemi"
               defaultValue={signedInAs?.fullName ?? ""}
+              onChange={() => clearError("full_name")}
               error={errors.full_name}
             />
 
@@ -664,6 +705,7 @@ export function RequestForm({
               placeholder="07700 900412"
               hint="The fastest way for us to reach you."
               defaultValue={signedInAs?.phone ?? ""}
+              onChange={() => clearError("phone")}
               error={errors.phone}
             />
 
@@ -676,6 +718,7 @@ export function RequestForm({
               placeholder="marcus@example.com"
               hint="We send your reference and, later, your quote here."
               defaultValue={signedInAs?.email ?? ""}
+              onChange={() => clearError("email")}
               error={errors.email}
             />
 

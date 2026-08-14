@@ -142,6 +142,13 @@ export function QuoteLinkResponse({
       ) : (
         <>
           <div className="mt-6 flex flex-col gap-3">
+            {/*
+              Stacked, not "Accept this quote — £1,240.00" on one line.
+              Buttons carry `whitespace-nowrap`, so that version silently
+              clipped its own price at 320px on any four-figure quote — the
+              valuable ones — on the button that wins the work. Two lines fit
+              any amount and read more clearly at a glance anyway.
+            */}
             <Button
               size="lg"
               fullWidth
@@ -149,8 +156,14 @@ export function QuoteLinkResponse({
               loadingLabel="Recording your answer…"
               onClick={handleAccept}
               icon={<CheckIcon size={20} weight="bold" />}
+              className="py-3.5"
             >
-              Accept this quote — {formatPence(totalPence)}
+              <span className="flex flex-col items-center leading-tight">
+                <span>Accept this quote</span>
+                <span className="mt-0.5 text-sm font-semibold opacity-90 tabular-nums">
+                  {formatPence(totalPence)}
+                </span>
+              </span>
             </Button>
 
             <Button
