@@ -60,15 +60,10 @@ function friendly(message: string | undefined, fallback: string): string {
 // Enquiries
 // ---------------------------------------------------------------------------
 
-export async function markEnquiryRead(enquiryId: string): Promise<void> {
-  await requireStaff();
-  const supabase = await createClient();
-
-  await supabase.from("enquiries").update({ status: "read" }).eq("id", enquiryId).eq("status", "new");
-
-  revalidatePath("/app/enquiries");
-  revalidatePath("/app", "layout");
-}
+// Marking an enquiry read lives in the enquiry page itself, inside `after()`.
+// It was a server action here, and the page called it while rendering — which
+// silently broke the page, because a server action revalidates paths and you
+// cannot revalidate the tree you are in the middle of rendering.
 
 export async function declineEnquiry(formData: FormData): Promise<ActionResult> {
   await requireOwner();

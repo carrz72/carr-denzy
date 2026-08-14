@@ -1,5 +1,7 @@
 import Image from "next/image";
+import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import type { Metadata } from "next";
 import {
   EnvelopeSimpleIcon,
@@ -11,7 +13,6 @@ import { Card, DetailRow } from "@/components/ui/surface";
 import { Badge, UrgencyBadge } from "@/components/ui/badge";
 import { EnquiryActions } from "@/components/owner/enquiry-actions";
 import { createClient } from "@/lib/supabase/server";
-import { markEnquiryRead } from "@/app/(app)/app/actions";
 import { formatDateTime } from "@/lib/dates";
 import { signedPhotoUrls } from "@/lib/storage";
 
@@ -21,15 +22,41 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const supabase = await createClient();
 
+  // Marking the enquiry read happens AFTER the response, never during render.
+  //
+  // `markEnquiryRead` is a server action, and it calls `revalidatePath`. Doing
+  // that while the page is rendering is not allowed — React was already
+  // rendering the tree that revalidation invalidates. Next did not throw
+  // anything visible: it abandoned the segment, sent the loading skeleton, and
+  // never sent the completion instruction that swaps the real content in. The
+  // page sat on its skeleton for ever, with a 200 and a silent server log.
+  //
+  // `after()` exists for exactly this — work that must happen because of a
+  // request but that the response must not wait on.
+  //
+  // The update is written out here rather than calling `markEnquiryRead`,
+  // because that action builds its own Supabase client, and building one reads
+  // cookies — which `after()` forbids. The client made above is fine to use
+  // inside: it captured the cookie store when it was created, out here, and
+  // only reads from that captured copy afterwards.
+  //
+  // `status = 'new'` in the filter is what makes this safe to run on every
+  // view: re-reading an enquiry that is already read changes nothing.
+  after(async () => {
+    await supabase
+      .from("enquiries")
+      .update({ status: "read" })
+      .eq("id", id)
+      .eq("status", "new");
+
+    revalidatePath("/app/enquiries");
+    revalidatePath("/app", "layout");
+  });
+
   // This page used to make five sequential database round trips, each waiting
   // on the one before it. Only two of the dependencies are real: the customer
   // match needs the enquiry's email and phone, and the signed URLs need the
   // photo paths. Everything else only ever needed the id from the URL.
-  //
-  // Two waves instead of five. `markEnquiryRead` rides along in the first —
-  // marking something read is not a fact the page renders, so nothing should
-  // wait on it. It is safe to call unconditionally because the action itself
-  // filters on `status = 'new'`.
   const [{ data: enquiry }, { data: photos }] = await Promise.all([
     supabase.from("enquiries").select("*").eq("id", id).maybeSingle(),
     supabase
@@ -37,7 +64,6 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
       .select("id, storage_path, created_at")
       .eq("enquiry_id", id)
       .order("created_at", { ascending: true }),
-    markEnquiryRead(id),
   ]);
 
   if (!enquiry) notFound();
