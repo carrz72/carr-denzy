@@ -211,7 +211,20 @@ export function PageHeader({
           ) : null}
         </div>
 
-        {action ? <div className="shrink-0">{action}</div> : null}
+        {/*
+          `sm:shrink-0`, not `shrink-0`.
+
+          A plain `shrink-0` pinned this to its natural width — with three
+          buttons on the Today screen that is 373px, wider than the 372px
+          content box on a 412px phone and 69px wider on a small one. The inner
+          `flex-wrap` never got a chance to wrap, because the wrapper always
+          sized to max-content, so the whole page scrolled sideways by a sliver.
+
+          Below `sm` it may now shrink and let its buttons wrap onto a second
+          line; from `sm` up it holds its size so the actions stay beside the
+          title on the screens that have room.
+        */}
+        {action ? <div className="w-full sm:w-auto sm:shrink-0">{action}</div> : null}
       </div>
     </div>
   );

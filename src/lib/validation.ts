@@ -47,10 +47,13 @@ export const enquirySchema = z
     phone: z.union([ukPhone, z.literal("")]).optional(),
     service_slug: trimmed(80).optional(),
     service_label: trimmed(120).optional(),
+    // Kept in step with the client check in request-form.tsx and the database
+    // CHECK constraint. All three must agree — a stricter database than form
+    // means an enquiry that passes validation and then vanishes on insert.
     description: z
       .string()
       .trim()
-      .min(10, "Please describe the problem in a sentence or two")
+      .min(3, "Tell us briefly what has gone wrong")
       .max(4000, "That is longer than we can store — please summarise the key points"),
     urgency: z.enum(["emergency", "soon", "flexible"]),
     address_line1: trimmed(200).optional(),

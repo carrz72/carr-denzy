@@ -157,8 +157,14 @@ export function RequestForm({
   function validateStepOne(): boolean {
     const next: Record<string, string> = {};
 
-    if (description.trim().length < 10) {
-      next.description = "Please describe the problem in a sentence or two";
+    // Three characters, not ten.
+    //
+    // Ten blocked "Leak" — which, with a photograph and a phone number
+    // attached, is a perfectly actionable job request. The point of this form
+    // is to catch enquiries, not to grade them; anything genuinely unclear is
+    // a phone call away. This now stops only an empty box or a stray keypress.
+    if (description.trim().length < 3) {
+      next.description = "Tell us briefly what has gone wrong";
     }
 
     setErrors(next);
