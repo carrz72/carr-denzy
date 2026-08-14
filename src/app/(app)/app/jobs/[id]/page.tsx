@@ -166,7 +166,11 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
         </div>
 
         <div className="flex flex-col gap-6">
-          <JobStatusControl jobId={job.id} status={job.status} />
+          <JobStatusControl
+            jobId={job.id}
+            status={job.status}
+            clientName={job.client?.full_name ?? null}
+          />
 
           {job.client ? (
             <Card>

@@ -3,6 +3,7 @@ import "server-only";
 import { Resend } from "resend";
 
 import { getBusiness } from "@/lib/business";
+import { formatPence } from "@/lib/money";
 
 /**
  * Email.
@@ -497,6 +498,173 @@ export async function sendInvoiceToClient(
   return send(to, `Invoice ${reference} — ${totalFormatted}`, html, text, attachments);
 }
 
+/**
+ * Confirms to a customer that their money arrived.
+ *
+ * Bank transfer is the only payment method here, and a bank transfer gives the
+ * payer no receipt from anybody — they push the money and hear nothing. The
+ * polite ones then ring to ask whether it landed, and the anxious ones pay
+ * twice. One email removes both.
+ *
+ * Deliberately NOT gated on the customer's notification preferences. Those
+ * cover conveniences — booking reminders, messages. This is a money document,
+ * like the invoice it settles, and the invoice is not optional either.
+ */
+export async function sendPaymentReceipt(
+  to: string,
+  fullName: string,
+  reference: string,
+  amountPence: number,
+  outstandingPence: number,
+  invoiceId: string,
+): Promise<SendResult> {
+  const settled = outstandingPence <= 0;
+
+  const amount = formatPence(amountPence);
+  const outstanding = formatPence(outstandingPence);
+
+  const closing = settled
+    ? "That settles the invoice in full — there is nothing more to pay. Thank you."
+    : `That leaves <strong>${esc(outstanding)}</strong> outstanding on this invoice.`;
+
+  const closingText = settled
+    ? "That settles the invoice in full — there is nothing more to pay. Thank you."
+    : `That leaves ${outstanding} outstanding on this invoice.`;
+
+  const html = await layout(
+    settled ? "Payment received — thank you" : "Payment received",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(fullName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We have received your payment of <strong>${esc(amount)}</strong> against invoice <strong>${esc(reference)}</strong>.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${closing}</p>
+     ${button(`${siteUrl()}/invoices/view/${invoiceId}`, "See the invoice")}`,
+  );
+
+  const text = [
+    `Hello ${fullName},`,
+    "",
+    `We have received your payment of ${amount} against invoice ${reference}.`,
+    "",
+    closingText,
+    "",
+    `See the invoice: ${siteUrl()}/invoices/view/${invoiceId}`,
+    "",
+    `Carr Denzy Plumbing & Gas · ${await businessPhone()}`,
+  ].join("\n");
+
+  return send(
+    to,
+    settled ? `Payment received — ${reference}` : `Part payment received — ${reference}`,
+    html,
+    text,
+  );
+}
+
+/**
+ * A polite nudge about an invoice that has gone past its due date.
+ *
+ * Written to assume the customer forgot, because they almost always did. A
+ * one-man business chasing money is the least comfortable job in the week, and
+ * the discomfort is why it does not happen — invoices are not unpaid because
+ * nobody noticed, they are unpaid because nobody wanted to make the call. A
+ * civil email that goes out on its own removes the decision.
+ *
+ * No threats, no late-payment charges, no capital letters. If a reminder has
+ * to escalate, that is a phone call from a human, not an automated one.
+ */
+export async function sendInvoiceReminder(
+  to: string,
+  clientName: string,
+  reference: string,
+  outstandingPence: number,
+  daysOverdue: number,
+  invoiceId: string,
+): Promise<SendResult> {
+  const link = `${siteUrl()}/invoices/view/${invoiceId}`;
+  const phone = await businessPhone();
+  const amount = formatPence(outstandingPence);
+
+  const timing =
+    daysOverdue <= 0
+      ? "which is due today"
+      : daysOverdue === 1
+        ? "which was due yesterday"
+        : `which was due ${daysOverdue} days ago`;
+
+  const html = await layout(
+    "A reminder about your invoice",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">This is a gentle reminder about invoice <strong>${esc(reference)}</strong> for <strong>${esc(amount)}</strong>, ${esc(timing)}.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">If you have already paid it in the last day or two, thank you — please ignore this, our records simply have not caught up.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">The bank details are on the invoice. If there is a problem with it, or you would rather sort something out, just ring me on <strong>${esc(phone)}</strong>.</p>
+     ${button(link, "See the invoice")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `This is a gentle reminder about invoice ${reference} for ${amount}, ${timing}.`,
+    "",
+    "If you have already paid it in the last day or two, thank you — please ignore this.",
+    "",
+    `The bank details are on the invoice. If there is a problem with it, ring me on ${phone}.`,
+    "",
+    link,
+  ].join("\n");
+
+  return send(to, `Reminder — invoice ${reference}`, html, text);
+}
+
+/**
+ * Tells a customer their quote is about to run out.
+ *
+ * Genuinely useful to both sides rather than a sales tactic: prices for parts
+ * and materials do move, and a quote honoured six months late costs the
+ * business money. Saying so a few days ahead gives somebody who meant to say
+ * yes the prompt they needed, and gives the owner a clean reason to re-price
+ * the rest.
+ */
+export async function sendQuoteExpiryReminder(
+  to: string,
+  clientName: string,
+  reference: string,
+  totalPence: number,
+  daysLeft: number,
+  quoteId: string,
+): Promise<SendResult> {
+  const link = `${siteUrl()}/quotes/view/${quoteId}`;
+  const phone = await businessPhone();
+
+  const timing =
+    daysLeft <= 0
+      ? "runs out today"
+      : daysLeft === 1
+        ? "runs out tomorrow"
+        : `runs out in ${daysLeft} days`;
+
+  const html = await layout(
+    "Your quote is about to run out",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Just so you know, your quote <strong>${esc(reference)}</strong> for <strong>${esc(formatPence(totalPence))}</strong> ${esc(timing)}.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">There is no hurry and no hard sell — prices for materials move, so we put a date on quotes rather than honour an old one and get it wrong. If you still want the work doing, say yes below and we will book you in.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">If it has gone past and you still want it, ring me on <strong>${esc(phone)}</strong> and I will do you a fresh one.</p>
+     ${button(link, "Look at the quote")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `Just so you know, your quote ${reference} for ${formatPence(totalPence)} ${timing}.`,
+    "",
+    "There is no hurry. Prices for materials move, so we put a date on quotes rather than honour an old one and get it wrong.",
+    "",
+    `If it has gone past and you still want it, ring me on ${phone} and I will do you a fresh one.`,
+    "",
+    link,
+  ].join("\n");
+
+  return send(to, `Your quote ${reference} ${timing}`, html, text);
+}
+
 export async function sendQuoteResponseToOwner(
   reference: string,
   clientName: string,
@@ -625,14 +793,24 @@ export async function sendJobCompleted(
   clientName: string,
   jobTitle: string,
   jobId: string,
+  /** What was actually done, in the owner's words. */
+  summary: string | null = null,
 ): Promise<SendResult> {
   const link = `${siteUrl()}/portal/jobs/${jobId}`;
   const phone = await businessPhone();
+
+  // Saying what was done, rather than only that something was. "We have
+  // finished" invites "finished what, exactly?" from anybody who was at work
+  // while it happened — and that question arrives as a phone call.
+  const summaryHtml = summary
+    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;padding:14px 16px;background:#f9f7f4;border-radius:8px;white-space:pre-wrap;">${esc(summary)}</p>`
+    : "";
 
   const html = await layout(
     "That is finished",
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We have finished <strong>${esc(jobTitle)}</strong>. Your invoice will follow shortly — nothing is payable until then.</p>
+     ${summaryHtml}
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Any photographs we took are on the job in your account, and they stay there for whenever you need them.</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">If anything is not right, ring us on <strong>${esc(phone)}</strong>. We would far rather come back and sort it than have you live with it.</p>
      ${button(link, "See the job")}`,
@@ -642,6 +820,7 @@ export async function sendJobCompleted(
     `Hello ${clientName},`,
     "",
     `We have finished ${jobTitle}. Your invoice will follow shortly — nothing is payable until then.`,
+    ...(summary ? ["", summary] : []),
     "",
     `If anything is not right, ring us on ${phone}.`,
     "",

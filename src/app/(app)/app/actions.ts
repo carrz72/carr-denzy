@@ -23,6 +23,7 @@ import {
   explainSendFailure,
   sendEnquiryDeclined,
   sendInvoiceToClient,
+  sendPaymentReceipt,
   sendPortalInvite,
   sendQuoteToClient,
 } from "@/lib/email";
@@ -407,7 +408,7 @@ export async function createPhoneJob(formData: FormData): Promise<ActionResult> 
  * any other way is checked by the same rule (spec FR-31).
  */
 export async function updateJobStatus(formData: FormData): Promise<ActionResult> {
-  await requireStaff();
+  const user = await requireStaff();
 
   const parsed = jobStatusSchema.safeParse({
     job_id: formData.get("job_id") ?? "",
@@ -417,6 +418,47 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
 
   const supabase = await createClient();
+
+  const completionNote = String(formData.get("completion_note") ?? "").trim();
+
+  // --- Two moves that are not just a status change -------------------------
+  //
+  // Both of these used to be one tap on a big button, and both of them do
+  // something in the real world: one tells a customer to expect you on a day,
+  // the other tells them their job is done. A mis-tap standing in somebody's
+  // kitchen sent a real email to a real person.
+  //
+  // The guard is deliberately not an "are you sure?" — people learn to tap
+  // through those inside a week. Each one instead asks for the thing that has
+  // to exist for the status to be true at all.
+
+  if (parsed.data.status === "scheduled") {
+    // "Booked in" with nothing booked was a lie the app told about itself: the
+    // status changed, no date was ever set, and because the booking email only
+    // goes out from the scheduling form, the customer heard nothing.
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("scheduled_start")
+      .eq("id", parsed.data.job_id)
+      .maybeSingle();
+
+    if (!job?.scheduled_start) {
+      return {
+        ok: false,
+        formError:
+          "Pick a date and time first — a job is not booked in until there is a day for it, and that is what tells the customer when you are coming.",
+      };
+    }
+  }
+
+  if (parsed.data.status === "completed" && completionNote.length < 5) {
+    return {
+      ok: false,
+      errors: {
+        completion_note: "Write a line about what you did — the customer sees this.",
+      },
+    };
+  }
 
   const { error } = await supabase
     .from("jobs")
@@ -441,7 +483,17 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
       .eq("id", parsed.data.job_id)
       .maybeSingle();
 
-    if (job) await notifyClientCompleted(parsed.data.job_id, job.title);
+    // The completion note becomes part of the job's record, visible to the
+    // customer. It is the same sentence that goes in their email, so there is
+    // one account of what was done rather than two that can disagree.
+    await supabase.from("job_notes").insert({
+      job_id: parsed.data.job_id,
+      author_id: user.id,
+      body: completionNote,
+      visible_to_client: true,
+    });
+
+    if (job) await notifyClientCompleted(parsed.data.job_id, job.title, completionNote);
   }
 
   revalidatePath(`/app/jobs/${parsed.data.job_id}`);
@@ -1308,14 +1360,41 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
   }
 
   // Move the job to paid if the invoice is now settled in full.
+  //
+  // `paid_pence` is maintained by a trigger, so this read happens after the
+  // insert above and reflects it — including any earlier part payments.
   const { data: invoice } = await supabase
     .from("invoices")
-    .select("status, job_id")
+    .select("reference, status, job_id, total_pence, paid_pence, client:clients(full_name, email)")
     .eq("id", parsed.data.invoice_id)
     .maybeSingle();
 
   if (invoice?.status === "paid" && invoice.job_id) {
     await supabase.from("jobs").update({ status: "paid" }).eq("id", invoice.job_id);
+  }
+
+  // Tell the customer their money arrived.
+  //
+  // Bank transfer is the only method here, and it gives the payer no receipt
+  // from anyone — they push the money into the void and hear nothing back.
+  // Until now this app knew the payment had landed and never said so.
+  //
+  // A failure here is logged, never surfaced: the payment is recorded, which is
+  // what the owner asked for, and an email that did not send is not a reason to
+  // make them think it wasn't.
+  if (invoice?.client?.email) {
+    const receipt = await sendPaymentReceipt(
+      invoice.client.email,
+      invoice.client.full_name,
+      invoice.reference,
+      parsed.data.amount_pence,
+      invoice.total_pence - invoice.paid_pence,
+      parsed.data.invoice_id,
+    );
+
+    if (!receipt.sent) {
+      console.error("[payment] receipt did not send:", receipt.error);
+    }
   }
 
   // Through the RPC, not a direct insert. `audit_log` has no INSERT policy for

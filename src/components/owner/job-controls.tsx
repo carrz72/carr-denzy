@@ -7,7 +7,7 @@ import {
   NotePencilIcon,
   WarningIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
 import { CheckField, FormError, TextAreaField, TextField } from "@/components/ui/field";
 import { addJobNote, scheduleJob, updateJobStatus } from "@/app/(app)/app/actions";
@@ -39,39 +39,91 @@ const nextSteps: Record<JobStatus, JobStatus[]> = {
   cancelled: ["new"],
 };
 
-/** The move the owner most likely wants, given where the job is. */
+/**
+ * The move the owner most likely wants, given where the job is.
+ *
+ * `accepted` deliberately has no entry. It used to offer "Book it in", which
+ * set the status to `scheduled` and nothing else — no date, no time, and no
+ * booking email, because that only goes out from the scheduling form. The job
+ * then sat in the diary claiming to be booked with nothing booked. Accepted
+ * jobs now get a link to the date form instead, and become scheduled by
+ * actually being scheduled.
+ */
 const primaryStep: Partial<Record<JobStatus, { to: JobStatus; label: string }>> = {
-  accepted: { to: "scheduled", label: "Book it in" },
   scheduled: { to: "in_progress", label: "Start work" },
   in_progress: { to: "completed", label: "Mark finished" },
   completed: { to: "invoiced", label: "Invoice it" },
 };
 
+/**
+ * Moves that reach out of the app and touch a customer, so they get a step
+ * rather than a tap.
+ *
+ * `scheduled` is not listed because it is blocked outright without a date —
+ * the server refuses it and points at the form.
+ */
+const needsCare: Partial<Record<JobStatus, string>> = {
+  completed: "This tells the customer their job is done.",
+  cancelled: "This closes the job off.",
+};
+
 export function JobStatusControl({
   jobId,
   status,
+  clientName,
 }: {
   jobId: string;
   status: JobStatus;
+  /** Named in the confirmation, so the owner sees who this reaches. */
+  clientName?: string | null;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  /** The move being confirmed, or null when nothing is pending. */
+  const [confirming, setConfirming] = useState<JobStatus | null>(null);
+  const [note, setNote] = useState("");
 
   const primary = primaryStep[status];
   const options = nextSteps[status] ?? [];
 
   function move(to: JobStatus) {
     setError(null);
+    setFieldError(null);
+
+    // Anything that reaches the customer stops here and asks for the detail
+    // that makes the status true, instead of firing on the first tap.
+    if (needsCare[to] && confirming !== to) {
+      setConfirming(to);
+      return;
+    }
+
     const formData = new FormData();
     formData.set("job_id", jobId);
     formData.set("status", to);
+    if (to === "completed") formData.set("completion_note", note);
 
     startTransition(async () => {
       const result = await updateJobStatus(formData);
-      if (!result.ok) setError(result.formError ?? "Could not change the status.");
-      else setShowAll(false);
+
+      if (!result.ok) {
+        setFieldError(result.errors?.completion_note ?? null);
+        setError(result.errors?.completion_note ? null : (result.formError ?? "Could not change the status."));
+        return;
+      }
+
+      setShowAll(false);
+      setConfirming(null);
+      setNote("");
     });
+  }
+
+  function cancelConfirm() {
+    setConfirming(null);
+    setNote("");
+    setError(null);
+    setFieldError(null);
   }
 
   return (
@@ -80,7 +132,62 @@ export function JobStatusControl({
 
       <p className="mt-3 font-display text-subheading text-ink">{jobStatusLabels[status]}</p>
 
-      {primary ? (
+      {confirming ? (
+        <div className="animate-fade mt-4 rounded-lg border border-caution/30 bg-caution-soft p-5">
+          <p className="font-medium text-caution-ink">
+            {confirming === "completed" ? "Finish this job?" : "Cancel this job?"}
+          </p>
+
+          <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-ink">
+            {needsCare[confirming]}
+            {clientName ? ` ${clientName} will be told.` : ""}
+          </p>
+
+          {confirming === "completed" ? (
+            <div className="mt-4">
+              {/*
+                A required note, not an "are you sure?".
+
+                Nobody reads a yes/no confirmation after the first week — it
+                becomes a second tap on the same button. Asking what was done
+                cannot be answered on autopilot, and unlike a confirmation it
+                leaves something behind: the customer's email says what was
+                done, and the job keeps a record of it.
+              */}
+              <TextAreaField
+                name="completion_note"
+                label="What did you do?"
+                hint="The customer sees this, and it stays on the job. A sentence is plenty."
+                placeholder="Replaced the flexi tail under the sink and tested for leaks. Old one had perished at the crimp."
+                rows={3}
+                value={note}
+                onChange={(event) => {
+                  setNote(event.target.value);
+                  setFieldError(null);
+                }}
+                error={fieldError ?? undefined}
+              />
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
+            <Button
+              variant={confirming === "cancelled" ? "destructive" : "primary"}
+              loading={isPending}
+              onClick={() => move(confirming)}
+              icon={confirming === "completed" ? <CheckIcon size={18} weight="bold" /> : undefined}
+            >
+              {confirming === "completed" ? "Yes, it is finished" : "Yes, cancel it"}
+            </Button>
+
+            <Button variant="quiet" onClick={cancelConfirm} disabled={isPending}>
+              Not yet
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {primary && !confirming ? (
         <Button
           size="lg"
           fullWidth
@@ -93,7 +200,18 @@ export function JobStatusControl({
         </Button>
       ) : null}
 
-      {options.length > 0 ? (
+      {/* An accepted job's next move is a date, not a status. */}
+      {status === "accepted" && !confirming ? (
+        <a
+          href="#schedule"
+          className={cn(buttonClasses({ size: "lg" }), "mt-4 w-full")}
+        >
+          <CalendarPlusIcon size={19} weight="fill" aria-hidden="true" />
+          Book it in
+        </a>
+      ) : null}
+
+      {options.length > 0 && !confirming ? (
         <div className="mt-3">
           {showAll ? (
             <ul className="flex flex-col gap-2">
@@ -175,8 +293,10 @@ export function ScheduleForm({
     });
   }
 
+  // `id="schedule"` is the target of the "Book it in" link on an accepted job,
+  // with a scroll margin so the sticky header does not sit over the heading.
   return (
-    <Card>
+    <Card id="schedule" className="scroll-mt-24">
       <h2 className="text-label uppercase text-ink-subtle">
         {existing ? "Booked in" : "Book it in"}
       </h2>

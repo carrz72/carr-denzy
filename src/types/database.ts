@@ -227,6 +227,8 @@ export type Quote = {
   decline_reason: string | null;
   created_at: string;
   updated_at: string;
+  /** Set by the scheduled reminder job; null until first chased. */
+  last_reminder_at: string | null;
   deleted_at: string | null;
 }
 
@@ -267,6 +269,8 @@ export type Invoice = {
   credit_note_for: string | null;
   created_at: string;
   updated_at: string;
+  /** Set by the scheduled reminder job; null until first chased. */
+  last_reminder_at: string | null;
   deleted_at: string | null;
 }
 

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { sendQuoteResponseToOwner } from "@/lib/email";
+import { notifyOwnerOfQuoteResponse } from "@/lib/notify-owner";
 import { fieldErrors } from "@/lib/validation";
 
 /**
@@ -100,7 +100,7 @@ export async function acceptQuoteViaLink(formData: FormData): Promise<LinkRespon
     };
   }
 
-  await notifyOwner(input.quote_id, true, null);
+  await notifyOwnerOfQuoteResponse(input.quote_id, true, null);
 
   revalidatePath(`/quotes/view/${input.quote_id}`);
   revalidatePath("/app", "layout");
@@ -132,45 +132,10 @@ export async function declineQuoteViaLink(formData: FormData): Promise<LinkRespo
     };
   }
 
-  await notifyOwner(input.quote_id, false, input.reason ?? null);
+  await notifyOwnerOfQuoteResponse(input.quote_id, false, input.reason ?? null);
 
   revalidatePath(`/quotes/view/${input.quote_id}`);
   revalidatePath("/app", "layout");
 
   return { ok: true };
-}
-
-/**
- * Tells the owner the quote was answered.
- *
- * Swallows its own failures: the response is already recorded in the database,
- * and losing a notification email must never undo a customer's decision. The
- * owner still sees it on the dashboard either way.
- */
-async function notifyOwner(
-  quoteId: string,
-  accepted: boolean,
-  reason: string | null,
-): Promise<void> {
-  try {
-    const admin = createAdminClient();
-
-    const { data: quote } = await admin
-      .from("quotes")
-      .select("reference, job_id, client:clients(full_name)")
-      .eq("id", quoteId)
-      .maybeSingle();
-
-    if (!quote) return;
-
-    await sendQuoteResponseToOwner(
-      quote.reference,
-      quote.client?.full_name ?? "A customer",
-      accepted,
-      reason,
-      quote.job_id,
-    );
-  } catch (error) {
-    console.error("[quote-link] owner notification failed", error);
-  }
 }

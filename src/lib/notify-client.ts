@@ -136,14 +136,18 @@ export async function notifyClientMessage(
   ]).catch((error) => console.error("[notify-client] message failed", error));
 }
 
-/** Work marked finished. */
-export async function notifyClientCompleted(jobId: string, jobTitle: string): Promise<void> {
+/** Work marked finished. `summary` is the owner's note on what was done. */
+export async function notifyClientCompleted(
+  jobId: string,
+  jobTitle: string,
+  summary: string | null = null,
+): Promise<void> {
   const recipient = await recipientFor(jobId, "notify_completion");
   if (!recipient?.wants) return;
 
   await Promise.all([
     recipient.email
-      ? sendJobCompleted(recipient.email, recipient.fullName, jobTitle, jobId)
+      ? sendJobCompleted(recipient.email, recipient.fullName, jobTitle, jobId, summary)
       : Promise.resolve(),
 
     pushToClient(recipient.clientId, {

@@ -135,6 +135,30 @@ export async function syncUserRole(userId: string, email: string): Promise<UserR
     await admin.auth.admin.updateUserById(userId, { app_metadata: { role } });
   }
 
+  // Adopt any customer record that belongs to this person but is not yet
+  // attached to their login.
+  //
+  // `clients.profile_id` is what every portal policy filters on, so a customer
+  // whose record was created after their account signs in successfully and
+  // then sees "Nothing here yet" — their own jobs, invoices and photographs
+  // are invisible, and they cannot reply on a job that is genuinely theirs.
+  //
+  // The database has triggers for this on both tables now, but they only fire
+  // on rows written from here on. Doing it on every sign-in as well means an
+  // account already in that broken state repairs itself the next time the
+  // person logs in, rather than waiting for somebody to notice.
+  //
+  // Only ever fills a blank — `profile_id is null` — because repointing an
+  // existing link would hand one customer's records to another.
+  const { error: linkError } = await admin
+    .from("clients")
+    .update({ profile_id: userId })
+    .is("profile_id", null)
+    .is("deleted_at", null)
+    .eq("email", email);
+
+  if (linkError) console.error("[auth] could not link client record", linkError.message);
+
   await admin.from("audit_log").insert({
     actor_id: userId,
     action: "auth.signed_in",

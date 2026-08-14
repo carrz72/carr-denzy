@@ -10,7 +10,7 @@ import {
   myDetailsSchema,
   quoteResponseSchema,
 } from "@/lib/validation";
-import { sendQuoteResponseToOwner } from "@/lib/email";
+import { notifyOwnerOfQuoteResponse } from "@/lib/notify-owner";
 
 export interface ActionResult {
   ok: boolean;
@@ -55,7 +55,7 @@ export async function acceptQuote(formData: FormData): Promise<ActionResult> {
     };
   }
 
-  await notifyOwnerOfResponse(parsed.data.quote_id, true, null);
+  await notifyOwnerOfQuoteResponse(parsed.data.quote_id, true, null);
 
   revalidatePath("/portal", "layout");
 
@@ -93,53 +93,11 @@ export async function declineQuote(formData: FormData): Promise<ActionResult> {
     };
   }
 
-  await notifyOwnerOfResponse(parsed.data.quote_id, false, parsed.data.reason ?? null);
+  await notifyOwnerOfQuoteResponse(parsed.data.quote_id, false, parsed.data.reason ?? null);
 
   revalidatePath("/portal", "layout");
 
   return { ok: true };
-}
-
-/**
- * Tells the owner a quote was answered.
- *
- * Uses the admin client because the client's own session cannot read the
- * owner's notification address, and reads only the four fields the email
- * needs. A failure here is logged and swallowed — the response is already
- * recorded, and losing an email must never undo it.
- */
-async function notifyOwnerOfResponse(
-  quoteId: string,
-  accepted: boolean,
-  reason: string | null,
-): Promise<void> {
-  try {
-    const admin = createAdminClient();
-
-    const { data: quote } = await admin
-      .from("quotes")
-      .select("reference, job_id, client_id")
-      .eq("id", quoteId)
-      .maybeSingle();
-
-    if (!quote) return;
-
-    const { data: client } = await admin
-      .from("clients")
-      .select("full_name")
-      .eq("id", quote.client_id)
-      .maybeSingle();
-
-    await sendQuoteResponseToOwner(
-      quote.reference,
-      client?.full_name ?? "A customer",
-      accepted,
-      reason,
-      quote.job_id,
-    );
-  } catch (error) {
-    console.error("[portal] owner notification failed", error);
-  }
 }
 
 /**
