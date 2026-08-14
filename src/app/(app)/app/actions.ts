@@ -21,6 +21,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   explainSendFailure,
+  sendEnquiryDeclined,
   sendInvoiceToClient,
   sendPortalInvite,
   sendQuoteToClient,
@@ -70,15 +71,20 @@ export async function declineEnquiry(formData: FormData): Promise<ActionResult> 
 
   const enquiryId = String(formData.get("enquiry_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
+  // Off unless the owner ticks it. The note field is where you write "time
+  // waster" — that must never leave the building by accident.
+  const shareReason = formData.get("share_reason") === "on";
 
   if (!enquiryId) return { ok: false, formError: "Missing enquiry." };
 
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: enquiry, error } = await supabase
     .from("enquiries")
     .update({ status: "declined", decline_reason: reason || null })
-    .eq("id", enquiryId);
+    .eq("id", enquiryId)
+    .select("full_name, email, phone, reference")
+    .maybeSingle();
 
   if (error) {
     return { ok: false, formError: "Could not update that enquiry. Try again." };
@@ -86,6 +92,36 @@ export async function declineEnquiry(formData: FormData): Promise<ActionResult> 
 
   revalidatePath("/app/enquiries");
   revalidatePath("/app", "layout");
+
+  // Tell the customer. Somebody who filled in a form and then hears nothing
+  // assumes they are still in a queue — they wait, and the leak keeps leaking.
+  //
+  // A failure here never fails the decline: the enquiry is already closed, and
+  // the owner is told what to do instead.
+  if (!enquiry) return { ok: true };
+
+  if (!enquiry.email) {
+    return {
+      ok: true,
+      warning: enquiry.phone
+        ? `Declined. They left no email address, so nothing was sent — give them a ring on ${enquiry.phone} if you want to let them know.`
+        : "Declined. They left no email address and no phone number, so there is no way to tell them.",
+    };
+  }
+
+  const sent = await sendEnquiryDeclined(
+    enquiry.email,
+    enquiry.full_name,
+    enquiry.reference,
+    shareReason && reason ? reason : null,
+  );
+
+  if (!sent.sent) {
+    return {
+      ok: true,
+      warning: `Declined, but we could not email them. ${explainSendFailure(sent.error)}`,
+    };
+  }
 
   return { ok: true };
 }

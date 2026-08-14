@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
+import { BeforeAfter } from "@/components/marketing/before-after";
 import { ServiceIcon } from "@/components/service-icon";
 import { business, services } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
@@ -66,18 +67,32 @@ export default async function HomePage() {
   // Anonymous client on purpose — see src/lib/supabase/public.ts.
   const supabase = createPublicClient();
 
-  // Four is what the grid below is built for. Taking them in the owner's own
+  // Five, not four: one of them is pulled out below as the before/after
+  // feature, and the grid is built for four. Taking them in the owner's own
   // order means the piece they are proudest of leads, without a "featured"
   // flag to maintain.
   const { data: recentWorkData } = await supabase
     .from("portfolio_items")
-    .select("id, after_path, caption, location")
+    .select("id, before_path, after_path, caption, location")
     .eq("is_published", true)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true })
-    .limit(4);
+    .limit(5);
 
-  const recentWork = recentWorkData ?? [];
+  const allWork = recentWorkData ?? [];
+
+  // The first job that has a before photo leads the section as a slider.
+  //
+  // Dragging one of these is the only thing on this site a visitor might
+  // actually enjoy doing, and it was buried on /work where most people never
+  // went. A finished bathroom shown on its own is a nice photograph; the same
+  // bathroom shown against what it replaced is the argument for hiring us.
+  //
+  // Deliberately one, not four. These need room to be draggable, and a grid of
+  // them turns a set of photographs into a wall of widgets.
+  const featured = allWork.find((item) => item.before_path) ?? null;
+
+  const recentWork = allWork.filter((item) => item.id !== featured?.id).slice(0, 4);
 
   return (
     <>
@@ -457,7 +472,26 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <ul className="mt-11 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {featured?.before_path ? (
+            <div className="mx-auto mt-11 max-w-3xl">
+              <BeforeAfter
+                beforeSrc={portfolioImageUrl(featured.before_path)}
+                afterSrc={portfolioImageUrl(featured.after_path)}
+                caption={featured.caption}
+              />
+
+              {featured.location ? (
+                <p className="mt-1 text-sm text-ink-subtle">{featured.location}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <ul
+            className={cn(
+              "grid gap-4 sm:grid-cols-2 lg:grid-cols-4",
+              featured?.before_path ? "mt-12" : "mt-11",
+            )}
+          >
             {recentWork.map((item, index) => (
               <li
                 key={item.id}

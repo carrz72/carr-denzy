@@ -218,6 +218,7 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
             jobId={enquiry.job_id}
             declineReason={enquiry.decline_reason}
             possibleMatches={possibleMatches ?? []}
+            clientEmail={enquiry.email}
           />
         </div>
       </div>

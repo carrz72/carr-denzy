@@ -298,6 +298,55 @@ export async function sendEnquiryConfirmation(
   return send(to, `We have your request — ${reference}`, html, text);
 }
 
+/**
+ * Tells somebody the job is not one we can take on.
+ *
+ * A person who filled in a form and then hears nothing assumes they are still
+ * in a queue. They wait a week before ringing somebody else, and by then the
+ * leak has done its damage. Saying no quickly is a kindness, and it costs the
+ * business nothing — the work was never going to happen.
+ *
+ * `reason` is only ever passed when the owner has ticked the box to share it.
+ * The note field is private by default, because notes written for yourself are
+ * not written for a customer to read.
+ */
+export async function sendEnquiryDeclined(
+  to: string,
+  fullName: string,
+  reference: string,
+  reason: string | null,
+): Promise<SendResult> {
+  const phone = await businessPhone();
+
+  const reasonHtml = reason
+    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;padding:14px 16px;background:#f9f7f4;border-radius:8px;">${esc(reason)}</p>`
+    : "";
+
+  const html = await layout(
+    "About your request",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(fullName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Thank you for asking us about your job (reference <strong>${esc(reference)}</strong>). I am sorry to say it is not one we are able to take on.</p>
+     ${reasonHtml}
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">I did not want to leave you waiting to hear. If it would help to talk it through, or you would like a suggestion of who else to try, do ring me on ${esc(phone)}.</p>
+     <p style="margin:0;font-size:15px;line-height:1.6;">All the best with it.</p>`,
+  );
+
+  const text = [
+    `Hello ${fullName},`,
+    "",
+    `Thank you for asking us about your job (reference ${reference}). I am sorry to say it is not one we are able to take on.`,
+    ...(reason ? ["", reason] : []),
+    "",
+    `I did not want to leave you waiting to hear. If it would help to talk it through, or you would like a suggestion of who else to try, do ring me on ${phone}.`,
+    "",
+    "All the best with it.",
+    "",
+    `Carr Denzy Plumbing & Gas · ${phone}`,
+  ].join("\n");
+
+  return send(to, `About your request — ${reference}`, html, text);
+}
+
 // ---------------------------------------------------------------------------
 // Quotes and invoices
 // ---------------------------------------------------------------------------
