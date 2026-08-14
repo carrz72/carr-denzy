@@ -22,14 +22,27 @@ import type { Database } from "@/types/database";
  */
 export function createAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (!key) {
+  // Both are checked, and both are named. Only the key used to be, so a
+  // deployment missing the URL as well reported the key — you fixed the key,
+  // redeployed, and hit the same wall from a different direction.
+  if (!key || !url) {
+    const missing = [
+      key ? null : "SUPABASE_SERVICE_ROLE_KEY",
+      url ? null : "NEXT_PUBLIC_SUPABASE_URL",
+    ]
+      .filter(Boolean)
+      .join(" and ");
+
+    const verb = missing.includes(" and ") ? "are" : "is";
+
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY is not set. Copy .env.example to .env.local and fill it in.",
+      `${missing} ${verb} not set. Locally, copy .env.example to .env.local and fill it in. On Vercel, add it under Settings → Environment Variables for the environment being built, then redeploy.`,
     );
   }
 
-  return createSupabaseClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+  return createSupabaseClient<Database>(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
