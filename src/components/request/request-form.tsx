@@ -31,7 +31,7 @@ import {
   type PreparedPhoto,
 } from "@/lib/photos";
 import { submitEnquiry } from "@/app/request/actions";
-import {services} from "@/lib/site";
+import { services } from "@/lib/site";
 import type { BusinessContact } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
@@ -68,7 +68,11 @@ export function RequestForm({
    * and the enquiry is attached to it server-side — the id is never taken from
    * this form.
    */
-  signedInAs?: { fullName: string; email: string | null; phone: string | null } | null;
+  signedInAs?: {
+    fullName: string;
+    email: string | null;
+    phone: string | null;
+  } | null;
   /**
    * True for any signed-in customer, even one with no linked record yet — that
    * must not send them back to the marketing site after they submit.
@@ -240,13 +244,18 @@ export function RequestForm({
             const key = storageKey("enquiry", photo.file.name);
             const { error } = await supabase.storage
               .from("enquiry-photos")
-              .upload(key, photo.file, { contentType: photo.file.type, upsert: false });
+              .upload(key, photo.file, {
+                contentType: photo.file.type,
+                upsert: false,
+              });
 
             return error ? null : key;
           }),
         );
 
-        uploadedPaths = results.filter((value): value is string => value !== null);
+        uploadedPaths = results.filter(
+          (value): value is string => value !== null,
+        );
 
         if (uploadedPaths.length < photos.length) {
           // Partial failure is worth saying out loud, but it must not block
@@ -308,12 +317,17 @@ export function RequestForm({
           <CheckCircleIcon size={30} weight="fill" aria-hidden="true" />
         </span>
 
-        <h2 className="mt-6 font-display text-title text-ink">We have your request.</h2>
+        <h2 className="mt-6 font-display text-title text-ink">
+          We have your request.
+        </h2>
 
         <p className="container-prose mt-4 text-lg leading-relaxed text-ink">
           Your reference is{" "}
-          <strong className="font-mono tabular-nums text-accent-ink">{reference}</strong>.
-          Quote it if you ring us. We have sent a copy to your email if you gave us one.
+          <strong className="font-mono tabular-nums text-accent-ink">
+            {reference}
+          </strong>
+          . Quote it if you ring us. We have sent a copy to your email if you
+          gave us one.
         </p>
 
         {/*
@@ -360,12 +374,18 @@ export function RequestForm({
             </>
           ) : (
             <>
-              <a href={contact.phoneHref} className={buttonClasses({ size: "lg" })}>
+              <a
+                href={contact.phoneHref}
+                className={buttonClasses({ size: "lg" })}
+              >
                 <PhoneIcon size={19} weight="fill" aria-hidden="true" />
                 <span className="tabular">{contact.phone}</span>
               </a>
 
-              <Link href="/" className={buttonClasses({ variant: "secondary", size: "lg" })}>
+              <Link
+                href="/"
+                className={buttonClasses({ variant: "secondary", size: "lg" })}
+              >
                 Back to the website
               </Link>
             </>
@@ -410,7 +430,11 @@ export function RequestForm({
               )}
             >
               <span className="sr-only">
-                {index < step ? "Completed: " : index === step ? "Current step: " : ""}
+                {index < step
+                  ? "Completed: "
+                  : index === step
+                    ? "Current step: "
+                    : ""}
               </span>
               {title}
             </span>
@@ -418,124 +442,155 @@ export function RequestForm({
         ))}
       </ol>
 
+      {/* Keyed on the step so the heading re-mounts and the fade replays — the
+          steps themselves can no longer animate, since they never unmount. */}
       <h2
+        key={step}
         ref={headingRef}
         tabIndex={-1}
-        className="font-display text-heading text-ink outline-none"
+        className="animate-fade font-display text-heading text-ink outline-none"
       >
         {stepTitles[step]}
       </h2>
 
+      {/*
+        Every step stays mounted; the inactive ones are hidden with CSS.
+
+        They used to be unmounted (`{step === 0 ? … : null}`), and that quietly
+        broke the whole form. `handleSubmit` builds its payload with
+        `new FormData(form)`, which reads the fields that are *in the DOM at
+        that moment*. Submitting happens on step three — by which point steps
+        one and two no longer existed, so their values were never in the
+        payload at all.
+
+        The visible symptom was the description coming back empty from the
+        server and bouncing the person to "What has happened?" with an error
+        about a box they had already filled in. The silent half was worse: the
+        address, postcode and availability were dropped on every single
+        enquiry, and nobody would ever have known, because those fields are
+        optional and the enquiry saved without them.
+
+        Hidden fields still submit their values, so keeping them mounted fixes
+        both. `noValidate` on the form is what makes this safe — a `required`
+        field inside `display:none` would otherwise block submission with an
+        unfocusable-control error.
+      */}
       <div className="mt-6 flex flex-col gap-6">
         {/* ============ Step 1 ============ */}
-        {step === 0 ? (
-          <div className="animate-fade flex flex-col gap-6">
-            <TextAreaField
-              name="description"
-              label="Tell us what is going on"
-              hint="In your own words. What you can see, when it started, anything you have already tried."
-              placeholder="The radiator in the front room stays cold at the top even though the others are fine. It started about a week ago."
-              required
-              rows={6}
-              value={description}
-              onChange={(event) => {
-                setDescription(event.target.value);
-                clearError("description");
-              }}
-              error={errors.description}
-            />
+        <div className={step === 0 ? "flex flex-col gap-6" : "hidden"}>
+          <TextAreaField
+            name="description"
+            label="Tell us what is going on"
+            hint="In your own words. What you can see, when it started, anything you have already tried."
+            placeholder="The radiator in the front room stays cold at the top even though the others are fine. It started about a week ago."
+            required
+            rows={6}
+            value={description}
+            onChange={(event) => {
+              setDescription(event.target.value);
+              clearError("description");
+            }}
+            error={errors.description}
+          />
 
-            <div>
-              <label htmlFor="field-service" className="font-medium text-ink">
-                What sort of work is it?
-              </label>
-              <p id="field-service-hint" className="mt-1.5 text-sm text-ink-muted">
-                A rough guess is fine — we will work it out properly from your description.
-              </p>
+          <div>
+            <label htmlFor="field-service" className="font-medium text-ink">
+              What sort of work is it?
+            </label>
+            <p
+              id="field-service-hint"
+              className="mt-1.5 text-sm text-ink-muted"
+            >
+              A rough guess is fine — we will work it out properly from your
+              description.
+            </p>
 
-              <select
-                id="field-service"
-                aria-describedby="field-service-hint"
-                value={serviceSlug}
-                onChange={(event) => setServiceSlug(event.target.value)}
-                className={cn(
-                  "mt-2 w-full rounded-md border border-line bg-surface-raised px-3.5 py-3",
-                  "shadow-subtle transition-[border-color] duration-200",
-                  "hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25",
-                )}
-              >
-                <option value="">I am not sure</option>
-                {services.map((service) => (
-                  <option key={service.slug} value={service.slug}>
-                    {service.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              id="field-service"
+              aria-describedby="field-service-hint"
+              value={serviceSlug}
+              onChange={(event) => setServiceSlug(event.target.value)}
+              className={cn(
+                "mt-2 w-full rounded-md border border-line bg-surface-raised px-3.5 py-3",
+                "shadow-subtle transition-[border-color] duration-200",
+                "hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25",
+              )}
+            >
+              <option value="">I am not sure</option>
+              {services.map((service) => (
+                <option key={service.slug} value={service.slug}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <ChoiceGroup
-              legend="How urgent is it?"
-              name="urgency"
-              value={urgency}
-              onChange={setUrgency}
-              options={[
-                {
-                  value: "emergency",
-                  label: "Emergency",
-                  description: "Water coming in, no heating in winter, or a safety worry",
-                  icon: <WarningIcon size={19} weight="fill" />,
-                },
-                {
-                  value: "soon",
-                  label: "Soon",
-                  description: "Within the next few days",
-                  icon: <ClockIcon size={19} />,
-                },
-                {
-                  value: "flexible",
-                  label: "Whenever suits",
-                  description: "No particular rush",
-                  icon: <ClockIcon size={19} />,
-                },
-              ]}
-            />
+          <ChoiceGroup
+            legend="How urgent is it?"
+            name="urgency"
+            value={urgency}
+            onChange={setUrgency}
+            options={[
+              {
+                value: "emergency",
+                label: "Emergency",
+                description:
+                  "Water coming in, no heating in winter, or a safety worry",
+                icon: <WarningIcon size={19} weight="fill" />,
+              },
+              {
+                value: "soon",
+                label: "Soon",
+                description: "Within the next few days",
+                icon: <ClockIcon size={19} />,
+              },
+              {
+                value: "flexible",
+                label: "Whenever suits",
+                description: "No particular rush",
+                icon: <ClockIcon size={19} />,
+              },
+            ]}
+          />
 
-            {/* Emergency guidance appears the moment it is relevant, rather
+          {/* Emergency guidance appears the moment it is relevant, rather
                 than as a permanent warning nobody reads (spec FR-10). */}
-            {urgency === "emergency" ? (
-              <div className="animate-fade flex items-start gap-3.5 rounded-lg border border-caution/30 bg-caution-soft p-5">
-                <PhoneIcon
-                  size={22}
-                  weight="fill"
-                  className="mt-0.5 shrink-0 text-caution"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="font-medium text-caution-ink">Please ring us as well</p>
-                  <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink">
-                    For a genuine emergency the phone is much faster than this form.
-                    Call{" "}
-                    <a
-                      href={contact.phoneHref}
-                      className="font-semibold tabular underline underline-offset-4"
-                    >
-                      {contact.phone}
-                    </a>
-                    . If you can smell gas, ring 0800 111 999 first.
-                  </p>
-                </div>
+          {urgency === "emergency" ? (
+            <div className="animate-fade flex items-start gap-3.5 rounded-lg border border-caution/30 bg-caution-soft p-5">
+              <PhoneIcon
+                size={22}
+                weight="fill"
+                className="mt-0.5 shrink-0 text-caution"
+                aria-hidden="true"
+              />
+              <div>
+                <p className="font-medium text-caution-ink">
+                  Please ring us as well
+                </p>
+                <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink">
+                  For a genuine emergency the phone is much faster than this
+                  form. Call{" "}
+                  <a
+                    href={contact.phoneHref}
+                    className="font-semibold tabular underline underline-offset-4"
+                  >
+                    {contact.phone}
+                  </a>
+                  . If you can smell gas, ring 0800 111 999 first.
+                </p>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {/* --- Photos --- */}
-            <div>
-              <p className="font-medium text-ink">Photos</p>
-              <p className="mt-1.5 text-sm text-ink-muted">
-                Optional, but they help a lot — often enough for us to price the job
-                without a visit. Up to {MAX_PHOTOS}.
-              </p>
+          {/* --- Photos --- */}
+          <div>
+            <p className="font-medium text-ink">Photos</p>
+            <p className="mt-1.5 text-sm text-ink-muted">
+              Optional, but they help a lot — often enough for us to price the
+              job without a visit. Up to {MAX_PHOTOS}.
+            </p>
 
-              {/*
+            {/*
                 No `capture` attribute, deliberately.
 
                 It used to say `capture="environment"`, which does not mean
@@ -547,197 +602,204 @@ export function RequestForm({
                 Without it the OS shows its normal chooser: take a photo, pick
                 from the library, or browse files. Which is what people expect.
               */}
-              <input
-                ref={fileInputRef}
-                id="field-photos"
-                type="file"
-                accept={ACCEPTED_TYPES.join(",")}
-                multiple
-                onChange={(event) => void handleFiles(event.target.files)}
-                className="sr-only"
-              />
+            <input
+              ref={fileInputRef}
+              id="field-photos"
+              type="file"
+              accept={ACCEPTED_TYPES.join(",")}
+              multiple
+              onChange={(event) => void handleFiles(event.target.files)}
+              className="sr-only"
+            />
 
-              <label
-                htmlFor="field-photos"
-                className={cn(
-                  "mt-3 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2",
-                  "rounded-lg border-2 border-dashed border-line-strong bg-surface-raised p-6 text-center",
-                  "transition-[border-color,background-color] duration-200",
-                  "[transition-timing-function:var(--ease-standard)]",
-                  "hover:border-accent hover:bg-accent-soft",
-                  photos.length >= MAX_PHOTOS && "pointer-events-none opacity-50",
-                )}
+            <label
+              htmlFor="field-photos"
+              className={cn(
+                "mt-3 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2",
+                "rounded-lg border-2 border-dashed border-line-strong bg-surface-raised p-6 text-center",
+                "transition-[border-color,background-color] duration-200",
+                "[transition-timing-function:var(--ease-standard)]",
+                "hover:border-accent hover:bg-accent-soft",
+                photos.length >= MAX_PHOTOS && "pointer-events-none opacity-50",
+              )}
+            >
+              <CameraIcon
+                size={26}
+                className="text-accent"
+                aria-hidden="true"
+              />
+              <span className="font-medium text-ink">
+                {photos.length === 0
+                  ? "Take a photo or choose from your phone"
+                  : `Add another (${photos.length} of ${MAX_PHOTOS})`}
+              </span>
+              <span className="text-sm text-ink-subtle">
+                JPG, PNG, WebP or HEIC. We shrink them for you.
+              </span>
+            </label>
+
+            {photoError ? (
+              <p
+                role="alert"
+                className="mt-2.5 text-sm font-medium text-critical"
               >
-                <CameraIcon size={26} className="text-accent" aria-hidden="true" />
-                <span className="font-medium text-ink">
-                  {photos.length === 0
-                    ? "Take a photo or choose from your phone"
-                    : `Add another (${photos.length} of ${MAX_PHOTOS})`}
-                </span>
-                <span className="text-sm text-ink-subtle">
-                  JPG, PNG, WebP or HEIC. We shrink them for you.
-                </span>
-              </label>
-
-              {photoError ? (
-                <p role="alert" className="mt-2.5 text-sm font-medium text-critical">
-                  {photoError}
-                </p>
-              ) : null}
-
-              {photos.length > 0 ? (
-                <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {photos.map((photo, index) => (
-                    <li
-                      key={photo.previewUrl}
-                      className="group relative overflow-hidden rounded-lg border border-line bg-surface-sunken"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={photo.previewUrl}
-                        alt={`Attached photo: ${photo.originalName}`}
-                        className="aspect-4/3 w-full object-cover"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(index)}
-                        className={cn(
-                          "absolute right-2 top-2 flex size-11 items-center justify-center rounded-md",
-                          "bg-surface-inverse/80 text-white backdrop-blur-sm",
-                          "transition-colors duration-200 hover:bg-critical",
-                        )}
-                      >
-                        <span className="sr-only">Remove {photo.originalName}</span>
-                        <TrashIcon size={18} aria-hidden="true" />
-                      </button>
-
-                      <p className="truncate px-2.5 py-2 text-xs text-ink-subtle">
-                        {formatBytes(photo.bytes)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        {/* ============ Step 2 ============ */}
-        {step === 1 ? (
-          <div className="animate-fade flex flex-col gap-6">
-            <p className="text-ink-muted">
-              All of this is optional. It just saves us a phone call to ask.
-            </p>
-
-            <TextField
-              name="address_line1"
-              label="Address"
-              placeholder="14 Rye Lane"
-              autoComplete="address-line1"
-              onChange={() => clearError("address_line1")}
-              error={errors.address_line1}
-            />
-
-            <TextField
-              name="address_line2"
-              label="Address line 2"
-              placeholder="Flat 2"
-              autoComplete="address-line2"
-              onChange={() => clearError("address_line2")}
-              error={errors.address_line2}
-            />
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              <TextField
-                name="city"
-                label="Town or city"
-                placeholder="Nottingham"
-                autoComplete="address-level2"
-                onChange={() => clearError("city")}
-              error={errors.city}
-              />
-
-              <TextField
-                name="postcode"
-                label="Postcode"
-                placeholder="NG1 5AA"
-                autoComplete="postal-code"
-                autoCapitalize="characters"
-                onChange={() => clearError("postcode")}
-              error={errors.postcode}
-              />
-            </div>
-
-            <TextAreaField
-              name="preferred_dates"
-              label="When are you usually in?"
-              hint="For example: any weekday morning, or Tuesdays and Thursdays after 2pm."
-              placeholder="Weekday mornings are best. I work from home on Wednesdays."
-              rows={3}
-              onChange={() => clearError("preferred_dates")}
-              error={errors.preferred_dates}
-            />
-          </div>
-        ) : null}
-
-        {/* ============ Step 3 ============ */}
-        {step === 2 ? (
-          <div className="animate-fade flex flex-col gap-6">
-            {signedInAs ? (
-              <p className="rounded-lg border border-accent-line bg-accent-soft px-4 py-3 text-[0.9375rem] leading-relaxed text-accent-ink">
-                Filled in from your account. This request will be added to it, so you can
-                follow it without a reference number.
+                {photoError}
               </p>
             ) : null}
 
-            <TextField
-              name="full_name"
-              label="Your name"
-              required
-              autoComplete="name"
-              placeholder="Marcus Adeyemi"
-              defaultValue={signedInAs?.fullName ?? ""}
-              onChange={() => clearError("full_name")}
-              error={errors.full_name}
-            />
+            {photos.length > 0 ? (
+              <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {photos.map((photo, index) => (
+                  <li
+                    key={photo.previewUrl}
+                    className="group relative overflow-hidden rounded-lg border border-line bg-surface-sunken"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photo.previewUrl}
+                      alt={`Attached photo: ${photo.originalName}`}
+                      className="aspect-4/3 w-full object-cover"
+                    />
 
-            <TextField
-              name="phone"
-              label="Phone number"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="07700 900412"
-              hint="The fastest way for us to reach you."
-              defaultValue={signedInAs?.phone ?? ""}
-              onChange={() => clearError("phone")}
-              error={errors.phone}
-            />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className={cn(
+                        "absolute right-2 top-2 flex size-11 items-center justify-center rounded-md",
+                        "bg-surface-inverse/80 text-white backdrop-blur-sm",
+                        "transition-colors duration-200 hover:bg-critical",
+                      )}
+                    >
+                      <span className="sr-only">
+                        Remove {photo.originalName}
+                      </span>
+                      <TrashIcon size={18} aria-hidden="true" />
+                    </button>
 
-            <TextField
-              name="email"
-              label="Email address"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="marcus@example.com"
-              hint="We send your reference and, later, your quote here."
-              defaultValue={signedInAs?.email ?? ""}
-              onChange={() => clearError("email")}
-              error={errors.email}
-            />
-
-            <p className="text-sm leading-relaxed text-ink-muted">
-              One of the two is enough — we just need some way to reply. We will only use
-              your details to answer this request. See our{" "}
-              <Link href="/privacy" className="underline underline-offset-4 hover:text-accent">
-                privacy policy
-              </Link>
-              .
-            </p>
+                    <p className="truncate px-2.5 py-2 text-xs text-ink-subtle">
+                      {formatBytes(photo.bytes)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
-        ) : null}
+        </div>
+
+        {/* ============ Step 2 ============ */}
+        <div className={step === 1 ? "flex flex-col gap-6" : "hidden"}>
+          <p className="text-ink-muted">
+            All of this is optional. It just saves us a phone call to ask.
+          </p>
+
+          <TextField
+            name="address_line1"
+            label="Address"
+            placeholder="14 Rye Lane"
+            autoComplete="address-line1"
+            onChange={() => clearError("address_line1")}
+            error={errors.address_line1}
+          />
+
+          <TextField
+            name="address_line2"
+            label="Address line 2"
+            placeholder="Flat 2"
+            autoComplete="address-line2"
+            onChange={() => clearError("address_line2")}
+            error={errors.address_line2}
+          />
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            <TextField
+              name="city"
+              label="Town or city"
+              placeholder="Nottingham"
+              autoComplete="address-level2"
+              onChange={() => clearError("city")}
+              error={errors.city}
+            />
+
+            <TextField
+              name="postcode"
+              label="Postcode"
+              placeholder="NG1 5AA"
+              autoComplete="postal-code"
+              autoCapitalize="characters"
+              onChange={() => clearError("postcode")}
+              error={errors.postcode}
+            />
+          </div>
+
+          <TextAreaField
+            name="preferred_dates"
+            label="When are you usually in?"
+            hint="For example: any weekday morning, or Tuesdays and Thursdays after 2pm."
+            placeholder="Weekday mornings are best. I work from home on Wednesdays."
+            rows={3}
+            onChange={() => clearError("preferred_dates")}
+            error={errors.preferred_dates}
+          />
+        </div>
+
+        {/* ============ Step 3 ============ */}
+        <div className={step === 2 ? "flex flex-col gap-6" : "hidden"}>
+          {signedInAs ? (
+            <p className="rounded-lg border border-accent-line bg-accent-soft px-4 py-3 text-[0.9375rem] leading-relaxed text-accent-ink">
+              Filled in from your account. This request will be added to it, so
+              you can follow it without a reference number.
+            </p>
+          ) : null}
+
+          <TextField
+            name="full_name"
+            label="Your name"
+            required
+            autoComplete="name"
+            placeholder="Marcus Adeyemi"
+            defaultValue={signedInAs?.fullName ?? ""}
+            onChange={() => clearError("full_name")}
+            error={errors.full_name}
+          />
+
+          <TextField
+            name="phone"
+            label="Phone number"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="07700 900412"
+            hint="The fastest way for us to reach you."
+            defaultValue={signedInAs?.phone ?? ""}
+            onChange={() => clearError("phone")}
+            error={errors.phone}
+          />
+
+          <TextField
+            name="email"
+            label="Email address"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="marcus@example.com"
+            hint="We send your reference and, later, your quote here."
+            defaultValue={signedInAs?.email ?? ""}
+            onChange={() => clearError("email")}
+            error={errors.email}
+          />
+
+          <p className="text-sm leading-relaxed text-ink-muted">
+            One of the two is enough — we just need some way to reply. We will
+            only use your details to answer this request. See our{" "}
+            <Link
+              href="/privacy"
+              className="underline underline-offset-4 hover:text-accent"
+            >
+              privacy policy
+            </Link>
+            .
+          </p>
+        </div>
 
         <FormError message={formError} />
       </div>
@@ -761,7 +823,9 @@ export function RequestForm({
             type="submit"
             size="lg"
             loading={busy}
-            loadingLabel={uploading ? "Uploading your photos…" : "Sending your request…"}
+            loadingLabel={
+              uploading ? "Uploading your photos…" : "Sending your request…"
+            }
           >
             Send my request
           </Button>
@@ -780,7 +844,12 @@ export function RequestForm({
         ) : null}
 
         {step === 1 ? (
-          <Button variant="link" size="lg" onClick={() => goToStep(2)} disabled={busy}>
+          <Button
+            variant="link"
+            size="lg"
+            onClick={() => goToStep(2)}
+            disabled={busy}
+          >
             Skip this
           </Button>
         ) : null}

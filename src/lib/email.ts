@@ -646,3 +646,38 @@ export async function sendOwnerMessageNotification(
 
   return send(to, `${clientName} replied — ${jobReference}`, html, text);
 }
+
+/**
+ * Turns a failed send into something the owner can act on.
+ *
+ * The invite action used to say "check the address and try again" for every
+ * failure, which sent the owner hunting for a typo in an address that was
+ * fine — the actual cause was almost always the sender configuration. A wrong
+ * diagnosis wastes more time than no diagnosis.
+ *
+ * Matched on Resend's own wording, with a readable fallback so an unrecognised
+ * error still says something truthful rather than something confidently wrong.
+ */
+export function explainSendFailure(error: string | undefined): string {
+  const e = (error ?? "").toLowerCase();
+
+  if (e.includes("resend_api_key") || e.includes("not configured")) {
+    return "Email is not switched on yet — the sending key is missing. Nothing is wrong with the address.";
+  }
+
+  if (e.includes("domain is not verified") || e.includes("testing") || e.includes("403")) {
+    return "Our email sender is not set up yet, so nothing can go out. This is a settings problem at our end, not a problem with the address.";
+  }
+
+  if (e.includes("invalid") && e.includes("to")) {
+    return "That address was rejected as invalid. Worth checking it for a typo.";
+  }
+
+  if (e.includes("rate") || e.includes("429") || e.includes("too many")) {
+    return "Too many emails have gone out in a short time. Wait a few minutes and try again.";
+  }
+
+  return error
+    ? `It did not send. The mail service said: ${error}`
+    : "It did not send, and no reason was given. Try again in a moment.";
+}

@@ -19,7 +19,12 @@ import {
   settingsSchema,
 } from "@/lib/validation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendInvoiceToClient, sendPortalInvite, sendQuoteToClient } from "@/lib/email";
+import {
+  explainSendFailure,
+  sendInvoiceToClient,
+  sendPortalInvite,
+  sendQuoteToClient,
+} from "@/lib/email";
 import { renderInvoicePdf, renderQuotePdf } from "@/lib/invoice-pdf";
 import { notifyClientBooked, notifyClientCompleted } from "@/lib/notify-client";
 import { formatPence } from "@/lib/money";
@@ -637,10 +642,12 @@ export async function inviteClientToPortal(formData: FormData): Promise<ActionRe
   const sent = await sendPortalInvite(email, client.full_name, link);
 
   if (!sent.sent) {
+    // Report what actually went wrong. This used to say "check the address",
+    // which was a confident wrong answer — the address is almost never the
+    // problem, and it sent the owner hunting for a typo that was not there.
     return {
       ok: false,
-      formError:
-        "The email address is saved, but the invitation did not send. Check the address and try again.",
+      formError: `The email address is saved, but the invitation did not send. ${explainSendFailure(sent.error)}`,
     };
   }
 
@@ -791,7 +798,7 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
     // The quote is sent either way — the status is already updated. The owner
     // just needs to know to pick up the phone (spec E-15).
     if (!sent.sent) {
-      warning = "The quote is marked as sent, but the email did not go out. Ring them, or copy the link.";
+      warning = `The quote is marked as sent, but the email did not go out. ${explainSendFailure(sent.error)} Ring them, or copy the link.`;
     }
   } else {
     warning = "This customer has no email address, so nothing was sent. Ring them or add an email.";
@@ -1139,7 +1146,7 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
     );
 
     if (!sent.sent) {
-      warning = "The invoice is marked as sent, but the email did not go out. Print it or ring them.";
+      warning = `The invoice is marked as sent, but the email did not go out. ${explainSendFailure(sent.error)} Print it or ring them.`;
     }
   } else {
     warning = "This customer has no email address, so nothing was sent. Print it or add an email.";
