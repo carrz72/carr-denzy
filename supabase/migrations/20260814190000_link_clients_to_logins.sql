@@ -27,24 +27,52 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_linked_email citext;
+  v_match uuid;
 begin
-  -- Only ever fills a blank. An existing link is never repointed: `profile_id`
-  -- is who can see this customer's jobs, invoices and photographs, and moving
-  -- it because an email address was edited would hand one person's records to
-  -- another.
-  if new.profile_id is null and new.email is not null then
-    select id into new.profile_id
-      from profiles
-     where email = new.email
-     limit 1;
+  if new.email is null then
+    -- No email is not a statement about identity — an owner clearing the field
+    -- should not silently revoke somebody's portal access.
+    return new;
   end if;
+
+  select id into v_match from profiles where email = new.email limit 1;
+
+  -- Case 1: no link yet. Adopt an account with this email if one exists.
+  if new.profile_id is null then
+    new.profile_id := v_match;
+    return new;
+  end if;
+
+  -- Case 2: already linked. Only act if the link has gone stale — that is, the
+  -- account it points at is no longer the address on this customer record.
+  select email into v_linked_email from profiles where id = new.profile_id;
+
+  if v_linked_email is not distinct from new.email then
+    return new;
+  end if;
+
+  -- The link is stale. This is the typo case: an invoice goes out to
+  -- carr723@…, that account gets linked, and the address is corrected to
+  -- carrz723@… afterwards. Without this the correction changes nothing —
+  -- the real customer still sees an empty portal, and the person on the
+  -- typo'd address can still read their invoices.
+  --
+  -- Repoint when the corrected address has an account. When it does not, the
+  -- link is CLEARED rather than left where it was: leaving it means somebody
+  -- who is no longer this customer keeps access to their invoices and
+  -- photographs, and stale access to a stranger's records is worse than a
+  -- customer having to sign in again. The blank refills itself the moment the
+  -- right person signs in — that is what the sign-in adoption is for.
+  new.profile_id := v_match;
 
   return new;
 end;
 $$;
 
 comment on function public.link_client_to_profile() is
-  'Adopts an existing login for a customer record created after the account. Mirror of handle_new_user(), which handles the opposite order.';
+  'Keeps clients.profile_id in step with clients.email: adopts a login for a record created after the account, and repoints (or clears) a link left stale by an email correction.';
 
 drop trigger if exists clients_link_profile on clients;
 
@@ -53,12 +81,13 @@ create trigger clients_link_profile
   for each row execute function public.link_client_to_profile();
 
 -- ---------------------------------------------------------------------------
--- Backfill.
+-- Backfill, in two parts.
 --
--- Every customer record created in the wrong order is currently orphaned, and
--- their owners are looking at an empty portal right now. Matched on email,
--- which is the same key both triggers use.
+-- Rows already in a broken state predate both triggers, and the people they
+-- belong to are looking at an empty portal right now.
 -- ---------------------------------------------------------------------------
+
+-- 1. Orphans: created in the wrong order, never linked to anything.
 update clients c
    set profile_id = p.id
   from profiles p
@@ -66,3 +95,28 @@ update clients c
    and c.email is not null
    and c.email = p.email
    and c.deleted_at is null;
+
+-- 2. Stale links: pointing at an account that is not the address on the record.
+--    This is the live case — a customer record whose email was corrected after
+--    the link was made, leaving the invoice visible to the typo'd account and
+--    invisible to the real customer.
+update clients c
+   set profile_id = correct.id
+  from profiles correct, profiles linked
+ where c.profile_id = linked.id
+   and c.email is not null
+   and c.email = correct.email
+   and linked.email <> c.email
+   and c.deleted_at is null;
+
+-- 3. Stale links with no account on the corrected address. Cleared, not left:
+--    an account that is no longer this customer must not keep reading their
+--    invoices. The sign-in adoption refills it when the right person arrives.
+update clients c
+   set profile_id = null
+  from profiles linked
+ where c.profile_id = linked.id
+   and c.email is not null
+   and linked.email <> c.email
+   and c.deleted_at is null
+   and not exists (select 1 from profiles p where p.email = c.email);

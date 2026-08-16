@@ -66,7 +66,11 @@ export function DetailsForm({ client }: { client: Client }) {
         type="email"
         inputMode="email"
         autoComplete="email"
-        hint="Where quotes and invoices are sent."
+        // Said plainly, because changing this really does change how you get
+        // back in: the portal link follows the email address on the account.
+        // Somebody who changes it and then cannot sign in with the old one
+        // would otherwise think they had been locked out by a fault.
+        hint="Where quotes and invoices are sent — and the address you sign in with. Change it and your next sign-in link goes to the new one."
         defaultValue={client.email ?? ""}
         error={errors.email}
       />
