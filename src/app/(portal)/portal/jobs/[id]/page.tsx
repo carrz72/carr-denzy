@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import type { Metadata } from "next";
 import {
   CameraIcon,
@@ -15,6 +16,7 @@ import { InvoiceStatusBadge, JobStatusBadge, QuoteStatusBadge } from "@/componen
 import { Card, DetailRow } from "@/components/ui/surface";
 import { buttonClasses } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { markMessagesRead } from "@/lib/unread";
 import { getSessionUser } from "@/lib/auth";
 import { formatDateTime, formatDuration } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
@@ -28,6 +30,11 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
 
   const user = await getSessionUser();
   const supabase = await createClient();
+
+  // Opening the thread is what makes it read, so the badge on the navigation
+  // can reach zero. In `after()`, never during render: this is a write, and a
+  // page that writes while rendering is what broke the enquiry screen.
+  if (user) after(() => markMessagesRead(id, user.id));
 
   const { data: job } = await supabase
     .from("jobs")

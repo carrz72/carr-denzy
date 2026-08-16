@@ -254,8 +254,45 @@ self.addEventListener("push", (event) => {
       vibrate: data.urgent ? [200, 100, 200, 100, 200] : [150],
       data: { url: data.url },
       actions: [{ action: "open", title: "Open" }],
-    }),
+    }).then(updateAppBadge),
   );
+});
+
+/**
+ * Puts a number on the home-screen icon while the app is shut.
+ *
+ * Counted from the notifications still on screen rather than from a tally kept
+ * somewhere, because a service worker is stopped and restarted at the
+ * browser's discretion — any counter it holds is one eviction away from being
+ * wrong, and a badge that is wrong upwards never goes back down.
+ *
+ * This deliberately under-counts: notifications are collapsed by tag, so three
+ * enquiries in a minute are one notification and therefore one on the badge.
+ * That is the right way round to be wrong. The app corrects it to the true
+ * figure the moment it is opened — see src/components/app-badge.tsx.
+ */
+async function updateAppBadge() {
+  if (!self.navigator || !("setAppBadge" in self.navigator)) return;
+
+  try {
+    const outstanding = await self.registration.getNotifications();
+
+    if (outstanding.length > 0) {
+      await self.navigator.setAppBadge(outstanding.length);
+    } else {
+      await self.navigator.clearAppBadge();
+    }
+  } catch {
+    // Not an installed app, or the platform does not support it. Nothing here
+    // is worth failing a push over.
+  }
+}
+
+// Swiped away without opening. The work still exists, but the person has seen
+// it and decided when to deal with it — leaving a number on the icon that no
+// action of theirs can clear is how a badge becomes wallpaper.
+self.addEventListener("notificationclose", (event) => {
+  event.waitUntil(updateAppBadge());
 });
 
 self.addEventListener("notificationclick", (event) => {
