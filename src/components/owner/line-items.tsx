@@ -208,21 +208,50 @@ export function LineItemEditor({
     setLines((current) => [...current, emptyLine(defaultVat)]);
   }
 
+  /**
+   * A line the owner has not put anything in.
+   *
+   * Quantity is not part of the test: it starts at "1" and stays there for
+   * most lines, so treating a line as "used" because it has a quantity would
+   * mean an untouched line never counted as blank.
+   */
+  function isBlank(line: DraftLine): boolean {
+    return line.description.trim() === "" && line.unitPrice.trim() === "";
+  }
+
   function addFromPriceList(priceItemId: string) {
     const item = priceItems.find((entry) => entry.id === priceItemId);
     if (!item) return;
 
-    setLines((current) => [
-      ...current,
-      {
-        key: newKey(),
-        description: item.description,
-        kind: item.kind,
-        quantity: "1",
-        unitPrice: (item.unit_price_pence / 100).toFixed(2),
-        vatRateBp: defaultVat,
-      },
-    ]);
+    const filled: Omit<DraftLine, "key"> = {
+      description: item.description,
+      kind: item.kind,
+      quantity: "1",
+      unitPrice: (item.unit_price_pence / 100).toFixed(2),
+      vatRateBp: defaultVat,
+    };
+
+    setLines((current) => {
+      // Fill the first empty line rather than always adding to the bottom.
+      //
+      // Every invoice opens with one blank line ready to type in. Picking from
+      // the price list used to append below it, so the common case — new
+      // invoice, pick a price — left an empty row stranded at the top that had
+      // to be deleted by hand every single time. The same applies after
+      // pressing "Add a line" and then deciding to use a saved price instead.
+      //
+      // Only genuinely untouched lines are reused, so anything half-typed is
+      // never overwritten.
+      const target = current.findIndex(isBlank);
+
+      if (target === -1) {
+        return [...current, { ...filled, key: newKey() }];
+      }
+
+      return current.map((line, index) =>
+        index === target ? { ...line, ...filled } : line,
+      );
+    });
   }
 
   return (
