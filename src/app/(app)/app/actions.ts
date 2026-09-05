@@ -834,6 +834,117 @@ export async function createQuote(formData: FormData): Promise<ActionResult> {
   return { ok: true, id: quote.id };
 }
 
+/**
+ * Rewrites a draft quote.
+ *
+ * There was no way to change one. A quote could be created and sent, and
+ * nothing in between — so a wrong price, a typo in front of a customer, or a
+ * line you thought better of meant starting the whole thing again. On a quote
+ * with thirty lines that is not a small ask.
+ *
+ * Drafts only, enforced here rather than trusted from the page. Once a quote
+ * has been sent it is a document the customer holds a copy of, and quietly
+ * editing it underneath them would be worse than useless — it would be
+ * dishonest. Changing a sent quote means issuing a new one.
+ */
+export async function updateQuote(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const quoteId = String(formData.get("quote_id") ?? "");
+  if (!quoteId) return { ok: false, formError: "Missing quote." };
+
+  const itemsRaw = String(formData.get("items") ?? "[]");
+
+  let items: unknown;
+  try {
+    items = JSON.parse(itemsRaw);
+  } catch {
+    return { ok: false, formError: "Could not read the quote lines. Try again." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("quotes")
+    .select("id, status, job_id")
+    .eq("id", quoteId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, formError: "That quote no longer exists." };
+
+  if (existing.status !== "draft") {
+    return {
+      ok: false,
+      formError:
+        "This quote has already gone to the customer, so it cannot be changed. Raise a new one instead.",
+    };
+  }
+
+  const parsed = quoteSchema.safeParse({
+    job_id: existing.job_id,
+    intro_note: formData.get("intro_note") ?? "",
+    terms: formData.get("terms") ?? "",
+    valid_until: formData.get("valid_until") ?? "",
+    items,
+  });
+
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+
+  const { error } = await supabase
+    .from("quotes")
+    .update({
+      intro_note: parsed.data.intro_note || null,
+      terms: parsed.data.terms || null,
+      valid_until: parsed.data.valid_until || null,
+    })
+    .eq("id", quoteId);
+
+  if (error) {
+    console.error("[quote] update failed", error);
+    return { ok: false, formError: "Could not save that. Try again." };
+  }
+
+  // Lines are replaced wholesale rather than reconciled one by one. Working
+  // out which of thirty lines moved, changed or went is a lot of machinery to
+  // arrive at the same place, and the totals are recalculated from whatever
+  // ends up in the table.
+  const { error: clearError } = await supabase
+    .from("quote_items")
+    .delete()
+    .eq("quote_id", quoteId);
+
+  if (clearError) {
+    console.error("[quote] could not clear lines", clearError);
+    return { ok: false, formError: "Could not save the lines. Try again." };
+  }
+
+  const { error: itemsError } = await supabase.from("quote_items").insert(
+    parsed.data.items.map((item, index) => ({
+      quote_id: quoteId,
+      description: item.description,
+      kind: item.kind,
+      quantity_milli: item.quantity_milli,
+      unit_price_pence: item.unit_price_pence,
+      vat_rate_bp: item.vat_rate_bp,
+      sort_order: index,
+    })),
+  );
+
+  if (itemsError) {
+    console.error("[quote] items failed", itemsError);
+    return {
+      ok: false,
+      formError: "The quote saved but its lines did not. Open it and try again.",
+    };
+  }
+
+  revalidatePath(`/app/quotes/${quoteId}`);
+  revalidatePath(`/app/jobs/${existing.job_id}`);
+
+  return { ok: true, id: quoteId };
+}
+
 /** Sends a draft quote to the customer. */
 export async function sendQuote(formData: FormData): Promise<ActionResult> {
   await requireOwner();

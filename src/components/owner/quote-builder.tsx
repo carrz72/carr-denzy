@@ -6,8 +6,8 @@ import { FileTextIcon } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
 import { FormError, TextAreaField, TextField } from "@/components/ui/field";
-import { LineItemEditor } from "@/components/owner/line-items";
-import { createQuote } from "@/app/(app)/app/actions";
+import { LineItemEditor, type DraftLine } from "@/components/owner/line-items";
+import { createQuote, updateQuote } from "@/app/(app)/app/actions";
 import { formatPence } from "@/lib/money";
 import { addDaysToToday, todayInLondon } from "@/lib/dates";
 import type { PriceItem, Settings } from "@/types/database";
@@ -28,6 +28,10 @@ export function QuoteBuilder({
   priceItems,
   settings,
   defaultTerms,
+  quoteId,
+  initialLines,
+  initialIntro,
+  initialValidUntil,
 }: {
   jobId: string;
   jobTitle: string;
@@ -35,7 +39,13 @@ export function QuoteBuilder({
   priceItems: PriceItem[];
   settings: Settings;
   defaultTerms: string;
+  /** Set when editing an existing draft rather than writing a new quote. */
+  quoteId?: string;
+  initialLines?: DraftLine[];
+  initialIntro?: string | null;
+  initialValidUntil?: string | null;
 }) {
+  const editing = Boolean(quoteId);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -48,7 +58,7 @@ export function QuoteBuilder({
     setFormError(null);
 
     startTransition(async () => {
-      const result = await createQuote(formData);
+      const result = editing ? await updateQuote(formData) : await createQuote(formData);
 
       if (!result.ok || !result.id) {
         setErrors(result.errors ?? {});
@@ -63,6 +73,7 @@ export function QuoteBuilder({
   return (
     <form action={handleSubmit} className="flex flex-col gap-6">
       <input type="hidden" name="job_id" value={jobId} />
+      {quoteId ? <input type="hidden" name="quote_id" value={quoteId} /> : null}
 
       <Card>
         <h2 className="text-label uppercase text-ink-subtle">What you are quoting for</h2>
@@ -77,6 +88,7 @@ export function QuoteBuilder({
             hint="Appears above the prices. A sentence explaining what you propose to do usually wins the job."
             placeholder="Thanks for having me out on Tuesday. Here is what I would do to sort the leak for good, rather than patch it."
             rows={4}
+            defaultValue={initialIntro ?? ""}
             error={errors.intro_note}
           />
 
@@ -85,7 +97,7 @@ export function QuoteBuilder({
             label="Open until"
             type="date"
             min={todayInLondon()}
-            defaultValue={addDaysToToday(settings.quote_valid_days)}
+            defaultValue={initialValidUntil ?? addDaysToToday(settings.quote_valid_days)}
             hint={`Your usual is ${settings.quote_valid_days} days. After this the quote expires on its own.`}
             error={errors.valid_until}
           />
@@ -101,6 +113,7 @@ export function QuoteBuilder({
 
         <div className="mt-5">
           <LineItemEditor
+            initialLines={initialLines}
             priceItems={priceItems}
             vatRegistered={settings.vat_registered}
             cisEnabled={settings.cis_enabled}
@@ -136,7 +149,9 @@ export function QuoteBuilder({
           owner has read the finished document back (spec FR-41). */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-[0.9375rem] text-ink-muted">
-          Saves as a draft. You will see it as the customer will before it goes.
+          {editing
+            ? "Still a draft. Nothing has gone to the customer, and saving does not send it."
+            : "Saves as a draft. You will see it as the customer will before it goes."}
         </p>
 
         <Button
@@ -146,7 +161,9 @@ export function QuoteBuilder({
           disabled={lineCount === 0}
           icon={<FileTextIcon size={19} />}
         >
-          {lineCount === 0 ? "Add a line first" : `Save quote for ${formatPence(totalPence)}`}
+          {lineCount === 0
+            ? "Add a line first"
+            : `${editing ? "Save changes —" : "Save quote for"} ${formatPence(totalPence)}`}
         </Button>
       </div>
     </form>

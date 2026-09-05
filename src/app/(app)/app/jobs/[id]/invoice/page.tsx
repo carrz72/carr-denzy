@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/app-shell";
 import { InvoiceBuilder } from "@/components/owner/invoice-builder";
-import { linesFromItems, type DraftLine } from "@/components/owner/line-items";
+import { linesFromItems, type DraftLine } from "@/lib/draft-lines";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
 

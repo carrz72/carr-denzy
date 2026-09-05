@@ -1,4 +1,9 @@
-import { formatPence, formatQuantity, formatRateBp, lineAmountPence } from "@/lib/money";
+import {
+  formatPence,
+  formatQuantity,
+  formatRateBp,
+  lineAmountPence,
+} from "@/lib/money";
 import { cn } from "@/lib/cn";
 import type { LineKind } from "@/types/database";
 
@@ -43,63 +48,135 @@ export function DocumentLines({
   const showVat = vatRegistered && !reverseCharge;
 
   return (
-    <div className={cn("overflow-x-auto", className)}>
-      <table className="w-full min-w-[34rem] border-collapse text-left">
-        <caption className="sr-only">What this covers, line by line</caption>
+    <div className={className}>
+      {/*
+        Two layouts, because a five-column table cannot be read on a phone.
 
-        <thead>
-          <tr className="border-b border-line-strong">
-            <th scope="col" className="py-2.5 pr-4 text-label uppercase text-ink-subtle">
-              What for
-            </th>
-            <th scope="col" className="py-2.5 px-4 text-right text-label uppercase text-ink-subtle">
-              Qty
-            </th>
-            <th scope="col" className="py-2.5 px-4 text-right text-label uppercase text-ink-subtle">
-              Each
-            </th>
-            {showVat ? (
-              <th scope="col" className="py-2.5 px-4 text-right text-label uppercase text-ink-subtle">
-                VAT
-              </th>
-            ) : null}
-            <th scope="col" className="py-2.5 pl-4 text-right text-label uppercase text-ink-subtle">
-              Amount
-            </th>
-          </tr>
-        </thead>
+        The table needs 34rem to hold its columns, and the card it sits in is
+        about 19rem wide on a normal handset. It scrolled sideways, so the
+        descriptions were visible and every price sat off the right-hand edge —
+        you could read a quote from top to bottom without ever seeing a number.
+        On the screen the owner actually works from, the money was hidden.
 
-        <tbody>
-          {items.map((item, index) => (
-            <tr key={item.id ?? index} className="border-b border-line align-top">
-              <td className="py-3.5 pr-4">
-                <span className="block font-medium text-ink">{item.description}</span>
+        Below `sm` each line becomes a block with its amount beside it. From
+        `sm` up there is room for the table, which is better for comparing a
+        column of figures, and it is what prints.
+      */}
+      <ul className="flex flex-col sm:hidden">
+        {items.map((item, index) => {
+          const amount = lineAmountPence(
+            item.quantity_milli,
+            item.unit_price_pence,
+          );
+          const multiple = item.quantity_milli !== 1000;
+
+          return (
+            <li
+              key={item.id ?? index}
+              className="flex items-start justify-between gap-4 border-b border-line py-3.5"
+            >
+              <div className="min-w-0">
+                <span className="block font-medium text-ink">
+                  {item.description}
+                </span>
                 <span className="mt-0.5 block text-sm text-ink-subtle">
                   {kindLabels[item.kind]}
+                  {/* Only worth saying when it is not simply one of something. */}
+                  {multiple
+                    ? ` · ${formatQuantity(item.quantity_milli)} × ${formatPence(item.unit_price_pence)}`
+                    : ""}
+                  {showVat ? ` · VAT ${formatRateBp(item.vat_rate_bp)}` : ""}
                 </span>
-              </td>
+              </div>
 
-              <td className="py-3.5 px-4 text-right font-mono tabular-nums text-ink-muted">
-                {formatQuantity(item.quantity_milli)}
-              </td>
+              <span className="shrink-0 font-mono font-semibold tabular-nums text-ink">
+                {formatPence(amount)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
 
-              <td className="py-3.5 px-4 text-right font-mono tabular-nums text-ink-muted">
-                {formatPence(item.unit_price_pence)}
-              </td>
+      <div className="hidden overflow-x-auto sm:block">
+        <table className="w-full min-w-[34rem] border-collapse text-left">
+          <caption className="sr-only">What this covers, line by line</caption>
 
+          <thead>
+            <tr className="border-b border-line-strong">
+              <th
+                scope="col"
+                className="py-2.5 pr-4 text-label uppercase text-ink-subtle"
+              >
+                What for
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-right text-label uppercase text-ink-subtle"
+              >
+                Qty
+              </th>
+              <th
+                scope="col"
+                className="py-2.5 px-4 text-right text-label uppercase text-ink-subtle"
+              >
+                Each
+              </th>
               {showVat ? (
-                <td className="py-3.5 px-4 text-right font-mono tabular-nums text-ink-muted">
-                  {formatRateBp(item.vat_rate_bp)}
-                </td>
+                <th
+                  scope="col"
+                  className="py-2.5 px-4 text-right text-label uppercase text-ink-subtle"
+                >
+                  VAT
+                </th>
               ) : null}
-
-              <td className="py-3.5 pl-4 text-right font-mono font-semibold tabular-nums text-ink">
-                {formatPence(lineAmountPence(item.quantity_milli, item.unit_price_pence))}
-              </td>
+              <th
+                scope="col"
+                className="py-2.5 pl-4 text-right text-label uppercase text-ink-subtle"
+              >
+                Amount
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {items.map((item, index) => (
+              <tr
+                key={item.id ?? index}
+                className="border-b border-line align-top"
+              >
+                <td className="py-3.5 pr-4">
+                  <span className="block font-medium text-ink">
+                    {item.description}
+                  </span>
+                  <span className="mt-0.5 block text-sm text-ink-subtle">
+                    {kindLabels[item.kind]}
+                  </span>
+                </td>
+
+                <td className="py-3.5 px-4 text-right font-mono tabular-nums text-ink-muted">
+                  {formatQuantity(item.quantity_milli)}
+                </td>
+
+                <td className="py-3.5 px-4 text-right font-mono tabular-nums text-ink-muted">
+                  {formatPence(item.unit_price_pence)}
+                </td>
+
+                {showVat ? (
+                  <td className="py-3.5 px-4 text-right font-mono tabular-nums text-ink-muted">
+                    {formatRateBp(item.vat_rate_bp)}
+                  </td>
+                ) : null}
+
+                <td className="py-3.5 pl-4 text-right font-mono font-semibold tabular-nums text-ink">
+                  {formatPence(
+                    lineAmountPence(item.quantity_milli, item.unit_price_pence),
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -141,11 +218,20 @@ export function TotalsPanel({
   const outstanding = paidPence === undefined ? null : totalPence - paidPence;
 
   return (
-    <div className={cn("rounded-lg border border-line bg-surface-sunken p-5", className)}>
+    <div
+      className={cn(
+        "rounded-lg border border-line bg-surface-sunken p-5",
+        className,
+      )}
+    >
       <dl className="flex flex-col gap-2.5">
-        {showBreakdown ? <TotalRow label="Subtotal" valuePence={subtotalPence} /> : null}
+        {showBreakdown ? (
+          <TotalRow label="Subtotal" valuePence={subtotalPence} />
+        ) : null}
 
-        {vatRegistered && !reverseCharge ? <TotalRow label="VAT" valuePence={vatPence} /> : null}
+        {vatRegistered && !reverseCharge ? (
+          <TotalRow label="VAT" valuePence={vatPence} />
+        ) : null}
 
         {vatRegistered && reverseCharge ? (
           <p className="text-sm text-ink-muted">
@@ -161,7 +247,9 @@ export function TotalsPanel({
         ) : null}
 
         <div className="flex items-baseline justify-between gap-4 border-t border-line pt-3">
-          <dt className="font-display text-subheading text-ink">{totalLabel}</dt>
+          <dt className="font-display text-subheading text-ink">
+            {totalLabel}
+          </dt>
           <dd className="font-mono text-heading font-bold tabular-nums text-ink">
             {formatPence(totalPence)}
           </dd>
@@ -188,11 +276,19 @@ export function TotalsPanel({
   );
 }
 
-function TotalRow({ label, valuePence }: { label: string; valuePence: number }) {
+function TotalRow({
+  label,
+  valuePence,
+}: {
+  label: string;
+  valuePence: number;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <dt className="text-[0.9375rem] text-ink-muted">{label}</dt>
-      <dd className="font-mono tabular-nums text-ink">{formatPence(valuePence)}</dd>
+      <dd className="font-mono tabular-nums text-ink">
+        {formatPence(valuePence)}
+      </dd>
     </div>
   );
 }
@@ -240,7 +336,9 @@ export function BusinessBlock({
       {snapshot.vat_registered === true && text("vat_number") ? (
         <p className="mt-1">VAT registration {text("vat_number")}</p>
       ) : null}
-      {snapshot.cis_enabled === true && text("utr") ? <p>UTR {text("utr")}</p> : null}
+      {snapshot.cis_enabled === true && text("utr") ? (
+        <p>UTR {text("utr")}</p>
+      ) : null}
     </div>
   );
 }
@@ -271,7 +369,12 @@ export function BankDetails({
   if (!accountName && !sortCode && !accountNumber) return null;
 
   return (
-    <div className={cn("rounded-lg border border-accent-line bg-accent-soft p-5", className)}>
+    <div
+      className={cn(
+        "rounded-lg border border-accent-line bg-accent-soft p-5",
+        className,
+      )}
+    >
       <h3 className="text-label uppercase text-accent-ink">How to pay</h3>
 
       <dl className="mt-3 flex flex-col gap-2">
@@ -285,25 +388,32 @@ export function BankDetails({
         {sortCode ? (
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <dt className="text-sm text-ink-muted">Sort code</dt>
-            <dd className="font-mono font-medium tabular-nums text-ink">{sortCode}</dd>
+            <dd className="font-mono font-medium tabular-nums text-ink">
+              {sortCode}
+            </dd>
           </div>
         ) : null}
 
         {accountNumber ? (
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <dt className="text-sm text-ink-muted">Account number</dt>
-            <dd className="font-mono font-medium tabular-nums text-ink">{accountNumber}</dd>
+            <dd className="font-mono font-medium tabular-nums text-ink">
+              {accountNumber}
+            </dd>
           </div>
         ) : null}
 
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-accent-line pt-2">
           <dt className="text-sm text-ink-muted">Payment reference</dt>
-          <dd className="font-mono font-semibold tabular-nums text-ink">{reference}</dd>
+          <dd className="font-mono font-semibold tabular-nums text-ink">
+            {reference}
+          </dd>
         </div>
       </dl>
 
       <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-        Please quote the reference so the payment can be matched to this invoice.
+        Please quote the reference so the payment can be matched to this
+        invoice.
       </p>
     </div>
   );

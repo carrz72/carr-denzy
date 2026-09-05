@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { EyeIcon, ReceiptIcon } from "@phosphor-icons/react/dist/ssr";
+import { EyeIcon, PencilSimpleIcon, ReceiptIcon } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
 import { Card, DetailRow } from "@/components/ui/surface";
 import { QuoteStatusBadge } from "@/components/ui/badge";
@@ -109,12 +109,26 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
 
               {/* Preview first, send second — deliberately in that order. This
                   is the last point at which a wrong price is still private. */}
+              {/* Edit before preview before send — the order you would use
+                  them in, and each step is harder to undo than the last. */}
+              <Link
+                href={`/app/quotes/${quote.id}/edit`}
+                className={buttonClasses({
+                  variant: "secondary",
+                  fullWidth: true,
+                  className: "mt-5",
+                })}
+              >
+                <PencilSimpleIcon size={18} aria-hidden="true" />
+                Change the prices or wording
+              </Link>
+
               <Link
                 href={`/app/quotes/${quote.id}/preview`}
                 className={buttonClasses({
                   variant: "secondary",
                   fullWidth: true,
-                  className: "mt-5",
+                  className: "mt-2.5",
                 })}
               >
                 <EyeIcon size={18} aria-hidden="true" />
