@@ -111,6 +111,30 @@ export async function syncUserRole(userId: string, email: string): Promise<UserR
     .eq("id", userId)
     .maybeSingle<Profile>();
 
+  // A signed-in account with no profile row is quietly broken, in a way that
+  // does not show up until it matters.
+  //
+  // `job_events.actor_id` is a foreign key to `profiles`, and every status
+  // change writes one by trigger. So an account missing its profile can sign
+  // in, load every screen, and then fail on "Start work" or "Mark finished"
+  // with a foreign key error — the status silently does not move.
+  //
+  // The row is normally created by `handle_new_user()` when the auth user is
+  // inserted, which means it only ever runs once. Delete a profile row while
+  // tidying up test data, or import users, and nothing ever puts it back.
+  // Recreating it here costs one query on sign-in and closes the hole.
+  if (!profile) {
+    const { error: repairError } = await admin
+      .from("profiles")
+      .insert({ id: userId, email, role: "client" });
+
+    if (repairError) {
+      console.error("[auth] could not recreate the missing profile", repairError.message);
+    } else {
+      console.info("[auth] recreated a missing profile row for", email);
+    }
+  }
+
   let role: UserRole = profile?.role ?? "client";
 
   if (isConfiguredOwner && role !== "owner") {

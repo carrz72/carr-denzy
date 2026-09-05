@@ -117,6 +117,94 @@ export function formatDuration(minutes: number | null | undefined): string {
 }
 
 /** Today's date in Europe/London as `YYYY-MM-DD`, for date inputs. */
+/**
+ * How long a job runs, said the way a person would say it.
+ *
+ * Stored as working days, because that is the only unit that stays true — a
+ * "week" of work is five days on site, not seven, and a job does not pause for
+ * the weekend just because the calendar does. But nobody tells a customer
+ * their kitchen will take "fifteen working days", so it is read back in
+ * whichever unit sounds natural at that length.
+ *
+ * Five working days to the week, twenty to the month. Deliberately round: this
+ * is an estimate given before the work starts, and dressing it up with a
+ * decimal place would imply a precision nobody has.
+ */
+export function formatWorkingDays(days: number | null | undefined): string {
+  if (!days || days < 1) return "";
+  if (days === 1) return "about a day";
+  if (days < 5) return `about ${days} days`;
+
+  if (days < 20) {
+    const weeks = Math.round(days / 5);
+    return weeks === 1 ? "about a week" : `about ${weeks} weeks`;
+  }
+
+  const months = Math.round(days / 20);
+  const leftover = days - months * 20;
+
+  // Close enough to a round number of months to say so.
+  if (Math.abs(leftover) <= 2) {
+    return months === 1 ? "about a month" : `about ${months} months`;
+  }
+
+  return `about ${Math.round(days / 5)} weeks`;
+}
+
+/**
+ * The same estimate given as a range: "three to four weeks", "a month or two".
+ *
+ * How a tradesman actually answers "how long will it take?" before anything is
+ * opened up. A single number sounds like a commitment; a range sounds like an
+ * estimate, which is what it is.
+ *
+ * Both ends are converted into one unit before pairing them, so the phrasing
+ * never straddles two — "1 week to 2 months" is technically accurate and reads
+ * like nonsense.
+ */
+export function formatWorkingDayRange(
+  from: number | null | undefined,
+  to: number | null | undefined,
+): string {
+  if (!from || from < 1) return "";
+  if (!to || to <= from) return formatWorkingDays(from);
+
+  // Months only when the BOTTOM of the range is already a month.
+  //
+  // Choosing the unit from the top end reads "15 to 20 days" as "about a
+  // month", because three weeks rounds up to one month and four weeks rounds
+  // to the same — the range collapses and the customer is told something
+  // vaguer than what was meant. The lower bound decides.
+  if (from >= 20) {
+    const lo = Math.max(1, Math.round(from / 20));
+    const hi = Math.round(to / 20);
+
+    if (lo === hi) return lo === 1 ? "about a month" : `about ${lo} months`;
+    // The idiom, worth special-casing because it is what people say.
+    if (lo === 1 && hi === 2) return "a month or two";
+    return `${lo} to ${hi} months`;
+  }
+
+  // Weeks, on the same rule.
+  if (from >= 5) {
+    const lo = Math.max(1, Math.round(from / 5));
+    const hi = Math.round(to / 5);
+
+    if (lo === hi) return lo === 1 ? "about a week" : `about ${lo} weeks`;
+    if (lo === 1 && hi === 2) return "a week or two";
+    return `${lo} to ${hi} weeks`;
+  }
+
+  return `${from} to ${to} days`;
+}
+
+/** Working days for a number entered as days, weeks or months. */
+export function workingDaysFrom(amount: number, unit: "days" | "weeks" | "months"): number {
+  if (unit === "weeks") return amount * 5;
+  if (unit === "months") return amount * 20;
+  return amount;
+}
+
 export function todayInLondon(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: LONDON,

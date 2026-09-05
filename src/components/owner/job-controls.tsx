@@ -10,7 +10,13 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
-import { CheckField, FormError, TextAreaField, TextField } from "@/components/ui/field";
+import {
+  CheckField,
+  FormError,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/ui/field";
 import {
   addJobNote,
   removeVisit,
@@ -20,7 +26,12 @@ import {
 } from "@/app/(app)/app/actions";
 import { jobStatusLabels } from "@/components/ui/badge";
 import { queueOutboxItem, isOnline } from "@/lib/outbox";
-import { formatDateTime, formatDuration, todayInLondon } from "@/lib/dates";
+import {
+  formatDateTime,
+  formatDuration,
+  formatWorkingDayRange,
+  todayInLondon,
+} from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import type { JobStatus } from "@/types/database";
 
@@ -281,11 +292,14 @@ export function ScheduleForm({
   jobId,
   visits,
   expectedDays,
+  expectedDaysMax,
   durationMinutes,
 }: {
   jobId: string;
   visits: Visit[];
   expectedDays: number | null;
+  /** Upper bound, when the estimate was given as a range. */
+  expectedDaysMax: number | null;
   durationMinutes: number | null;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -300,6 +314,28 @@ export function ScheduleForm({
   );
 
   const next = booked.find((v) => new Date(v.starts_at).getTime() >= Date.now());
+
+  // Read the stored working days back in the unit it was most likely typed in,
+  // so re-opening the form shows "3 weeks" rather than "15".
+  //
+  // The unit is chosen from the lower bound and then applied to both, because
+  // a range typed as "1 to 2 months" must come back as 1 and 2 — not 1 month
+  // and 40 days.
+  const [initialAmount, initialAmountMax, initialUnit] = (() => {
+    if (!expectedDays) return ["", "", "days"] as const;
+
+    const divisor =
+      expectedDays >= 20 && expectedDays % 20 === 0
+        ? 20
+        : expectedDays >= 5 && expectedDays % 5 === 0
+          ? 5
+          : 1;
+
+    const unit = divisor === 20 ? "months" : divisor === 5 ? "weeks" : "days";
+    const max = expectedDaysMax ? String(Math.round(expectedDaysMax / divisor)) : "";
+
+    return [String(expectedDays / divisor), max, unit] as const;
+  })();
 
   function handleSubmit(formData: FormData, force = false) {
     setErrors({});
@@ -405,28 +441,71 @@ export function ScheduleForm({
         </ul>
       ) : null}
 
-      {/* How long the whole job runs — a different fact from the days
-          themselves, and the one the customer is actually told. */}
-      {booked.length > 0 ? (
-        <form action={saveExpected} className="mt-4 flex items-end gap-3">
+      {/*
+        How long the whole job runs — a different fact from the days
+        themselves, and the one the customer is actually told.
+
+        Entered in whatever unit suits the job, stored as working days. Nobody
+        says "fifteen working days" about a kitchen — they say three weeks —
+        and nobody says "eighty days" about a full refurbishment. It is read
+        back to the customer in the natural unit too.
+
+        Shown BEFORE anything is booked, deliberately. The customer is emailed
+        when the first day goes in, and that email only says "this runs for
+        about three weeks" if the length is already set. Hiding this field
+        until a day existed meant the one email a long job sends could never
+        carry the one fact that makes it a long job.
+      */}
+      {(
+        <form action={saveExpected} className="mt-4">
           <input type="hidden" name="job_id" value={jobId} />
-          <div className="min-w-0 flex-1">
-            <TextField
-              name="expected_days"
-              label="How long altogether"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              hint="Working days. Leave blank for a one-day job."
-              defaultValue={expectedDays ? String(expectedDays) : ""}
-              error={errors.expected_days}
-            />
+
+          <p className="text-label uppercase text-ink-subtle">How long altogether</p>
+
+          <div className="mt-2 flex items-end gap-2">
+            <div className="w-16 shrink-0">
+              <TextField
+                name="expected_amount"
+                label="From"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                defaultValue={initialAmount}
+                error={errors.expected_days}
+              />
+            </div>
+
+            <div className="w-16 shrink-0">
+              <TextField
+                name="expected_amount_max"
+                label="To"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                defaultValue={initialAmountMax}
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <SelectField name="expected_unit" label="Unit" defaultValue={initialUnit}>
+                <option value="days">days on site</option>
+                <option value="weeks">weeks</option>
+                <option value="months">months</option>
+              </SelectField>
+            </div>
+
+            <Button variant="secondary" type="submit" disabled={isPending}>
+              Save
+            </Button>
           </div>
-          <Button variant="secondary" type="submit" disabled={isPending}>
-            Save
-          </Button>
+
+          <p className="mt-2 text-sm text-ink-subtle">
+            {expectedDays
+              ? `The customer is told "${formatWorkingDayRange(expectedDays, expectedDaysMax)}".`
+              : "Leave blank for a one-day job. Fill in both boxes for an estimate — 1 to 2 months reads as “a month or two”."}
+          </p>
         </form>
-      ) : null}
+      )}
 
       {booked.length > 0 && !showAdd ? (
         <Button

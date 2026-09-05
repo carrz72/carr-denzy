@@ -30,7 +30,7 @@ import {
 import { renderInvoicePdf, renderQuotePdf } from "@/lib/invoice-pdf";
 import { notifyClientBooked, notifyClientCompleted } from "@/lib/notify-client";
 import { formatPence } from "@/lib/money";
-import { addDaysToToday, formatDate } from "@/lib/dates";
+import { addDaysToToday, formatDate, workingDaysFrom } from "@/lib/dates";
 
 export interface ActionResult {
   ok: boolean;
@@ -576,7 +576,24 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
     return { ok: false, formError: friendly(error.message, "Could not book that in. Try again.") };
   }
 
-  await supabase.from("jobs").update({ status: "scheduled" }).eq("id", parsed.data.job_id);
+  // Only worth moving a job that has not started yet. A job already under way,
+  // finished or invoiced must not be dragged back to "Booked in" because
+  // another day was added to it — which is exactly what happens on a long job.
+  const { data: moved, error: statusError } = await supabase
+    .from("jobs")
+    .update({ status: "scheduled" })
+    .eq("id", parsed.data.job_id)
+    .in("status", ["new", "quoted", "accepted"])
+    .select("id");
+
+  // Reported rather than swallowed. A day that saves while the job silently
+  // stays on "New request" is the kind of half-done state that has already
+  // bitten this app more than once today.
+  if (statusError) {
+    console.error("[schedule] could not move the job to scheduled", statusError.message);
+  } else if ((moved ?? []).length === 0) {
+    console.info("[schedule] job left on its current status — already past booking");
+  }
 
   // Tell the customer — but only once for the job, not once per day.
   //
@@ -588,7 +605,7 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
   const { data: booked } = await supabase
     .from("jobs")
     .select(
-      `title, expected_days, property:properties(address_line1, address_line2, city, postcode)`,
+      `title, expected_days, expected_days_max, property:properties(address_line1, address_line2, city, postcode)`,
     )
     .eq("id", parsed.data.job_id)
     .maybeSingle();
@@ -660,21 +677,61 @@ export async function setExpectedDays(formData: FormData): Promise<ActionResult>
   await requireStaff();
 
   const jobId = String(formData.get("job_id") ?? "");
-  const raw = String(formData.get("expected_days") ?? "").trim();
+  const raw = String(formData.get("expected_amount") ?? "").trim();
+  const unitRaw = String(formData.get("expected_unit") ?? "days");
 
   if (!jobId) return { ok: false, formError: "Missing job." };
 
-  const days = raw === "" ? null : Number(raw);
+  const unit: "days" | "weeks" | "months" =
+    unitRaw === "weeks" || unitRaw === "months" ? unitRaw : "days";
 
-  if (days !== null && (!Number.isInteger(days) || days < 1 || days > 260)) {
-    return { ok: false, errors: { expected_days: "Give it a whole number of days." } };
+  const rawMax = String(formData.get("expected_amount_max") ?? "").trim();
+
+  const amount = raw === "" ? null : Number(raw);
+  const amountMax = rawMax === "" ? null : Number(rawMax);
+
+  if (amount !== null && (!Number.isInteger(amount) || amount < 1)) {
+    return { ok: false, errors: { expected_days: "Give it a whole number." } };
+  }
+
+  if (amountMax !== null && (!Number.isInteger(amountMax) || amountMax < 1)) {
+    return { ok: false, errors: { expected_days: "Give it a whole number." } };
+  }
+
+  // An upper bound on its own says nothing — "up to three weeks" from what?
+  if (amountMax !== null && amount === null) {
+    return {
+      ok: false,
+      errors: { expected_days: "Fill in the first box too, or clear them both." },
+    };
+  }
+
+  if (amount !== null && amountMax !== null && amountMax < amount) {
+    return {
+      ok: false,
+      errors: { expected_days: "The second number needs to be the longer one." },
+    };
+  }
+
+  // Kept in working days whatever the owner typed, so there is one unit in the
+  // database and the reading-back is a display decision rather than a stored
+  // one. Five days to the week, twenty to the month. Both ends use the same
+  // unit, so a range can never straddle two.
+  const days = amount === null ? null : workingDaysFrom(amount, unit);
+  const daysMax = amountMax === null ? null : workingDaysFrom(amountMax, unit);
+
+  if ((days !== null && days > 260) || (daysMax !== null && daysMax > 260)) {
+    return {
+      ok: false,
+      errors: { expected_days: "That is over a year of work — check the number." },
+    };
   }
 
   const supabase = await createClient();
 
   const { error } = await supabase
     .from("jobs")
-    .update({ expected_days: days })
+    .update({ expected_days: days, expected_days_max: daysMax })
     .eq("id", jobId);
 
   if (error) return { ok: false, formError: "Could not save that. Try again." };

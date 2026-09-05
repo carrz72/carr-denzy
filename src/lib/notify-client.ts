@@ -67,6 +67,7 @@ export async function notifyClientBooked(
   address: string | null,
   /** Working days the whole job runs, when it is more than a single visit. */
   expectedDays: number | null = null,
+  expectedDaysMax: number | null = null,
 ): Promise<void> {
   const recipient = await recipientFor(jobId, "notify_booking");
   if (!recipient?.wants) return;
@@ -99,6 +100,7 @@ export async function notifyClientBooked(
           address,
           jobId,
           runsForDays ? expectedDays : null,
+          runsForDays ? expectedDaysMax : null,
         )
       : Promise.resolve(),
 

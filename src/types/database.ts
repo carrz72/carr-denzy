@@ -155,6 +155,8 @@ export type Job = {
   duration_minutes: number | null;
   /** Working days the whole job should take. Null for a single-visit job. */
   expected_days: number | null;
+  /** Optional upper bound, when the estimate is a range ("a month or two"). */
+  expected_days_max: number | null;
   completed_at: string | null;
   private_notes: string | null;
   created_at: string;

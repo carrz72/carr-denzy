@@ -39,7 +39,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     .from("jobs")
     .select(
       `id, reference, title, description, status, urgency, scheduled_start,
-       duration_minutes, expected_days, completed_at, private_notes, created_at,
+       duration_minutes, expected_days, expected_days_max, completed_at, private_notes, created_at,
        client:clients(id, full_name, email, phone, company_name),
        property:properties(address_line1, address_line2, city, postcode, access_notes),
        service:services(name)`,
@@ -244,6 +244,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             jobId={job.id}
             visits={visits ?? []}
             expectedDays={job.expected_days}
+            expectedDaysMax={job.expected_days_max}
             durationMinutes={job.duration_minutes}
           />
 

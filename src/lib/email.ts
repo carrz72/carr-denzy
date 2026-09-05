@@ -4,6 +4,7 @@ import { Resend } from "resend";
 
 import { getBusiness } from "@/lib/business";
 import { formatPence } from "@/lib/money";
+import { formatWorkingDayRange } from "@/lib/dates";
 
 /**
  * Email.
@@ -716,6 +717,8 @@ export async function sendBookingConfirmation(
   jobId: string,
   /** Working days the whole job runs. Null for a single visit. */
   expectedDays: number | null = null,
+  /** Upper bound, when the estimate was given as a range. */
+  expectedDaysMax: number | null = null,
 ): Promise<SendResult> {
   const link = `${siteUrl()}/portal/jobs/${jobId}`;
   const phone = await businessPhone();
@@ -728,7 +731,7 @@ export async function sendBookingConfirmation(
   const multiDay = (expectedDays ?? 1) > 1;
 
   const spanLine = multiDay
-    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We expect the work to take about <strong>${expectedDays} working days</strong> in all. The days we will be with you are listed on your job page, and we keep them up to date as we go.</p>`
+    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We expect the work to take <strong>${esc(formatWorkingDayRange(expectedDays, expectedDaysMax))}</strong> in all. The days we will be with you are listed on your job page, and we keep them up to date as we go.</p>`
     : "";
 
   const html = await layout(
@@ -759,7 +762,7 @@ export async function sendBookingConfirmation(
     arrivalWindow ? `Arriving: ${arrivalWindow}` : "",
     address ? `Where: ${address}` : "",
     multiDay
-      ? `\nWe expect about ${expectedDays} working days in all. The days we will be with you are listed on your job page.`
+      ? `\nWe expect it to take ${formatWorkingDayRange(expectedDays, expectedDaysMax)} in all. The days we will be with you are listed on your job page.`
       : "",
     "",
     `If that no longer suits, ring us on ${phone}.`,

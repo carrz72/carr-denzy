@@ -18,7 +18,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { markMessagesRead } from "@/lib/unread";
 import { getSessionUser } from "@/lib/auth";
-import { formatDateTime, formatDuration } from "@/lib/dates";
+import { formatDateTime, formatDuration, formatWorkingDayRange } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { signedPhotoUrls } from "@/lib/storage";
 import { cn } from "@/lib/cn";
@@ -40,7 +40,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
     .from("jobs")
     .select(
       `id, reference, title, description, status, urgency, scheduled_start,
-       duration_minutes, expected_days, completed_at, created_at,
+       duration_minutes, expected_days, expected_days_max, completed_at, created_at,
        property:properties(address_line1, address_line2, city, postcode, access_notes),
        service:services(name)`,
     )
@@ -214,7 +214,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
 
               {job.expected_days && job.expected_days > 1 ? (
                 <DetailRow label="How long altogether">
-                  About {job.expected_days} working days
+                  {formatWorkingDayRange(job.expected_days, job.expected_days_max)}
                 </DetailRow>
               ) : null}
 
