@@ -79,7 +79,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-8">
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Jobs</h2>
 
@@ -166,7 +166,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           </Card>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Get in touch</h2>
 

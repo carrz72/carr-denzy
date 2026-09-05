@@ -40,7 +40,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
     .from("jobs")
     .select(
       `id, reference, title, description, status, urgency, scheduled_start,
-       duration_minutes, completed_at, created_at,
+       duration_minutes, expected_days, completed_at, created_at,
        property:properties(address_line1, address_line2, city, postcode, access_notes),
        service:services(name)`,
     )
@@ -52,6 +52,14 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
   // else's. A 404 rather than a 403 for both, so job ids cannot be probed
   // (spec E-6, AC-3).
   if (!job) notFound();
+
+  // The days we will be with them. The booking email promises this list
+  // exists, so it has to.
+  const { data: visits } = await supabase
+    .from("job_visits")
+    .select("id, starts_at, duration_minutes, note")
+    .eq("job_id", id)
+    .order("starts_at", { ascending: true });
 
   const [{ data: events }, { data: quotes }, { data: invoices }, { data: photos }, { data: messages }] =
     await Promise.all([
@@ -119,7 +127,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-8">
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Progress</h2>
             <div className="mt-5">
@@ -182,7 +190,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
           </Card>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Details</h2>
 
@@ -194,13 +202,19 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
               {job.service ? <DetailRow label="Type of work">{job.service.name}</DetailRow> : null}
 
               {job.scheduled_start ? (
-                <DetailRow label="Booked for">
+                <DetailRow label={(visits ?? []).length > 1 ? "Next with you" : "Booked for"}>
                   {formatDateTime(job.scheduled_start)}
                   {job.duration_minutes ? (
                     <span className="block text-sm font-normal text-ink-muted">
                       Allow about {formatDuration(job.duration_minutes)}
                     </span>
                   ) : null}
+                </DetailRow>
+              ) : null}
+
+              {job.expected_days && job.expected_days > 1 ? (
+                <DetailRow label="How long altogether">
+                  About {job.expected_days} working days
                 </DetailRow>
               ) : null}
 
@@ -249,6 +263,43 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
               </div>
             ) : null}
           </Card>
+
+          {/*
+            When we are coming, on a job that takes more than one day.
+
+            A single visit is already covered by "Booked for" above, and
+            repeating it as a one-item list would be noise. This is here for the
+            refurbishment that runs for weeks — it is the list the booking email
+            promises, and the answer to the question customers ring about most.
+          */}
+          {(visits ?? []).length > 1 ? (
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">When we are with you</h2>
+
+              <ul className="mt-4 flex flex-col divide-y divide-line border-y border-line">
+                {(visits ?? []).map((visit) => {
+                  const past = new Date(visit.starts_at).getTime() < Date.now();
+
+                  return (
+                    <li key={visit.id} className="py-3">
+                      <p className={past ? "text-ink-subtle" : "font-medium text-ink"}>
+                        {formatDateTime(visit.starts_at)}
+                        {past ? " · done" : ""}
+                      </p>
+                      {visit.note ? (
+                        <p className="mt-0.5 text-sm text-ink-subtle">{visit.note}</p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <p className="mt-4 text-sm leading-relaxed text-ink-muted">
+                We keep this up to date as the job goes on. If a day no longer suits you,
+                ring us and we will move it.
+              </p>
+            </Card>
+          ) : null}
 
           {(quotes ?? []).length > 0 ? (
             <Card>

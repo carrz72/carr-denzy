@@ -5,15 +5,22 @@ import {
   CalendarPlusIcon,
   CheckIcon,
   NotePencilIcon,
+  TrashIcon,
   WarningIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
 import { CheckField, FormError, TextAreaField, TextField } from "@/components/ui/field";
-import { addJobNote, scheduleJob, updateJobStatus } from "@/app/(app)/app/actions";
+import {
+  addJobNote,
+  removeVisit,
+  scheduleJob,
+  setExpectedDays,
+  updateJobStatus,
+} from "@/app/(app)/app/actions";
 import { jobStatusLabels } from "@/components/ui/badge";
 import { queueOutboxItem, isOnline } from "@/lib/outbox";
-import { todayInLondon } from "@/lib/dates";
+import { formatDateTime, formatDuration, todayInLondon } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import type { JobStatus } from "@/types/database";
 
@@ -250,33 +257,62 @@ export function JobStatusControl({
   );
 }
 
+export interface Visit {
+  id: string;
+  starts_at: string;
+  duration_minutes: number;
+  note: string | null;
+}
+
+/**
+ * The days you will actually be on site.
+ *
+ * A job used to hold one date, capped at 24 hours, with a validation message
+ * telling the owner to "split it into separate visits" and nowhere to put
+ * them. That is right for a boiler service and wrong for a refurbishment, and
+ * this business does both.
+ *
+ * So: a list of days, added one at a time, plus a separate figure for how long
+ * the whole job is expected to run. The customer is told the shape of the job
+ * once — "starting the 6th, about three weeks" — rather than receiving an
+ * email for every day of it, and the days themselves show on their job page.
+ */
 export function ScheduleForm({
   jobId,
-  scheduledStart,
+  visits,
+  expectedDays,
   durationMinutes,
 }: {
   jobId: string;
-  scheduledStart: string | null;
+  visits: Visit[];
+  expectedDays: number | null;
   durationMinutes: number | null;
 }) {
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(visits.length === 0);
 
-  const existing = scheduledStart ? new Date(scheduledStart) : null;
+  const booked = [...visits].sort(
+    (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
+  );
+
+  const next = booked.find((v) => new Date(v.starts_at).getTime() >= Date.now());
 
   function handleSubmit(formData: FormData, force = false) {
     setErrors({});
     setError(null);
-    setSaved(false);
+    setSaved(null);
     if (force) formData.set("confirm_overlap", "on");
 
     startTransition(async () => {
       const result = await scheduleJob(formData);
 
-      if (result.warning) {
+      // An overlap warning comes back with ok:false and stops here so the
+      // owner can confirm. A note alongside a successful save does not.
+      if (!result.ok && result.warning) {
         setWarning(result.warning);
         return;
       }
@@ -289,7 +325,33 @@ export function ScheduleForm({
         return;
       }
 
-      setSaved(true);
+      setSaved(result.warning ?? "Added to the job.");
+      setShowAdd(false);
+    });
+  }
+
+  function drop(visitId: string) {
+    setError(null);
+    const formData = new FormData();
+    formData.set("visit_id", visitId);
+    formData.set("job_id", jobId);
+
+    startTransition(async () => {
+      const result = await removeVisit(formData);
+      if (!result.ok) setError(result.formError ?? "Could not remove that day.");
+    });
+  }
+
+  function saveExpected(formData: FormData) {
+    setErrors({});
+    startTransition(async () => {
+      const result = await setExpectedDays(formData);
+      if (!result.ok) {
+        setErrors(result.errors ?? {});
+        setError(result.formError ?? null);
+        return;
+      }
+      setSaved("Saved.");
     });
   }
 
@@ -298,12 +360,89 @@ export function ScheduleForm({
   return (
     <Card id="schedule" className="scroll-mt-24">
       <h2 className="text-label uppercase text-ink-subtle">
-        {existing ? "Booked in" : "Book it in"}
+        {booked.length === 0 ? "Book it in" : "Days on site"}
       </h2>
+
+      {booked.length > 0 ? (
+        <ul className="mt-4 flex flex-col divide-y divide-line border-y border-line">
+          {booked.map((visit) => {
+            const when = new Date(visit.starts_at);
+            const past = when.getTime() < Date.now();
+
+            return (
+              <li key={visit.id} className="flex items-start justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      "font-medium",
+                      past ? "text-ink-subtle line-through" : "text-ink",
+                      visit.id === next?.id && "text-accent",
+                    )}
+                  >
+                    {formatDateTime(visit.starts_at)}
+                  </p>
+                  <p className="mt-0.5 text-sm text-ink-subtle">
+                    {formatDuration(visit.duration_minutes)}
+                    {visit.note ? ` · ${visit.note}` : ""}
+                    {visit.id === next?.id ? " · next" : ""}
+                  </p>
+                </div>
+
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => drop(visit.id)}
+                >
+                  <TrashIcon size={16} aria-hidden="true" />
+                  <span className="sr-only">
+                    Remove {formatDateTime(visit.starts_at)}
+                  </span>
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {/* How long the whole job runs — a different fact from the days
+          themselves, and the one the customer is actually told. */}
+      {booked.length > 0 ? (
+        <form action={saveExpected} className="mt-4 flex items-end gap-3">
+          <input type="hidden" name="job_id" value={jobId} />
+          <div className="min-w-0 flex-1">
+            <TextField
+              name="expected_days"
+              label="How long altogether"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              hint="Working days. Leave blank for a one-day job."
+              defaultValue={expectedDays ? String(expectedDays) : ""}
+              error={errors.expected_days}
+            />
+          </div>
+          <Button variant="secondary" type="submit" disabled={isPending}>
+            Save
+          </Button>
+        </form>
+      ) : null}
+
+      {booked.length > 0 && !showAdd ? (
+        <Button
+          variant="secondary"
+          fullWidth
+          className="mt-4"
+          onClick={() => setShowAdd(true)}
+          icon={<CalendarPlusIcon size={18} />}
+        >
+          Add another day
+        </Button>
+      ) : null}
 
       <form
         action={(formData) => handleSubmit(formData)}
-        className="mt-4 flex flex-col gap-4"
+        className={cn("flex flex-col gap-4", showAdd ? "mt-4" : "hidden")}
         id={`schedule-${jobId}`}
       >
         <input type="hidden" name="job_id" value={jobId} />
@@ -314,7 +453,7 @@ export function ScheduleForm({
           type="date"
           required
           min={todayInLondon()}
-          defaultValue={existing ? existing.toISOString().slice(0, 10) : todayInLondon()}
+          defaultValue={todayInLondon()}
           error={errors.date}
         />
 
@@ -325,11 +464,7 @@ export function ScheduleForm({
             type="time"
             required
             step={900}
-            defaultValue={
-              existing
-                ? `${String(existing.getHours()).padStart(2, "0")}:${String(existing.getMinutes()).padStart(2, "0")}`
-                : "09:00"
-            }
+            defaultValue="09:00"
             error={errors.time}
           />
 
@@ -399,7 +534,7 @@ export function ScheduleForm({
             loading={isPending}
             icon={<CalendarPlusIcon size={19} />}
           >
-            {existing ? "Change the booking" : "Book it in"}
+            {booked.length === 0 ? "Book it in" : "Add this day"}
           </Button>
         ) : null}
       </form>

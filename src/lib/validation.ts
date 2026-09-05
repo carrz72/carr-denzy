@@ -195,7 +195,10 @@ export const scheduleSchema = z.object({
     .number()
     .int()
     .min(15, "Give it at least 15 minutes")
-    .max(60 * 24, "That is longer than a day — split it into separate visits"),
+    // A day at a time. A job running for weeks is recorded as the days you are
+    // actually on site, so this cap is a real limit rather than a refusal:
+    // "Add another day" is the answer, and it is on the same card.
+    .max(60 * 24, "One day at a time — add the other days separately below"),
   confirm_overlap: z.coerce.boolean().optional(),
 });
 

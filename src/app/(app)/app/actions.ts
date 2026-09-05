@@ -550,28 +550,50 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
     }
   }
 
-  const { error } = await supabase
-    .from("jobs")
-    .update({
-      scheduled_start: startsAt,
-      duration_minutes: parsed.data.duration_minutes,
-      status: "scheduled",
-    })
-    .eq("id", parsed.data.job_id);
+  // A day on site is a row in `job_visits`. `jobs.scheduled_start` is kept in
+  // step by a trigger, so the diary and the Today screen carry on reading the
+  // one column they always read, and nothing here has to remember to update it.
+  const { data: existingVisits } = await supabase
+    .from("job_visits")
+    .select("id")
+    .eq("job_id", parsed.data.job_id);
+
+  const isFirstDay = (existingVisits ?? []).length === 0;
+
+  const { error } = await supabase.from("job_visits").insert({
+    job_id: parsed.data.job_id,
+    starts_at: startsAt,
+    duration_minutes: parsed.data.duration_minutes,
+    note: String(formData.get("visit_note") ?? "").trim() || null,
+  });
 
   if (error) {
+    // The unique index catches the same day being added twice, which is a
+    // double tap rather than a plan.
+    if (error.code === "23505") {
+      return { ok: false, formError: "That day and time is already booked on this job." };
+    }
     return { ok: false, formError: friendly(error.message, "Could not book that in. Try again.") };
   }
 
-  // Tell the customer. "When are you coming?" is the question they ring about
-  // most, and until now the app knew the answer and never volunteered it.
+  await supabase.from("jobs").update({ status: "scheduled" }).eq("id", parsed.data.job_id);
+
+  // Tell the customer — but only once for the job, not once per day.
+  //
+  // A refurbishment booked across twenty days would otherwise send twenty
+  // emails, each promising a two-hour arrival window, which is how a useful
+  // notification becomes something a customer filters out. They are told when
+  // the work starts and roughly how long it runs; the individual days are on
+  // their job page for whenever they want to look.
   const { data: booked } = await supabase
     .from("jobs")
-    .select(`title, property:properties(address_line1, address_line2, city, postcode)`)
+    .select(
+      `title, expected_days, property:properties(address_line1, address_line2, city, postcode)`,
+    )
     .eq("id", parsed.data.job_id)
     .maybeSingle();
 
-  if (booked) {
+  if (booked && isFirstDay) {
     const address = booked.property
       ? [
           booked.property.address_line1,
@@ -589,11 +611,75 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
       startsAt,
       parsed.data.duration_minutes,
       address,
+      booked.expected_days,
     );
   }
 
   revalidatePath(`/app/jobs/${parsed.data.job_id}`);
   revalidatePath("/app", "layout");
+
+  return {
+    ok: true,
+    warning: isFirstDay
+      ? undefined
+      : "Added. The customer was told when the job starts, so this day has not been emailed to them separately.",
+  };
+}
+
+/** Takes a day back off a job. */
+export async function removeVisit(formData: FormData): Promise<ActionResult> {
+  await requireStaff();
+
+  const visitId = String(formData.get("visit_id") ?? "");
+  const jobId = String(formData.get("job_id") ?? "");
+
+  if (!visitId || !jobId) return { ok: false, formError: "Missing that day." };
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("job_visits").delete().eq("id", visitId);
+
+  if (error) {
+    return { ok: false, formError: "Could not remove that day. Try again." };
+  }
+
+  revalidatePath(`/app/jobs/${jobId}`);
+  revalidatePath("/app", "layout");
+
+  return { ok: true };
+}
+
+/**
+ * How long the whole job is expected to run.
+ *
+ * Separate from the days themselves, because it is a different kind of fact: a
+ * customer wants "about three weeks" up front, long before anybody knows which
+ * Tuesdays that will be.
+ */
+export async function setExpectedDays(formData: FormData): Promise<ActionResult> {
+  await requireStaff();
+
+  const jobId = String(formData.get("job_id") ?? "");
+  const raw = String(formData.get("expected_days") ?? "").trim();
+
+  if (!jobId) return { ok: false, formError: "Missing job." };
+
+  const days = raw === "" ? null : Number(raw);
+
+  if (days !== null && (!Number.isInteger(days) || days < 1 || days > 260)) {
+    return { ok: false, errors: { expected_days: "Give it a whole number of days." } };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({ expected_days: days })
+    .eq("id", jobId);
+
+  if (error) return { ok: false, formError: "Could not save that. Try again." };
+
+  revalidatePath(`/app/jobs/${jobId}`);
 
   return { ok: true };
 }

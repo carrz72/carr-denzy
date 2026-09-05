@@ -39,7 +39,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     .from("jobs")
     .select(
       `id, reference, title, description, status, urgency, scheduled_start,
-       duration_minutes, completed_at, private_notes, created_at,
+       duration_minutes, expected_days, completed_at, private_notes, created_at,
        client:clients(id, full_name, email, phone, company_name),
        property:properties(address_line1, address_line2, city, postcode, access_notes),
        service:services(name)`,
@@ -50,8 +50,13 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
 
   if (!job) notFound();
 
-  const [{ data: quotes }, { data: invoices }, { data: notes }, { data: messages }] =
-    await Promise.all([
+  const [
+    { data: quotes },
+    { data: invoices },
+    { data: notes },
+    { data: messages },
+    { data: visits },
+  ] = await Promise.all([
       supabase
         .from("quotes")
         .select("id, reference, status, total_pence, valid_until, sent_at")
@@ -74,6 +79,11 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
         .select("id, body, sender_id, created_at")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("job_visits")
+        .select("id, starts_at, duration_minutes, note")
+        .eq("job_id", id)
+        .order("starts_at", { ascending: true }),
     ]);
 
   const address = job.property
@@ -98,7 +108,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-8">
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">The job</h2>
 
@@ -172,7 +182,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
           </Card>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <JobStatusControl
             jobId={job.id}
             status={job.status}
@@ -232,7 +242,8 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
 
           <ScheduleForm
             jobId={job.id}
-            scheduledStart={job.scheduled_start}
+            visits={visits ?? []}
+            expectedDays={job.expected_days}
             durationMinutes={job.duration_minutes}
           />
 

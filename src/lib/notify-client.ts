@@ -65,6 +65,8 @@ export async function notifyClientBooked(
   scheduledStart: string,
   durationMinutes: number | null,
   address: string | null,
+  /** Working days the whole job runs, when it is more than a single visit. */
+  expectedDays: number | null = null,
 ): Promise<void> {
   const recipient = await recipientFor(jobId, "notify_booking");
   if (!recipient?.wants) return;
@@ -80,6 +82,12 @@ export async function notifyClientBooked(
     return `between ${formatTime(start)} and ${formatTime(end)}`;
   })();
 
+  // A job running over several days is a different message from a morning's
+  // work. "We are coming on Tuesday between 9 and 11" is exactly right for a
+  // leak and misleading for a refurbishment — the customer needs to know the
+  // shape of the whole thing, and that the individual days are listed for them.
+  const runsForDays = (expectedDays ?? 1) > 1;
+
   await Promise.all([
     recipient.email
       ? sendBookingConfirmation(
@@ -90,12 +98,15 @@ export async function notifyClientBooked(
           arrivalWindow,
           address,
           jobId,
+          runsForDays ? expectedDays : null,
         )
       : Promise.resolve(),
 
     pushToClient(recipient.clientId, {
-      title: "You are booked in",
-      body: `${jobTitle} — ${whenLabel}`,
+      title: runsForDays ? "Your job is booked in" : "You are booked in",
+      body: runsForDays
+        ? `${jobTitle} — starting ${whenLabel}`
+        : `${jobTitle} — ${whenLabel}`,
       url: `/portal/jobs/${jobId}`,
       tag: `job-${jobId}`,
     }),

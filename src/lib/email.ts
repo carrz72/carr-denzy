@@ -714,22 +714,36 @@ export async function sendBookingConfirmation(
   arrivalWindow: string | null,
   address: string | null,
   jobId: string,
+  /** Working days the whole job runs. Null for a single visit. */
+  expectedDays: number | null = null,
 ): Promise<SendResult> {
   const link = `${siteUrl()}/portal/jobs/${jobId}`;
   const phone = await businessPhone();
 
+  // A job that runs for weeks needs a different first sentence and a different
+  // promise. Telling somebody having their house refurbished that we are
+  // "arriving between 9 and 11" describes the first morning and nothing else.
+  // What they want to know is when it starts, roughly how long it runs, and
+  // where to find the days in between.
+  const multiDay = (expectedDays ?? 1) > 1;
+
+  const spanLine = multiDay
+    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We expect the work to take about <strong>${expectedDays} working days</strong> in all. The days we will be with you are listed on your job page, and we keep them up to date as we go.</p>`
+    : "";
+
   const html = await layout(
-    "You are booked in",
+    multiDay ? "Your job is booked in" : "You are booked in",
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
-     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We have you booked in for <strong>${esc(jobTitle)}</strong>.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${multiDay ? "We are booked in to start" : "We have you booked in for"} <strong>${esc(jobTitle)}</strong>.</p>
      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
        <tr><td style="padding:18px 20px;">
-         <p style="margin:0 0 4px;font-size:13px;color:#6b6055;">When</p>
+         <p style="margin:0 0 4px;font-size:13px;color:#6b6055;">${multiDay ? "Starting" : "When"}</p>
          <p style="margin:0 0 14px;font-size:17px;font-weight:700;">${esc(whenLabel)}</p>
          ${arrivalWindow ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6055;">Arriving</p><p style="margin:0 0 14px;font-size:15px;">${esc(arrivalWindow)}</p>` : ""}
          ${address ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6055;">Where</p><p style="margin:0;font-size:15px;">${esc(address)}</p>` : ""}
        </td></tr>
      </table>
+     ${spanLine}
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">If that no longer suits, ring us on <strong>${esc(phone)}</strong> and we will move it — the earlier the better for both of us.</p>
      ${button(link, "See the job")}`,
   );
@@ -737,11 +751,16 @@ export async function sendBookingConfirmation(
   const text = [
     `Hello ${clientName},`,
     "",
-    `We have you booked in for ${jobTitle}.`,
+    multiDay
+      ? `We are booked in to start ${jobTitle}.`
+      : `We have you booked in for ${jobTitle}.`,
     "",
-    `When: ${whenLabel}`,
+    `${multiDay ? "Starting" : "When"}: ${whenLabel}`,
     arrivalWindow ? `Arriving: ${arrivalWindow}` : "",
     address ? `Where: ${address}` : "",
+    multiDay
+      ? `\nWe expect about ${expectedDays} working days in all. The days we will be with you are listed on your job page.`
+      : "",
     "",
     `If that no longer suits, ring us on ${phone}.`,
     "",
@@ -750,7 +769,7 @@ export async function sendBookingConfirmation(
     .filter(Boolean)
     .join("\n");
 
-  return send(to, `Booked in — ${whenLabel}`, html, text);
+  return send(to, multiDay ? `Starting ${whenLabel} — ${jobTitle}` : `Booked in — ${whenLabel}`, html, text);
 }
 
 export async function sendJobMessageToClient(

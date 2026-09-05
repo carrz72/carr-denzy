@@ -150,13 +150,26 @@ export type Job = {
   status: JobStatus;
   urgency: UrgencyLevel;
   assigned_to: string | null;
+  /** Next day on site. Derived from job_visits by trigger — never written directly. */
   scheduled_start: string | null;
   duration_minutes: number | null;
+  /** Working days the whole job should take. Null for a single-visit job. */
+  expected_days: number | null;
   completed_at: string | null;
   private_notes: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+}
+
+export type JobVisit = {
+  id: string;
+  job_id: string;
+  starts_at: string;
+  duration_minutes: number;
+  /** "First fix", "plasterer in". Shown to the customer. */
+  note: string | null;
+  created_at: string;
 }
 
 export type JobEvent = {
@@ -438,6 +451,12 @@ export type Database = {
           Rel<"job_events_job_id_fkey", "job_id", "jobs">,
           Rel<"job_events_actor_id_fkey", "actor_id", "profiles">,
         ]
+      >;
+
+      job_visits: Table<
+        JobVisit,
+        "job_id" | "starts_at",
+        [Rel<"job_visits_job_id_fkey", "job_id", "jobs">]
       >;
 
       job_notes: Table<
