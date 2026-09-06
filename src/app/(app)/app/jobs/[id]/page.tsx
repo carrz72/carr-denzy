@@ -14,6 +14,7 @@ import { Card, DetailRow } from "@/components/ui/surface";
 import { InvoiceStatusBadge, JobStatusBadge, QuoteStatusBadge, UrgencyBadge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { JobNoteForm, JobStatusControl, ScheduleForm } from "@/components/owner/job-controls";
+import { JobNote } from "@/components/owner/job-note";
 import { MessageThread } from "@/components/message-thread";
 import { createClient } from "@/lib/supabase/server";
 import { markMessagesRead } from "@/lib/unread";
@@ -71,7 +72,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
         .order("created_at", { ascending: false }),
       supabase
         .from("job_notes")
-        .select("id, body, visible_to_client, created_at")
+        .select("id, body, visible_to_client, created_at, updated_at")
         .eq("job_id", id)
         .order("created_at", { ascending: false }),
       supabase
@@ -153,17 +154,12 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             {(notes ?? []).length > 0 ? (
               <ul className="mt-6 flex flex-col gap-3 border-t border-line pt-5">
                 {(notes ?? []).map((note) => (
-                  <li key={note.id} className="rounded-md bg-surface-sunken p-4">
-                    <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-ink">
-                      {note.body}
-                    </p>
-                    <p className="mt-2 flex items-center gap-2 text-xs text-ink-subtle">
-                      {formatDateTime(note.created_at)}
-                      {note.visible_to_client ? (
-                        <span className="font-medium text-accent">· customer can see this</span>
-                      ) : null}
-                    </p>
-                  </li>
+                  <JobNote
+                    key={note.id}
+                    note={note}
+                    jobId={job.id}
+                    canDelete={user?.role === "owner"}
+                  />
                 ))}
               </ul>
             ) : null}

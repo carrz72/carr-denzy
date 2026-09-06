@@ -196,6 +196,10 @@ export interface TextAreaFieldProps
   hint?: string;
   error?: string;
   containerClassName?: string;
+  /** See TextField — drops the "optional" badge in tight rows. */
+  optionalLabel?: boolean;
+  /** Visually hidden label, still announced to a screen reader. */
+  hideLabel?: boolean;
 }
 
 export function TextAreaField({
@@ -205,6 +209,8 @@ export function TextAreaField({
   required,
   className,
   containerClassName,
+  optionalLabel,
+  hideLabel,
   rows = 5,
   ...props
 }: TextAreaFieldProps) {
@@ -218,6 +224,8 @@ export function TextAreaField({
       hint={hint}
       error={error}
       required={required}
+      optionalLabel={optionalLabel}
+      hideLabel={hideLabel}
       className={containerClassName}
     >
       <textarea

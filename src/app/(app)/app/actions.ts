@@ -775,6 +775,82 @@ export async function addJobNote(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Corrects a note.
+ *
+ * The `author edits own note` policy has permitted this since the first
+ * migration and nothing ever called it — so a note typed one-handed under a
+ * sink was permanent. There is no good reason for that: the immutable record
+ * is `job_events` and `audit_log`, not this.
+ *
+ * Authorisation is left to RLS, which restricts it to the note's own author.
+ * No author id is accepted from the form, so this cannot be aimed at somebody
+ * else's note; a mismatched one simply updates nothing.
+ *
+ * Whether the note is visible to the customer is deliberately NOT editable
+ * here. Making a private note public is a different decision from fixing a
+ * typo, and quietly folding the two together is how something meant for
+ * yourself ends up on a customer's screen.
+ */
+export async function updateJobNote(formData: FormData): Promise<ActionResult> {
+  await requireStaff();
+
+  const noteId = String(formData.get("note_id") ?? "");
+  const jobId = String(formData.get("job_id") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!noteId || !jobId) return { ok: false, formError: "Missing note." };
+
+  if (body.length < 1 || body.length > 5000) {
+    return { ok: false, errors: { body: "A note needs some words, and fewer than 5000." } };
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("job_notes")
+    .update({ body })
+    .eq("id", noteId)
+    .select("id");
+
+  if (error) {
+    console.error("[note] update failed", error.message);
+    return { ok: false, formError: "Could not save that change. Try again." };
+  }
+
+  // RLS filtered it out rather than erroring: somebody else wrote this note.
+  if (!data || data.length === 0) {
+    return { ok: false, formError: "That note was written by somebody else, so it cannot be changed here." };
+  }
+
+  revalidatePath(`/app/jobs/${jobId}`);
+
+  return { ok: true };
+}
+
+/** Removes a note. Owner-only, per the `owner deletes notes` policy. */
+export async function deleteJobNote(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const noteId = String(formData.get("note_id") ?? "");
+  const jobId = String(formData.get("job_id") ?? "");
+
+  if (!noteId || !jobId) return { ok: false, formError: "Missing note." };
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("job_notes").delete().eq("id", noteId);
+
+  if (error) {
+    console.error("[note] delete failed", error.message);
+    return { ok: false, formError: "Could not remove that note. Try again." };
+  }
+
+  revalidatePath(`/app/jobs/${jobId}`);
+
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------

@@ -192,6 +192,8 @@ export type JobNote = {
   visible_to_client: boolean;
   client_key: string | null;
   created_at: string;
+  /** Equal to created_at until edited. Drives the "edited" marker. */
+  updated_at: string;
 }
 
 export type JobPhoto = {
