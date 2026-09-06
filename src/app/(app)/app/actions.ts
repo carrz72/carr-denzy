@@ -776,6 +776,90 @@ export async function addJobNote(formData: FormData): Promise<ActionResult> {
 }
 
 /**
+ * Removes a job that should never have existed.
+ *
+ * Distinct from cancelling, and the distinction is the point. A job that was
+ * quoted and then fell through is part of the history — it gets `cancelled`
+ * and stays in the record. A duplicate, a typo, or a job taken down against
+ * the wrong customer is not history, and leaving it in the list for ever as
+ * "cancelled" is just clutter that has to be read past every time.
+ *
+ * Soft, never hard, exactly like `deleteDraftInvoice` — nothing financial is
+ * erased from this database (spec FR-58 / NFR-24).
+ *
+ * The guard is "has the customer seen anything?", not "is it new". A job with
+ * a draft quote nobody has read is still a mistake that can be swept up; a job
+ * with a sent quote or any invoice is a conversation that already happened,
+ * and it has to be cancelled instead so the trail stays intact.
+ */
+export async function deleteJob(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const jobId = String(formData.get("job_id") ?? "");
+  if (!jobId) return { ok: false, formError: "Missing job." };
+
+  const supabase = await createClient();
+
+  const [{ data: liveQuotes }, { data: anyInvoices }] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select("id, status")
+      .eq("job_id", jobId)
+      .is("deleted_at", null)
+      .neq("status", "draft")
+      .limit(1),
+    supabase
+      .from("invoices")
+      .select("id, status")
+      .eq("job_id", jobId)
+      .is("deleted_at", null)
+      .limit(1),
+  ]);
+
+  if ((liveQuotes ?? []).length > 0) {
+    return {
+      ok: false,
+      formError:
+        "This job has a quote the customer has already been sent, so it cannot be deleted. Cancel it instead and the history stays intact.",
+    };
+  }
+
+  if ((anyInvoices ?? []).length > 0) {
+    return {
+      ok: false,
+      formError:
+        "This job has an invoice on it, so it cannot be deleted. Cancel the job, and void or delete the invoice from the Money screen.",
+    };
+  }
+
+  // Draft quotes go with it. Left behind they would be orphans with no job to
+  // open, still counted on the quotes screen.
+  await supabase
+    .from("quotes")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("job_id", jobId)
+    .eq("status", "draft")
+    .is("deleted_at", null);
+
+  const { data, error } = await supabase
+    .from("jobs")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", jobId)
+    .is("deleted_at", null)
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    console.error("[job] delete failed", error?.message);
+    return { ok: false, formError: "Could not delete that job. Try again." };
+  }
+
+  revalidatePath("/app", "layout");
+
+  redirect("/app/jobs");
+}
+
+/**
  * Corrects a note.
  *
  * The `author edits own note` policy has permitted this since the first

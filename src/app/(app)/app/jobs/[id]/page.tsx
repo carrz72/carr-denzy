@@ -15,6 +15,7 @@ import { InvoiceStatusBadge, JobStatusBadge, QuoteStatusBadge, UrgencyBadge } fr
 import { buttonClasses } from "@/components/ui/button";
 import { JobNoteForm, JobStatusControl, ScheduleForm } from "@/components/owner/job-controls";
 import { JobNote } from "@/components/owner/job-note";
+import { DeleteJob } from "@/components/owner/delete-job";
 import { MessageThread } from "@/components/message-thread";
 import { createClient } from "@/lib/supabase/server";
 import { markMessagesRead } from "@/lib/unread";
@@ -94,6 +95,19 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     : null;
 
   const acceptedQuote = (quotes ?? []).find((quote) => quote.status === "accepted");
+
+  // Whether this job can be swept up as a mistake, or has to be cancelled
+  // because the customer has already seen something. Worked out here so the
+  // delete button is never offered and then refused — the same rule the action
+  // enforces server-side.
+  const sentQuote = (quotes ?? []).some((quote) => quote.status !== "draft");
+  const hasInvoice = (invoices ?? []).length > 0;
+
+  const deleteBlockedReason = sentQuote
+    ? "This job has a quote the customer has already been sent."
+    : hasInvoice
+      ? "This job has an invoice on it."
+      : null;
 
   return (
     <>
@@ -332,6 +346,14 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
               </ul>
             )}
           </Card>
+
+          {/* Last thing on the page, quiet, behind a confirm. Nobody opens a
+              job meaning to press this. */}
+          <DeleteJob
+            jobId={job.id}
+            jobTitle={job.title}
+            blockedReason={deleteBlockedReason}
+          />
         </div>
       </div>
     </>
