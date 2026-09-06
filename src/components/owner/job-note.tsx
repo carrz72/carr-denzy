@@ -89,10 +89,16 @@ export function JobNote({
           <input type="hidden" name="note_id" value={note.id} />
           <input type="hidden" name="job_id" value={jobId} />
 
+          {/*
+            Grows to the whole note. A fixed four rows meant editing 564px of
+            text through a 130px window — a sixth of the screen — which is how
+            you lose your place halfway through a correction.
+          */}
           <TextAreaField
             name="body"
             label="Note"
             hideLabel
+            autoGrow
             rows={4}
             required
             value={body}

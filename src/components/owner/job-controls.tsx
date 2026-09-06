@@ -713,11 +713,14 @@ export function JobNoteForm({ jobId }: { jobId: string }) {
     <form action={handleSubmit} className="flex flex-col gap-4">
       <input type="hidden" name="job_id" value={jobId} />
 
+      {/* Grows as it is typed, so a long note is written in full view rather
+          than through a four-row slot. */}
       <TextAreaField
         name="body"
         label="Add a note"
         hint="What you found, what you did, what it still needs."
         placeholder="Isolated the supply at the stopcock. Needs a 15mm compression elbow — none on the van, ordering for Thursday."
+        autoGrow
         rows={4}
         required
       />

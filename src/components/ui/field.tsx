@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef } from "react";
 import type {
   InputHTMLAttributes,
   ReactNode,
@@ -200,6 +200,14 @@ export interface TextAreaFieldProps
   optionalLabel?: boolean;
   /** Visually hidden label, still announced to a screen reader. */
   hideLabel?: boolean;
+  /**
+   * Grows to fit its content instead of scrolling inside a fixed box.
+   *
+   * `rows` becomes the minimum rather than the size. Use it wherever the text
+   * can be long and the box is the only view of it — editing a job note on a
+   * phone meant reading 564px of text through a 130px window.
+   */
+  autoGrow?: boolean;
 }
 
 export function TextAreaField({
@@ -211,11 +219,37 @@ export function TextAreaField({
   containerClassName,
   optionalLabel,
   hideLabel,
+  autoGrow = false,
   rows = 5,
   ...props
 }: TextAreaFieldProps) {
   const generatedId = useId();
   const id = props.name ? `field-${props.name}` : generatedId;
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const fit = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el || !autoGrow) return;
+
+    // Collapse first: without this the box can only ever grow, because
+    // scrollHeight is measured against the height already set.
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [autoGrow]);
+
+  // Layout effect, not effect: the box is sized before the browser paints, so
+  // an already-long note never flashes at four rows and then jumps.
+  useLayoutEffect(fit, [fit, props.value, props.defaultValue]);
+
+  // A textarea's width changes on rotate and on the keyboard opening, and the
+  // wrap — and so the height — changes with it.
+  useEffect(() => {
+    if (!autoGrow) return;
+
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [autoGrow, fit]);
 
   return (
     <FieldShell
@@ -230,12 +264,25 @@ export function TextAreaField({
     >
       <textarea
         id={id}
+        ref={textareaRef}
         rows={rows}
         required={required}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(id, hint, error)}
-        className={cn(controlBase, "resize-y leading-relaxed", error && controlError, className)}
+        className={cn(
+          controlBase,
+          "leading-relaxed",
+          // A growing box has nothing to drag, and capping it stops one very
+          // long note swallowing the whole screen — past that it scrolls.
+          autoGrow ? "resize-none overflow-y-auto max-h-[60vh]" : "resize-y",
+          error && controlError,
+          className,
+        )}
         {...props}
+        onInput={(event) => {
+          fit();
+          props.onInput?.(event);
+        }}
       />
     </FieldShell>
   );
