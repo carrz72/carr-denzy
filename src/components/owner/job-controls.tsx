@@ -561,7 +561,21 @@ export function ScheduleForm({
           error={errors.date}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/*
+          Content-driven columns, not a breakpoint.
+
+          `sm:grid-cols-2` split this row in two the moment the *viewport* hit
+          640px — but this card lives in the narrow right-hand column from `lg`,
+          so each field was handed 168px. A native date control needs about
+          180px for `dd/mm/yyyy` plus its calendar button, and a number input
+          with its spinner wants more still: they were only staying inside their
+          boxes because `min-width: 0` was crushing them, and on a device with a
+          wider system font or a longer locale date format they escape.
+
+          `auto-fit` with a floor means the second column only exists when there
+          is genuinely room for it, whatever the container happens to be.
+        */}
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
           <TextField
             name="time"
             label="Arriving"

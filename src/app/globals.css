@@ -204,6 +204,45 @@
     color: var(--color-accent-ink);
   }
 
+  /* Native date, time and number controls carry a UA-defined minimum width —
+     the widget, not the CSS box. A number field with its spinner measured 242px
+     of intrinsic width inside a 168px column, and only stayed put because
+     `min-width: 0` was crushing it; on a device with a wider system font it
+     escapes instead. These three rules take the pressure off:
+
+       * the spinner goes, which is most of the number field's width and is
+         unusable on a touchscreen anyway (the field is `inputMode="numeric"`,
+         so the right keyboard still appears);
+       * the calendar and clock buttons keep their padding but stop forcing the
+         field wider than its container;
+       * `min-width: 0` stays explicit so a grid or flex child can shrink.
+
+     Layout still has to give these fields room — see the auto-fit grids that
+     feed them — but nothing here silently overflows when it does not. */
+  input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="number"] {
+    min-width: 0;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    margin-inline-start: 0;
+  }
+
   /* Native controls inherit the warm palette rather than the OS blue. */
   input,
   textarea,

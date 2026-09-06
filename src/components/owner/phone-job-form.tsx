@@ -262,7 +262,10 @@ export function PhoneJobForm({
         />
 
         {bookItIn ? (
-          <div className="mt-5 grid gap-5 border-t border-line pt-5 sm:grid-cols-3">
+          // Auto-fit rather than three fixed columns: at 640px that gave each
+          // native date control ~190px, barely its own minimum width. The
+          // columns now form only where they actually fit.
+          <div className="mt-5 grid gap-5 border-t border-line pt-5 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
             <TextField
               name="date"
               label="Date"
