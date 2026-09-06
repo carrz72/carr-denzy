@@ -238,6 +238,34 @@
     min-width: 0;
   }
 
+  /* iOS Safari sizes date and time fields to their own content and IGNORES
+     `width: 100%` until `-webkit-appearance` is reset. The field then renders
+     at whatever "6 Sep 2026" or "9:00 am" happens to need — wider than the
+     card holding it — and hangs over the right edge while every neighbouring
+     control lines up correctly. It is invisible in desktop Chrome, including
+     device emulation, because Chrome honours the width and renders the shorter
+     `06/09/2026`. Only a real iPhone shows it.
+
+     Resetting the appearance hands sizing back to CSS. The native picker still
+     opens on tap — this changes how the field is drawn, not what it does. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+    /* Safari collapses these to the text height once the native chrome is
+       gone; the shared control padding no longer applies on its own. */
+    min-height: 3rem;
+    /* iOS centres the value in the field it decided on. Left-align it so it
+       sits under its label like every other control. */
+    text-align: start;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    text-align: start;
+  }
+
   input[type="date"]::-webkit-calendar-picker-indicator,
   input[type="time"]::-webkit-calendar-picker-indicator {
     margin-inline-start: 0;
