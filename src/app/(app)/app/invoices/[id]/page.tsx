@@ -328,7 +328,9 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
                 <DetailRow label="Email">
                   {invoice.client.email ? (
                     <>
-                      {invoice.client.email}{" "}
+                      {/* Same reason as the customers list: an address is one
+                          unbreakable word and will leave the row without it. */}
+                      <span className="wrap-anywhere">{invoice.client.email}</span>{" "}
                       <Link
                         href={`/app/clients/${invoice.client.id}`}
                         className="text-accent hover:underline hover:underline-offset-4"

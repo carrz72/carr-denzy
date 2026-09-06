@@ -463,44 +463,55 @@ export function ScheduleForm({
           <p className="text-label uppercase text-ink-subtle">How long altogether</p>
 
           {/*
-            Wraps rather than squeezing. All four controls on one line left the
-            unit menu 79px wide inside a 308px card, so "days on site" was cut
-            off and every box was too narrow to tap comfortably. The two
-            numbers are small and sit together; the menu claims a sensible
-            minimum and drops to its own line when there is not room, which on
-            a phone is always.
+            A grid, not wrapping flex with fixed widths.
+
+            The previous version pinned each number to `w-20` (80px). A label
+            of "From" plus the automatic "optional" badge needs 98px, so the
+            badge broke out of its box and collided with the "To" label next to
+            it — on a 320px screen the two read as one run-together string.
+
+            Two columns on a phone puts each number in ~140px, which fits the
+            label honestly. The unit menu spans the full width beneath them,
+            where "days on site" is readable rather than clipped. From `sm` all
+            three sit on one line with the menu taking the slack.
+
+            The "optional" badges are switched off here: three of them stacked
+            in a 240px row is noise, and the sentence under the form already
+            says what leaving them blank means.
           */}
-          <div className="mt-2 flex flex-wrap items-end gap-x-2 gap-y-3">
-            <div className="w-20 shrink-0">
-              <TextField
-                name="expected_amount"
-                label="From"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                defaultValue={initialAmount}
-                error={errors.expected_days}
-              />
-            </div>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-[6rem_6rem_1fr] sm:items-end">
+            <TextField
+              name="expected_amount"
+              label="From"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              optionalLabel={false}
+              defaultValue={initialAmount}
+              error={errors.expected_days}
+            />
 
-            <div className="w-20 shrink-0">
-              <TextField
-                name="expected_amount_max"
-                label="To"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                defaultValue={initialAmountMax}
-              />
-            </div>
+            <TextField
+              name="expected_amount_max"
+              label="To"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              optionalLabel={false}
+              defaultValue={initialAmountMax}
+            />
 
-            <div className="min-w-40 flex-1">
-              <SelectField name="expected_unit" label="Unit" defaultValue={initialUnit}>
-                <option value="days">days on site</option>
-                <option value="weeks">weeks</option>
-                <option value="months">months</option>
-              </SelectField>
-            </div>
+            <SelectField
+              name="expected_unit"
+              label="Unit"
+              defaultValue={initialUnit}
+              optionalLabel={false}
+              containerClassName="col-span-2 sm:col-span-1"
+            >
+              <option value="days">days on site</option>
+              <option value="weeks">weeks</option>
+              <option value="months">months</option>
+            </SelectField>
           </div>
 
           <Button

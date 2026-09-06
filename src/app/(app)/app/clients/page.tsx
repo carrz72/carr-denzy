@@ -90,7 +90,17 @@ export default async function ClientsPage() {
                       </span>
                     ) : null}
 
-                    <span className="mt-1 block text-sm text-ink-subtle">
+                    {/*
+                      `wrap-anywhere`, not the default.
+
+                      An email address is one unbroken word to the line breaker,
+                      so a long one has no legal break point and runs straight
+                      out of the card — clipped at the rounded edge on iOS, and
+                      pushing the page sideways on Android, which is where this
+                      was first noticed. Breaking mid-string is ugly for prose
+                      and exactly right for an address nobody reads as words.
+                    */}
+                    <span className="mt-1 block wrap-anywhere text-sm text-ink-subtle">
                       {client.phone ? <span className="tabular">{client.phone}</span> : null}
                       {client.phone && client.email ? " · " : null}
                       {client.email}

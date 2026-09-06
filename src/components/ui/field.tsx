@@ -62,7 +62,19 @@ function FieldShell({
 }: FieldShellProps) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className="flex items-baseline gap-2 font-medium text-ink">
+      {/*
+        `flex-wrap` is load-bearing, not tidiness.
+
+        Without it a label and its "optional" badge sit on one unbreakable
+        line: in a narrow field the badge overflowed the label's box and
+        overlapped whatever sat beside it, so "From optional" and "To optional"
+        rendered as one run-together string. Wrapping costs a line of height in
+        the rare narrow case and cannot collide.
+      */}
+      <label
+        htmlFor={id}
+        className="flex flex-wrap items-baseline gap-x-2 font-medium text-ink"
+      >
         <span>{label}</span>
         {!required && optionalLabel ? (
           <span className="text-sm font-normal text-ink-subtle">optional</span>
@@ -107,6 +119,12 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   /** Rendered inside the field, before the input. Use for the £ on money fields. */
   prefix?: string;
   containerClassName?: string;
+  /**
+   * Set false to drop the "optional" badge. For tight rows where several
+   * badges would be noise and the surrounding copy already says what leaving
+   * the field blank means.
+   */
+  optionalLabel?: boolean;
 }
 
 export function TextField({
@@ -117,6 +135,7 @@ export function TextField({
   required,
   className,
   containerClassName,
+  optionalLabel,
   ...props
 }: TextFieldProps) {
   const generatedId = useId();
@@ -129,6 +148,7 @@ export function TextField({
       hint={hint}
       error={error}
       required={required}
+      optionalLabel={optionalLabel}
       className={containerClassName}
     >
       <div className="relative">
@@ -210,6 +230,8 @@ export interface SelectFieldProps extends Omit<SelectHTMLAttributes<HTMLSelectEl
   hint?: string;
   error?: string;
   containerClassName?: string;
+  /** See TextField — drops the "optional" badge in tight rows. */
+  optionalLabel?: boolean;
   children: ReactNode;
 }
 
@@ -220,6 +242,7 @@ export function SelectField({
   required,
   className,
   containerClassName,
+  optionalLabel,
   children,
   ...props
 }: SelectFieldProps) {
@@ -233,6 +256,7 @@ export function SelectField({
       hint={hint}
       error={error}
       required={required}
+      optionalLabel={optionalLabel}
       className={containerClassName}
     >
       <select
