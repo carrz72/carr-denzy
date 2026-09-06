@@ -462,8 +462,16 @@ export function ScheduleForm({
 
           <p className="text-label uppercase text-ink-subtle">How long altogether</p>
 
-          <div className="mt-2 flex items-end gap-2">
-            <div className="w-16 shrink-0">
+          {/*
+            Wraps rather than squeezing. All four controls on one line left the
+            unit menu 79px wide inside a 308px card, so "days on site" was cut
+            off and every box was too narrow to tap comfortably. The two
+            numbers are small and sit together; the menu claims a sensible
+            minimum and drops to its own line when there is not room, which on
+            a phone is always.
+          */}
+          <div className="mt-2 flex flex-wrap items-end gap-x-2 gap-y-3">
+            <div className="w-20 shrink-0">
               <TextField
                 name="expected_amount"
                 label="From"
@@ -475,7 +483,7 @@ export function ScheduleForm({
               />
             </div>
 
-            <div className="w-16 shrink-0">
+            <div className="w-20 shrink-0">
               <TextField
                 name="expected_amount_max"
                 label="To"
@@ -486,18 +494,24 @@ export function ScheduleForm({
               />
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-40 flex-1">
               <SelectField name="expected_unit" label="Unit" defaultValue={initialUnit}>
                 <option value="days">days on site</option>
                 <option value="weeks">weeks</option>
                 <option value="months">months</option>
               </SelectField>
             </div>
-
-            <Button variant="secondary" type="submit" disabled={isPending}>
-              Save
-            </Button>
           </div>
+
+          <Button
+            variant="secondary"
+            type="submit"
+            fullWidth
+            className="mt-3 sm:w-auto"
+            disabled={isPending}
+          >
+            Save
+          </Button>
 
           <p className="mt-2 text-sm text-ink-subtle">
             {expectedDays
