@@ -360,6 +360,25 @@ export type PushSubscriptionRow = {
   failure_count: number;
 }
 
+export type ClientMemberRole = "manager" | "viewer";
+
+/**
+ * Somebody other than the named customer who can see an account.
+ *
+ * `profile_id` is null until they first sign in — a member is invited by email
+ * and adopted when the account appears, in either order.
+ */
+export type ClientMember = {
+  id: string;
+  client_id: string;
+  profile_id: string | null;
+  email: string;
+  role: ClientMemberRole;
+  invited_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type AuditLogEntry = {
   id: number;
   actor_id: string | null;
@@ -531,6 +550,15 @@ export type Database = {
 
       closures: Table<Closure, "starts_on" | "ends_on">;
 
+      client_members: Table<
+        ClientMember,
+        "client_id" | "email",
+        [
+          Rel<"client_members_client_id_fkey", "client_id", "clients">,
+          Rel<"client_members_profile_id_fkey", "profile_id", "profiles">,
+        ]
+      >;
+
       push_subscriptions: Table<
         PushSubscriptionRow,
         "profile_id" | "endpoint" | "p256dh" | "auth",
@@ -543,6 +571,7 @@ export type Database = {
       accept_quote: { Args: { p_quote_id: string }; Returns: undefined };
       decline_quote: { Args: { p_quote_id: string; p_reason?: string | null }; Returns: undefined };
       mark_overdue_invoices: { Args: Record<string, never>; Returns: number };
+      can_manage_client: { Args: { p_client_id: string }; Returns: boolean };
       current_closure: {
         Args: Record<string, never>;
         Returns: {

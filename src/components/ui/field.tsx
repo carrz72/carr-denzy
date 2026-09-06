@@ -46,6 +46,8 @@ interface FieldShellProps {
   error?: string;
   required?: boolean;
   optionalLabel?: boolean;
+  /** Visually hidden but still announced. See the note in FieldShell. */
+  hideLabel?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -57,11 +59,18 @@ function FieldShell({
   error,
   required,
   optionalLabel = true,
+  hideLabel = false,
   className,
   children,
 }: FieldShellProps) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
+      {/*
+        `hideLabel` hides it visually and never from assistive technology — the
+        label stays in the DOM, wrapped in `sr-only`. For controls whose purpose
+        is obvious from the row they sit in but which still must announce
+        themselves to a screen reader.
+      */}
       {/*
         `flex-wrap` is load-bearing, not tidiness.
 
@@ -73,7 +82,10 @@ function FieldShell({
       */}
       <label
         htmlFor={id}
-        className="flex flex-wrap items-baseline gap-x-2 font-medium text-ink"
+        className={cn(
+          "flex flex-wrap items-baseline gap-x-2 font-medium text-ink",
+          hideLabel && "sr-only",
+        )}
       >
         <span>{label}</span>
         {!required && optionalLabel ? (
@@ -232,6 +244,8 @@ export interface SelectFieldProps extends Omit<SelectHTMLAttributes<HTMLSelectEl
   containerClassName?: string;
   /** See TextField — drops the "optional" badge in tight rows. */
   optionalLabel?: boolean;
+  /** Visually hidden label, still announced to a screen reader. */
+  hideLabel?: boolean;
   children: ReactNode;
 }
 
@@ -243,6 +257,7 @@ export function SelectField({
   className,
   containerClassName,
   optionalLabel,
+  hideLabel,
   children,
   ...props
 }: SelectFieldProps) {
@@ -257,6 +272,7 @@ export function SelectField({
       error={error}
       required={required}
       optionalLabel={optionalLabel}
+      hideLabel={hideLabel}
       className={containerClassName}
     >
       <select

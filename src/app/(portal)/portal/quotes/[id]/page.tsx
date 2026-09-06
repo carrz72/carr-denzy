@@ -29,7 +29,7 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
       .from("quotes")
       .select(
         `id, reference, status, intro_note, terms, subtotal_pence, tax_pence, total_pence,
-         valid_until, sent_at, responded_at, decline_reason,
+         valid_until, sent_at, responded_at, decline_reason, client_id,
          job:jobs(id, title)`,
       )
       .eq("id", id)
@@ -48,6 +48,13 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
 
   const open = quote.status === "sent" && !isPast(quote.valid_until);
   const phone = settings?.phone ?? business.phone;
+
+  // A viewer on this account can read the quote but cannot answer it —
+  // `accept_quote` refuses them. Asking the database the same question it will
+  // ask itself means the button is never offered and then rejected.
+  const { data: canRespond } = await supabase.rpc("can_manage_client", {
+    p_client_id: quote.client_id,
+  });
 
   return (
     <>
@@ -95,8 +102,19 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
         </Card>
 
         <div className="no-print flex min-w-0 flex-col gap-6">
-          {open ? (
+          {open && canRespond ? (
             <QuoteResponse quoteId={quote.id} totalLabel={formatPence(quote.total_pence)} />
+          ) : null}
+
+          {open && !canRespond ? (
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">Waiting on a decision</h2>
+              <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
+                You can see this quote, but accepting it is down to whoever holds the
+                account. Nudge them, or ring us on {phone} if something needs changing
+                first.
+              </p>
+            </Card>
           ) : null}
 
           {quote.status === "accepted" ? (

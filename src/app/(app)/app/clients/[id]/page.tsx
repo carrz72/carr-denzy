@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
 import { PortalInvite } from "@/components/owner/portal-invite";
+import { ClientMembers } from "@/components/client-members";
 import { Card, DetailRow } from "@/components/ui/surface";
 import { InvoiceStatusBadge, JobStatusBadge, QuoteStatusBadge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
@@ -35,8 +36,13 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
   if (!client) notFound();
 
-  const [{ data: properties }, { data: jobs }, { data: quotes }, { data: invoices }] =
-    await Promise.all([
+  const [
+    { data: properties },
+    { data: jobs },
+    { data: quotes },
+    { data: invoices },
+    { data: members },
+  ] = await Promise.all([
       supabase
         .from("properties")
         .select("id, label, address_line1, address_line2, city, postcode, access_notes")
@@ -60,6 +66,11 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         .eq("client_id", id)
         .is("deleted_at", null)
         .order("issue_date", { ascending: false }),
+      supabase
+        .from("client_members")
+        .select("*")
+        .eq("client_id", id)
+        .order("created_at", { ascending: true }),
     ]);
 
   const outstanding = (invoices ?? [])
@@ -204,6 +215,17 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             clientName={client.full_name}
             email={client.email}
             hasAccount={Boolean(client.profile_id)}
+          />
+
+          {/* The owner is always allowed to manage members — the RLS policy
+              `owner manages all members` says so — so the panel is never
+              read-only here. */}
+          <ClientMembers
+            clientId={client.id}
+            clientName={client.full_name}
+            members={members ?? []}
+            audience="owner"
+            canManage
           />
 
           <Card>

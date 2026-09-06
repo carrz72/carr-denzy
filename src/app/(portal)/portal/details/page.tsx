@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/states";
 import { DetailsForm } from "@/components/portal/details-form";
 import { NotificationPreferences } from "@/components/portal/notification-preferences";
 import { PushToggle } from "@/components/owner/push-toggle";
+import { ClientMembers } from "@/components/client-members";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient, requireUser } from "@/lib/auth";
 import { business } from "@/lib/site";
@@ -20,6 +21,20 @@ export default async function PortalDetailsPage() {
   const client = await getMyClient();
 
   const supabase = await createClient();
+
+  // Who else is on this account, and whether this person may change that.
+  // `can_manage_client` is the same check the database uses, so the UI can
+  // never offer a control that RLS would then refuse.
+  const [{ data: members }, { data: canManage }] = client
+    ? await Promise.all([
+        supabase
+          .from("client_members")
+          .select("*")
+          .eq("client_id", client.id)
+          .order("created_at", { ascending: true }),
+        supabase.rpc("can_manage_client", { p_client_id: client.id }),
+      ])
+    : [{ data: null }, { data: false }];
 
   // Scoped by RLS to this person's own properties; there is no client filter to
   // forget here.
@@ -68,6 +83,16 @@ export default async function PortalDetailsPage() {
         </Card>
 
         <div className="flex flex-col gap-6">
+          {client ? (
+            <ClientMembers
+              clientId={client.id}
+              clientName={client.full_name}
+              members={members ?? []}
+              audience="customer"
+              canManage={canManage === true}
+            />
+          ) : null}
+
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Your addresses</h2>
 

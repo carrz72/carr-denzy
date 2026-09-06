@@ -19,6 +19,7 @@ import {
   settingsSchema,
 } from "@/lib/validation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recipientsForClient } from "@/lib/recipients";
 import {
   explainSendFailure,
   sendEnquiryDeclined,
@@ -1102,7 +1103,7 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
     .update({ status: "sent", sent_at: new Date().toISOString() })
     .eq("id", quoteId)
     .eq("status", "draft")
-    .select("id, reference, total_pence, valid_until, job_id, client:clients(full_name, email)")
+    .select("id, reference, total_pence, valid_until, job_id, client_id, client:clients(full_name, email)")
     .single();
 
   if (error || !quote) {
@@ -1113,7 +1114,11 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
 
   let warning: string | undefined;
 
-  if (quote.client?.email) {
+  // Everyone on the account, not just the named customer — an office manager
+  // who can see the quote but is never told it arrived is no use to anybody.
+  const recipients = await recipientsForClient(quote.client_id);
+
+  if (recipients.length > 0) {
     // Best-effort. A PDF that fails to render must not stop the quote being
     // sent — the link in the email is the thing that actually wins the job,
     // and the attachment is a convenience for people who forward it on.
@@ -1122,23 +1127,31 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
       return undefined;
     });
 
-    const sent = await sendQuoteToClient(
-      quote.client.email,
-      quote.client.full_name,
-      quote.reference,
-      formatPence(quote.total_pence),
-      quote.id,
-      quote.valid_until ? formatDate(quote.valid_until) : null,
-      pdf,
+    const results = await Promise.all(
+      recipients.map((recipient) =>
+        sendQuoteToClient(
+          recipient.email,
+          quote.client?.full_name ?? "there",
+          quote.reference,
+          formatPence(quote.total_pence),
+          quote.id,
+          quote.valid_until ? formatDate(quote.valid_until) : null,
+          pdf,
+        ),
+      ),
     );
 
     // The quote is sent either way — the status is already updated. The owner
     // just needs to know to pick up the phone (spec E-15).
-    if (!sent.sent) {
-      warning = `The quote is marked as sent, but the email did not go out. ${explainSendFailure(sent.error)} Ring them, or copy the link.`;
+    const failed = results.filter((result) => !result.sent);
+
+    if (failed.length === results.length) {
+      warning = `The quote is marked as sent, but the email did not go out. ${explainSendFailure(failed[0]?.error)} Ring them, or copy the link.`;
+    } else if (failed.length > 0) {
+      warning = `The quote went to ${results.length - failed.length} of ${results.length} people on this account. ${explainSendFailure(failed[0]?.error)}`;
     }
   } else {
-    warning = "This customer has no email address, so nothing was sent. Ring them or add an email.";
+    warning = "Nobody on this account has an email address, so nothing was sent. Ring them or add one.";
   }
 
   revalidatePath(`/app/jobs/${quote.job_id}`);
@@ -1454,7 +1467,7 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
     .update({ status: "sent", sent_at: new Date().toISOString() })
     .eq("id", invoiceId)
     .eq("status", "draft")
-    .select("id, reference, total_pence, due_date, job_id, client:clients(full_name, email)")
+    .select("id, reference, total_pence, due_date, job_id, client_id, client:clients(full_name, email)")
     .single();
 
   if (error || !invoice) {
@@ -1470,23 +1483,36 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
 
   let warning: string | undefined;
 
-  if (invoice.client?.email) {
+  // Everyone on the account. A landlord's bookkeeper who cannot see the
+  // invoice arrive cannot pay it.
+  const recipients = await recipientsForClient(invoice.client_id);
+
+  if (recipients.length > 0) {
     const pdf = await buildInvoicePdf(supabase, invoice.id);
-    const sent = await sendInvoiceToClient(
-      invoice.client.email,
-      invoice.client.full_name,
-      invoice.reference,
-      formatPence(invoice.total_pence),
-      invoice.id,
-      invoice.due_date ? formatDate(invoice.due_date) : null,
-      pdf ?? undefined,
+
+    const results = await Promise.all(
+      recipients.map((recipient) =>
+        sendInvoiceToClient(
+          recipient.email,
+          invoice.client?.full_name ?? "there",
+          invoice.reference,
+          formatPence(invoice.total_pence),
+          invoice.id,
+          invoice.due_date ? formatDate(invoice.due_date) : null,
+          pdf ?? undefined,
+        ),
+      ),
     );
 
-    if (!sent.sent) {
-      warning = `The invoice is marked as sent, but the email did not go out. ${explainSendFailure(sent.error)} Print it or ring them.`;
+    const failed = results.filter((result) => !result.sent);
+
+    if (failed.length === results.length) {
+      warning = `The invoice is marked as sent, but the email did not go out. ${explainSendFailure(failed[0]?.error)} Print it or ring them.`;
+    } else if (failed.length > 0) {
+      warning = `The invoice went to ${results.length - failed.length} of ${results.length} people on this account. ${explainSendFailure(failed[0]?.error)}`;
     }
   } else {
-    warning = "This customer has no email address, so nothing was sent. Print it or add an email.";
+    warning = "Nobody on this account has an email address, so nothing was sent. Print it or add one.";
   }
 
   revalidatePath("/app/invoices");
