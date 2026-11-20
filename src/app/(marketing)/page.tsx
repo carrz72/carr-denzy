@@ -121,7 +121,7 @@ export default async function HomePage() {
 
         <div className="container-page">
           <div className="flex min-h-[max(34rem,72dvh)] flex-col justify-center py-20 md:py-28">
-            <div className="stagger max-w-2xl">
+            <div className="hero-in max-w-2xl">
               <p className="flex items-center gap-2.5 font-display text-lg font-semibold text-ink-inverse-strong">
                 <SealCheckIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
                 Est. {business.established} · Gas Safe registered
@@ -187,11 +187,11 @@ export default async function HomePage() {
       <section aria-label="Phone" className="overflow-hidden bg-accent text-white">
         <div className="container-page flex flex-col gap-1.5 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:py-6">
           <p className="sign text-[0.7rem] tracking-[0.16em] text-white">
-            Plumbing · Heating · Building · Nottingham
+            Plumbing · Heating · Building
           </p>
           <a
             href={contact.phoneHref}
-            className="sign animate-pull-up tabular text-[clamp(1.9rem,7.5vw,3.25rem)] leading-none text-white [animation-delay:500ms] hover:underline hover:decoration-2 hover:underline-offset-8"
+            className="sign animate-pull-up tabular whitespace-nowrap text-[clamp(1.75rem,7.6vw,3.25rem)] leading-none text-white [animation-delay:500ms] hover:underline hover:decoration-2 hover:underline-offset-8"
           >
             {contact.phone}
           </a>
@@ -302,7 +302,7 @@ export default async function HomePage() {
               </Link>
             ) : null}
 
-            {rest.slice(0, 4).map((service) => (
+            {rest.slice(0, 5).map((service) => (
               <Link
                 key={service.slug}
                 href={`/services/${service.slug}`}
@@ -338,8 +338,8 @@ export default async function HomePage() {
             ))}
           </div>
 
-          <div className="reveal mt-4 grid gap-4 sm:grid-cols-3">
-            {rest.slice(4).map((service) => (
+          <div className="reveal mt-4 grid gap-4 sm:grid-cols-2">
+            {rest.slice(5).map((service) => (
               <Link
                 key={service.slug}
                 href={`/services/${service.slug}`}
@@ -510,7 +510,9 @@ export default async function HomePage() {
                   "reveal group overflow-hidden rounded-lg",
                   // Two of the four are taller. The break in rhythm is what
                   // stops this reading as a stock four-up grid.
-                  index % 3 === 0 ? "sm:row-span-2" : "",
+                  // Only where the grid has room to balance it: on a wide screen a
+                  // tall photo beside short ones left empty space below them.
+                  index % 3 === 0 ? "sm:row-span-2 lg:row-span-1" : "",
                 )}
               >
                 <figure className="flex h-full flex-col">
@@ -525,7 +527,7 @@ export default async function HomePage() {
                         "w-full object-cover transition-transform duration-700",
                         "[transition-timing-function:var(--ease-out-soft)] group-hover:scale-105",
                         "motion-reduce:transition-none motion-reduce:group-hover:scale-100",
-                        index % 3 === 0 ? "aspect-[3/4]" : "aspect-[4/3]",
+                        index % 3 === 0 ? "aspect-[3/4] lg:aspect-[4/3]" : "aspect-[4/3]",
                       )}
                     />
                   </div>
@@ -550,7 +552,9 @@ export default async function HomePage() {
           dark box with a blurred glowing circle, which is one of the most
           recognisable marks of an AI-built page.
           --------------------------------------------------------------- */}
-      <section className="bg-accent text-white">
+      {/* -mb-24 cancels the footer's top margin here, so the brick band runs
+          straight into the footer instead of leaving a strip of page between. */}
+      <section className="-mb-24 bg-accent text-white">
         <div className="container-page section-y">
           <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr] lg:items-end">
             <div className="reveal">
@@ -558,7 +562,7 @@ export default async function HomePage() {
 
               <a
                 href={contact.phoneHref}
-                className="sign tabular mt-5 block text-[clamp(2.25rem,9vw,4.25rem)] leading-none text-white hover:underline hover:decoration-2 hover:underline-offset-8"
+                className="sign tabular mt-5 block whitespace-nowrap text-[clamp(1.75rem,7.6vw,3.5rem)] leading-none text-white hover:underline hover:decoration-2 hover:underline-offset-8"
               >
                 {contact.phone}
               </a>

@@ -41,3 +41,4 @@ yarn-error.log*
 # local tool caches — not part of the project
 .claude/
 .impeccable/
+previews/

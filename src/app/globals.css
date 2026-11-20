@@ -480,6 +480,17 @@
 }
 
 /* Hero entrance: the photo settles, then the words land in reading order. */
+@keyframes lift-in {
+  from {
+    opacity: 0.45;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes settle {
   from {
     transform: scale(1.06);
@@ -489,10 +500,12 @@
   }
 }
 
-/* The phone bar slides in like a van pulling up. */
+/* The phone bar slides in like a van pulling up. Starts readable, never
+   invisible: if the animation is paused (a background tab, a link-preview
+   renderer, a search crawler) the number is still there to read. */
 @keyframes pull-up {
   from {
-    opacity: 0;
+    opacity: 0.45;
     transform: translateX(-2.5rem);
   }
   to {
@@ -520,6 +533,16 @@
     animation: pull-up 700ms var(--ease-out-soft) both;
   }
 
+  /* The hero's words, in reading order. Same idea as pull-up: they lift
+     and brighten into place but are readable from the first frame. */
+  .hero-in > * {
+    animation: lift-in 640ms var(--ease-out-soft) both;
+  }
+  .hero-in > *:nth-child(2) { animation-delay: 90ms; }
+  .hero-in > *:nth-child(3) { animation-delay: 180ms; }
+  .hero-in > *:nth-child(4) { animation-delay: 270ms; }
+  .hero-in > *:nth-child(5) { animation-delay: 360ms; }
+
   /* Scroll reveal, as an enhancement only: everything is fully visible by
      default, and only browsers with scroll-driven animations (and no
      reduced-motion preference) fade sections up as they arrive. Nothing is
@@ -527,7 +550,7 @@
   @supports (animation-timeline: view()) {
     @media (prefers-reduced-motion: no-preference) {
       .reveal {
-        animation: rise-in linear both;
+        animation: lift-in linear both;
         animation-timeline: view();
         animation-range: entry 0% entry 40%;
       }
