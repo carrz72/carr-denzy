@@ -28,11 +28,14 @@ export function MessageThread({
   currentUserId,
   messages,
   emptyLabel,
+  placeholder = "Anything we should know?",
 }: {
   jobId: string;
   currentUserId: string;
   messages: ThreadMessage[];
   emptyLabel: string;
+  /** Written for whoever is typing: the customer by default, the owner on their side. */
+  placeholder?: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +122,7 @@ export function MessageThread({
           rows={3}
           required
           maxLength={5000}
-          placeholder="Anything we should know?"
+          placeholder={placeholder}
           className={cn(
             "w-full resize-y rounded-md border border-line-input bg-surface-raised px-3.5 py-3",
             "shadow-subtle transition-[border-color] duration-200",

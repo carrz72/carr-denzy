@@ -588,13 +588,14 @@ export function ScheduleForm({
 
           <TextField
             name="duration_minutes"
-            label="How long"
+            // Unit in the label, not a hint line: the hint pushed this box
+            // lower than "Arriving" beside it.
+            label="Minutes on site"
             type="number"
             inputMode="numeric"
             min={15}
             step={15}
             required
-            hint="Minutes"
             defaultValue={String(durationMinutes ?? 60)}
             error={errors.duration_minutes}
           />

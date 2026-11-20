@@ -1755,7 +1755,13 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
   }
 
   if (invoice.job_id) {
-    await supabase.from("jobs").update({ status: "invoiced" }).eq("id", invoice.job_id);
+    // Logged rather than ignored: a refused status change here once left jobs
+    // reading "New request" with a paid invoice on them, and nobody knew.
+    const { error: jobError } = await supabase
+      .from("jobs")
+      .update({ status: "invoiced" })
+      .eq("id", invoice.job_id);
+    if (jobError) console.error("[invoice] job status not moved to invoiced", jobError.message);
   }
 
   let warning: string | undefined;
@@ -2010,7 +2016,11 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
     .maybeSingle();
 
   if (invoice?.status === "paid" && invoice.job_id) {
-    await supabase.from("jobs").update({ status: "paid" }).eq("id", invoice.job_id);
+    const { error: jobError } = await supabase
+      .from("jobs")
+      .update({ status: "paid" })
+      .eq("id", invoice.job_id);
+    if (jobError) console.error("[payment] job status not moved to paid", jobError.message);
   }
 
   // Tell the customer their money arrived.

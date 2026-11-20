@@ -85,32 +85,32 @@ export function ClientDetailsEditForm({
         error={errors.company_name}
       />
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <TextField
-          name="phone"
-          label="Phone"
-          type="tel"
-          inputMode="tel"
-          autoComplete="off"
-          defaultValue={client.phone ?? ""}
-          error={errors.phone}
-        />
+      {/* Stacked rather than side by side: the email hint is three lines, and
+          beside it the phone box sat visibly higher than the email box. */}
+      <TextField
+        name="phone"
+        label="Phone"
+        type="tel"
+        inputMode="tel"
+        autoComplete="off"
+        defaultValue={client.phone ?? ""}
+        error={errors.phone}
+      />
 
-        <TextField
-          name="email"
-          label="Email"
-          type="email"
-          inputMode="email"
-          autoComplete="off"
-          hint={
-            client.profile_id
-              ? "Where quotes and invoices go. They already have a portal login, which keeps the address they signed up with."
-              : "Where quotes and invoices go."
-          }
-          defaultValue={client.email ?? ""}
-          error={errors.email}
-        />
-      </div>
+      <TextField
+        name="email"
+        label="Email"
+        type="email"
+        inputMode="email"
+        autoComplete="off"
+        hint={
+          client.profile_id
+            ? "Where quotes and invoices go. They already have a portal login, which keeps the address they signed up with."
+            : "Where quotes and invoices go."
+        }
+        defaultValue={client.email ?? ""}
+        error={errors.email}
+      />
 
       <TextAreaField
         name="notes"
@@ -166,7 +166,7 @@ export function PropertyEditForm({
         id={`${prefix}-label`}
         name="label"
         label="Label"
-        hint="Optional, such as Home, Rental flat or Shop."
+        hint="Such as Home, Rental flat or Shop."
         autoComplete="off"
         defaultValue={property?.label ?? ""}
         error={errors.label}
@@ -228,7 +228,9 @@ export function PropertyEditForm({
       <div className="flex flex-wrap items-center gap-4">
         <Button
           type="submit"
-          variant={property ? "primary" : "secondary"}
+          // One primary action per screen (Save details); address saves sit a
+          // step below it so the page does not read as a stack of red buttons.
+          variant="secondary"
           loading={isPending}
           icon={property ? <FloppyDiskIcon size={18} /> : <PlusIcon size={18} />}
         >
@@ -237,5 +239,36 @@ export function PropertyEditForm({
         <SavedTick show={saved} />
       </div>
     </form>
+  );
+}
+
+/**
+ * "Add an address", closed until asked for. An empty eight-field form under
+ * every customer made the page twice as long on a phone for something that
+ * happens rarely.
+ */
+export function AddPropertyDisclosure({ clientId }: { clientId: string }) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <Button
+        variant="secondary"
+        fullWidth
+        onClick={() => setOpen(true)}
+        icon={<PlusIcon size={18} />}
+      >
+        Add another address
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PropertyEditForm clientId={clientId} />
+      <Button variant="quiet" onClick={() => setOpen(false)} className="self-start">
+        Never mind
+      </Button>
+    </div>
   );
 }

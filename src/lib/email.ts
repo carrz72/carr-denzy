@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { getBusiness } from "@/lib/business";
 import { formatPence } from "@/lib/money";
 import { formatWorkingDayRange } from "@/lib/dates";
+import { addressName } from "@/lib/names";
 
 /**
  * Email.
@@ -368,7 +369,7 @@ export async function sendPortalInvite(
   clientName: string,
   signInLink: string,
 ): Promise<SendResult> {
-  const firstName = clientName.split(" ")[0] ?? clientName;
+  const firstName = addressName(clientName) || clientName;
 
   const html = await layout(
     "See your jobs online",

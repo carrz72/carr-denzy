@@ -24,6 +24,7 @@ import { formatDateTime, formatDuration } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { cn } from "@/lib/cn";
 import { signedJobPhotoUrls } from "@/lib/storage";
+import { addressName } from "@/lib/names";
 
 export const metadata: Metadata = { title: "Job", robots: { index: false } };
 
@@ -232,6 +233,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
                 currentUserId={user?.id ?? ""}
                 messages={messages ?? []}
                 emptyLabel="No messages. Anything you write here, the customer sees in their account."
+                placeholder={`Write to ${addressName(job.client?.full_name) || "the customer"}…`}
               />
             </div>
           </Card>

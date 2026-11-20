@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/app-shell";
 import { Card } from "@/components/ui/surface";
-import { ClientDetailsEditForm, PropertyEditForm } from "@/components/owner/client-edit-forms";
+import {
+  AddPropertyDisclosure,
+  ClientDetailsEditForm,
+  PropertyEditForm,
+} from "@/components/owner/client-edit-forms";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
 
@@ -70,12 +74,17 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
           </Card>
         ))}
 
-        <Card>
-          <h2 className="text-label uppercase text-ink-subtle">Add an address</h2>
-          <div className="mt-5">
-            <PropertyEditForm clientId={client.id} />
-          </div>
-        </Card>
+        {(properties ?? []).length === 0 ? (
+          <Card>
+            <h2 className="text-label uppercase text-ink-subtle">Address</h2>
+            <p className="mt-1.5 text-sm text-ink-muted">None on file yet.</p>
+            <div className="mt-5">
+              <PropertyEditForm clientId={client.id} />
+            </div>
+          </Card>
+        ) : (
+          <AddPropertyDisclosure clientId={client.id} />
+        )}
       </div>
     </>
   );

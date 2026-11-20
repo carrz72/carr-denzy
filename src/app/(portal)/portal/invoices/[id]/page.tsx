@@ -177,7 +177,7 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
           ) : null}
         </Card>
 
-        <div className="no-print flex min-w-0 flex-col gap-6">
+        <div className="no-print order-first flex min-w-0 flex-col gap-6 lg:order-none">
           {voided ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Cancelled</h2>
@@ -244,11 +244,11 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Keep a copy</h2>
             <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
-              This page prints as a clean invoice, or saves as a PDF for your records.
+              Save the invoice as a PDF for your records, or to pass on to an insurer or landlord.
             </p>
 
             <div className="mt-5">
-              <PrintButton />
+              <PrintButton pdfHref={`/invoices/view/${invoice.id}/pdf`} />
             </div>
           </Card>
         </div>

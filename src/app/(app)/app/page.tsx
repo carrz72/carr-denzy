@@ -34,6 +34,7 @@ import {
   todayInLondon,
 } from "@/lib/dates";
 import { cn } from "@/lib/cn";
+import { addressName } from "@/lib/names";
 
 export const metadata: Metadata = { title: "Today", robots: { index: false } };
 
@@ -175,7 +176,7 @@ export default async function OwnerDashboard() {
     (invoice) => invoice.status === "overdue" || isPast(invoice.due_date),
   ).length;
 
-  const firstName = user?.fullName?.split(" ")[0];
+  const firstName = addressName(user?.fullName);
 
   return (
     <>

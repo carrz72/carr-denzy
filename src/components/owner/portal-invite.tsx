@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
 import { FormError, TextField } from "@/components/ui/field";
 import { inviteClientToPortal } from "@/app/(app)/app/actions";
+import { addressName } from "@/lib/names";
 
 /**
  * Giving a customer access to their own jobs.
@@ -58,7 +59,7 @@ export function PortalInvite({
 
       {hasAccount ? (
         <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
-          {clientName.split(" ")[0]} can already sign in and see their jobs, quotes and
+          {addressName(clientName)} can already sign in and see their jobs, quotes and
           invoices. Sending another link is harmless if they cannot get in.
         </p>
       ) : (

@@ -111,12 +111,13 @@ export default async function PublicInvoicePage({
 
   return (
     <main className="container-page py-8 md:py-10">
-      <div className="no-print mb-6 flex flex-wrap items-start justify-between gap-4 rounded-lg border border-line bg-surface-sunken p-5">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <LinkIcon size={18} className="mt-0.5 shrink-0 text-ink-subtle" aria-hidden="true" />
-          <p className="text-[0.9375rem] leading-relaxed text-ink-muted">
-            Anyone with this link can view this invoice — it was sent directly to {customerName} by
-            email, so it works without signing in.
+      {/* Kept to a line: on a phone this sits above everything the customer
+          actually came for, so it states the fact and gets out of the way. */}
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface-sunken px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <LinkIcon size={16} className="shrink-0 text-ink-subtle" aria-hidden="true" />
+          <p className="text-sm text-ink-muted">
+            Sent to {customerName}. Anyone with this link can view it, no sign-in needed.
           </p>
         </div>
 
@@ -214,7 +215,7 @@ export default async function PublicInvoicePage({
           ) : null}
         </Card>
 
-        <div className="no-print flex min-w-0 flex-col gap-6">
+        <div className="no-print order-first flex min-w-0 flex-col gap-6 lg:order-none">
           {voided ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Cancelled</h2>
@@ -281,7 +282,7 @@ export default async function PublicInvoicePage({
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Keep a copy</h2>
             <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
-              This page prints as a clean invoice, or saves as a PDF for your records.
+              Save the invoice as a PDF for your records, or to pass on to an insurer or landlord.
             </p>
 
             <div className="mt-5">

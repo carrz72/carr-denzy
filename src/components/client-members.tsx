@@ -18,6 +18,7 @@ import {
 } from "@/app/(app)/app/clients/member-actions";
 import { cn } from "@/lib/cn";
 import type { ClientMember } from "@/types/database";
+import { addressName } from "@/lib/names";
 
 /**
  * Who else can see this account.
@@ -52,7 +53,7 @@ export function ClientMembers({
   const [warning, setWarning] = useState<string | null>(null);
 
   const forOwner = audience === "owner";
-  const firstName = clientName.split(" ")[0] ?? clientName;
+  const firstName = addressName(clientName) || clientName;
 
   function run(
     action: (data: FormData) => Promise<{ ok: boolean; formError?: string; errors?: Record<string, string>; warning?: string }>,

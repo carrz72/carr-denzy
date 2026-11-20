@@ -186,11 +186,11 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
             <h2 className="text-label uppercase text-ink-subtle">Keep a copy</h2>
             <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
               {quote.sent_at ? `Sent ${formatDate(quote.sent_at)}. ` : null}
-              This page prints as a clean one-page document.
+              Save it as a PDF to keep, or to share with whoever is paying.
             </p>
 
             <div className="mt-5">
-              <PrintButton />
+              <PrintButton pdfHref={`/quotes/view/${quote.id}/pdf`} />
             </div>
           </Card>
         </div>

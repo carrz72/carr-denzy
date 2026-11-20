@@ -44,6 +44,14 @@
      surface, while staying a step lighter than ink-muted. */
   --color-ink-subtle: #74685b;
   --color-ink-inverse: #faf7f2;
+  /* Text on dark photographic or inverse sections, strongest to faintest.
+     All clear 6:1 on --color-surface-inverse and on --color-scrim. */
+  --color-ink-inverse-strong: #e9d9d3;
+  --color-ink-inverse-muted: #ded2ca;
+  --color-ink-inverse-subtle: #c9bcb2;
+  --color-ink-inverse-faint: #a89a8e;
+  /* The darkening laid over photographs so text on them stays readable. */
+  --color-scrim: #15120f;
 
   /* --- Accent (single, desaturated brick) ------------------------------- */
   --color-accent: #be4a33;

@@ -115,13 +115,13 @@ export default async function HomePage() {
             photograph belongs to the page rather than sitting on top of it. */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,rgba(21,18,15,0.94)_0%,rgba(21,18,15,0.82)_42%,rgba(21,18,15,0.42)_72%,rgba(21,18,15,0.28)_100%)]"
+          className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,color-mix(in_srgb,var(--color-scrim)_94%,transparent)_0%,color-mix(in_srgb,var(--color-scrim)_82%,transparent)_42%,color-mix(in_srgb,var(--color-scrim)_42%,transparent)_72%,color-mix(in_srgb,var(--color-scrim)_28%,transparent)_100%)]"
         />
 
         <div className="container-page">
           <div className="flex min-h-[max(34rem,72dvh)] flex-col justify-center py-20 md:py-28">
             <div className="max-w-2xl">
-              <p className="flex items-center gap-2.5 text-label uppercase text-[#e9d9d3]">
+              <p className="flex items-center gap-2.5 text-label uppercase text-ink-inverse-strong">
                 <SealCheckIcon size={17} weight="fill" className="text-accent" aria-hidden="true" />
                 Gas Safe registered · since {business.established}
               </p>
@@ -130,7 +130,7 @@ export default async function HomePage() {
                 When something has gone wrong with the water, the heating or the gas.
               </h1>
 
-              <p className="mt-6 max-w-xl text-[1.0625rem] leading-relaxed text-[#ded2ca] sm:text-lg">
+              <p className="mt-6 max-w-xl text-[1.0625rem] leading-relaxed text-ink-inverse-muted sm:text-lg">
                 We are plumbers and builders working across Nottingham. Send a photo of the
                 problem and we will tell you what it needs and what it costs — before
                 anyone turns up at your door.
@@ -164,7 +164,7 @@ export default async function HomePage() {
                   "Written quotes, no verbal guesses",
                   "Worcester & Bosch accredited",
                 ].map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-sm text-[#ded2ca]">
+                  <li key={item} className="flex items-center gap-2 text-sm text-ink-inverse-muted">
                     <CheckIcon
                       size={16}
                       weight="bold"
@@ -259,7 +259,7 @@ export default async function HomePage() {
                 />
                 <div
                   aria-hidden="true"
-                  className="absolute inset-0 -z-10 bg-[linear-gradient(to_top,rgba(21,18,15,0.92)_10%,rgba(21,18,15,0.55)_45%,rgba(21,18,15,0.15)_100%)]"
+                  className="absolute inset-0 -z-10 bg-[linear-gradient(to_top,color-mix(in_srgb,var(--color-scrim)_92%,transparent)_10%,color-mix(in_srgb,var(--color-scrim)_55%,transparent)_45%,color-mix(in_srgb,var(--color-scrim)_15%,transparent)_100%)]"
                 />
 
                 <span className="flex size-11 items-center justify-center rounded-lg bg-accent text-white">
@@ -268,7 +268,7 @@ export default async function HomePage() {
 
                 <h3 className="mt-5 font-display text-heading text-white">{lead.name}</h3>
 
-                <p className="mt-2 max-w-md leading-relaxed text-[#ded2ca]">{lead.blurb}</p>
+                <p className="mt-2 max-w-md leading-relaxed text-ink-inverse-muted">{lead.blurb}</p>
 
                 <span className="mt-5 inline-flex items-center gap-2 font-medium text-white">
                   See what this covers
@@ -546,7 +546,7 @@ export default async function HomePage() {
                   Tell us what has gone wrong.
                 </h2>
 
-                <p className="container-prose mt-4 leading-relaxed text-[#c9bcb2]">
+                <p className="container-prose mt-4 leading-relaxed text-ink-inverse-subtle">
                   It takes about two minutes, you can attach photos, and you do not need
                   to make an account. We usually reply the same working day.
                 </p>
@@ -579,12 +579,12 @@ export default async function HomePage() {
                   />
                   <div>
                     <dt className="font-medium text-white">Opening hours</dt>
-                    <dd className="mt-0.5 text-sm text-[#c9bcb2]">
+                    <dd className="mt-0.5 text-sm text-ink-inverse-subtle">
                       Mon–Sat {business.hours.weekdays}
                       <br />
                       Sun · {business.hours.sunday}
                       <br />
-                      <span className="text-[#a89a8e]">
+                      <span className="text-ink-inverse-faint">
                         Emergency call-outs Mon–Sat, outside these hours
                       </span>
                     </dd>
@@ -599,7 +599,7 @@ export default async function HomePage() {
                   />
                   <div>
                     <dt className="font-medium text-white">Where we work</dt>
-                    <dd className="mt-0.5 text-sm text-[#c9bcb2]">
+                    <dd className="mt-0.5 text-sm text-ink-inverse-subtle">
                       {business.serviceAreas.join(" · ")}
                     </dd>
                   </div>

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
 import { formatDateTime, formatRelative } from "@/lib/dates";
 import { cn } from "@/lib/cn";
+import { addressName } from "@/lib/names";
 
 export const metadata: Metadata = { title: "Your jobs", robots: { index: false } };
 
@@ -39,7 +40,7 @@ export default async function PortalHomePage() {
   return (
     <>
       <PageHeader
-        title={user?.fullName ? `Hello, ${user.fullName.split(" ")[0]}` : "Your jobs"}
+        title={user?.fullName ? `Hello, ${addressName(user.fullName)}` : "Your jobs"}
         description="Everything we are doing for you, and everything we have done."
         action={
           <Link href="/request" className={buttonClasses({ variant: "secondary" })}>

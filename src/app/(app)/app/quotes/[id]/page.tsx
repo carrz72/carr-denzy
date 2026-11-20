@@ -115,7 +115,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
           </Card>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="order-first flex min-w-0 flex-col gap-6 lg:order-none">
           {quote.status === "draft" ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Ready to go?</h2>

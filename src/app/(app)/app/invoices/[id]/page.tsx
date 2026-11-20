@@ -233,7 +233,7 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
           ) : null}
         </div>
 
-        <div className="no-print flex min-w-0 flex-col gap-6">
+        <div className="no-print order-first flex min-w-0 flex-col gap-6 lg:order-none">
           {isDraft ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Not sent yet</h2>
