@@ -35,6 +35,7 @@ import {
 } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
+import { NotifyToggle } from "@/components/owner/invoice-actions";
 import type { JobStatus } from "@/types/database";
 
 /**
@@ -331,6 +332,12 @@ export function ScheduleForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  /** What the current warning is about, and which ones have been waved through. */
+  const [warningKind, setWarningKind] = useState<"closure" | "overlap" | null>(null);
+  const [confirmed, setConfirmed] = useState<Array<"closure" | "overlap">>([]);
+  /** The day being removed, while its confirm is open. */
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [notifyRemoval, setNotifyRemoval] = useState(true);
   const [saved, setSaved] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(visits.length === 0);
 
@@ -366,19 +373,28 @@ export function ScheduleForm({
     setErrors({});
     setError(null);
     setSaved(null);
-    if (force) formData.set("confirm_overlap", "on");
+
+    // Each warning is confirmed on its own: saying yes to "that is a day off"
+    // must not also wave through "you are already booked then".
+    const accepted = force && warningKind ? [...confirmed, warningKind] : force ? confirmed : [];
+    setConfirmed(accepted);
+    if (accepted.includes("overlap")) formData.set("confirm_overlap", "on");
+    if (accepted.includes("closure")) formData.set("confirm_closure", "on");
 
     startTransition(async () => {
       const result = await scheduleJob(formData);
 
-      // An overlap warning comes back with ok:false and stops here so the
-      // owner can confirm. A note alongside a successful save does not.
+      // A warning comes back with ok:false and stops here so the owner can
+      // confirm. A note alongside a successful save does not.
       if (!result.ok && result.warning) {
         setWarning(result.warning);
+        setWarningKind(result.confirm ?? "overlap");
         return;
       }
 
       setWarning(null);
+      setWarningKind(null);
+      setConfirmed([]);
 
       if (!result.ok) {
         setErrors(result.errors ?? {});
@@ -396,10 +412,12 @@ export function ScheduleForm({
     const formData = new FormData();
     formData.set("visit_id", visitId);
     formData.set("job_id", jobId);
+    if (notifyRemoval) formData.set("notify", "on");
 
     startTransition(async () => {
       const result = await removeVisit(formData);
       if (!result.ok) setError(result.formError ?? "Could not remove that day.");
+      setRemoving(null);
     });
   }
 
@@ -431,7 +449,7 @@ export function ScheduleForm({
             const past = when.getTime() < Date.now();
 
             return (
-              <li key={visit.id} className="flex items-start justify-between gap-3 py-3">
+              <li key={visit.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <p
                     className={cn(
@@ -453,13 +471,38 @@ export function ScheduleForm({
                   variant="quiet"
                   size="sm"
                   disabled={isPending}
-                  onClick={() => drop(visit.id)}
+                  onClick={() => {
+                    setRemoving(visit.id);
+                    // Worth telling them about a day still to come; a past day is just tidying.
+                    setNotifyRemoval(new Date(visit.starts_at).getTime() > Date.now());
+                  }}
                 >
                   <TrashIcon size={16} aria-hidden="true" />
                   <span className="sr-only">
                     Remove {formatDateTime(visit.starts_at)}
                   </span>
                 </Button>
+
+                {removing === visit.id ? (
+                  <div className="flex w-full flex-col gap-2 rounded-md bg-surface-sunken p-3">
+                    <p className="text-sm text-ink">Remove {formatDateTime(visit.starts_at)}?</p>
+                    {new Date(visit.starts_at).getTime() > Date.now() ? (
+                      <NotifyToggle
+                        checked={notifyRemoval}
+                        onChange={setNotifyRemoval}
+                        label="Email the customer that this day is off"
+                      />
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="destructive" loading={isPending} onClick={() => drop(visit.id)}>
+                        Remove the day
+                      </Button>
+                      <Button size="sm" variant="quiet" onClick={() => setRemoving(null)}>
+                        Keep it
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -651,7 +694,15 @@ export function ScheduleForm({
                 >
                   Save anyway
                 </Button>
-                <Button size="sm" variant="quiet" onClick={() => setWarning(null)}>
+                <Button
+                  size="sm"
+                  variant="quiet"
+                  onClick={() => {
+                    setWarning(null);
+                    setWarningKind(null);
+                    setConfirmed([]);
+                  }}
+                >
                   Change the time
                 </Button>
               </div>

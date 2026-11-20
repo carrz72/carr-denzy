@@ -343,3 +343,47 @@ export function weekLabel(monday: string): string {
 export function isBeforeToday(dateOnly: string): boolean {
   return dateOnly < todayInLondon();
 }
+
+/** Minutes London is ahead of UTC at a given instant: 0 in winter, 60 in summer. */
+function londonOffsetMinutes(at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: LONDON,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(at);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  const asUtc = Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute"));
+  return Math.round((asUtc - at.getTime()) / 60_000);
+}
+
+/**
+ * A wall-clock time in London ("2026-06-10", "09:00") as a UTC ISO timestamp.
+ *
+ * Bookings used to be saved as the bare string "2026-06-10T09:00:00". The
+ * database runs in UTC, so it read that as 09:00 UTC — right in winter, but an
+ * hour late (10:00 London) for every date in British Summer Time, in the diary
+ * and in the customer's booking email alike.
+ */
+export function londonWallTimeToIso(dateOnly: string, time: string): string {
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const asIfUtc = Date.UTC(year!, month! - 1, day!, hour!, minute!);
+
+  // Offset at the guessed instant, then once more at the corrected one, so a
+  // time near the clock change lands on the right side of it.
+  const first = asIfUtc - londonOffsetMinutes(new Date(asIfUtc)) * 60_000;
+  const second = asIfUtc - londonOffsetMinutes(new Date(first)) * 60_000;
+  return new Date(second).toISOString();
+}
+
+/** The UTC instants that bound a London calendar day, for day-range queries. */
+export function londonDayBoundsIso(dateOnly: string): { start: string; end: string } {
+  return {
+    start: londonWallTimeToIso(dateOnly, "00:00"),
+    end: londonWallTimeToIso(addDays(dateOnly, 1), "00:00"),
+  };
+}

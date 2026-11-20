@@ -37,13 +37,24 @@ import {
 } from "@/lib/invoice-snapshot";
 import { notifyClientBooked, notifyClientCompleted } from "@/lib/notify-client";
 import { formatPence } from "@/lib/money";
-import { addDaysToToday, formatDate, isPast, workingDaysFrom } from "@/lib/dates";
+import {
+  addDaysToToday,
+  formatDate,
+  formatDateTime,
+  formatTime,
+  isPast,
+  londonDayBoundsIso,
+  londonWallTimeToIso,
+  workingDaysFrom,
+} from "@/lib/dates";
 
 export interface ActionResult {
   ok: boolean;
   errors?: Record<string, string>;
   formError?: string;
   warning?: string;
+  /** Which "do it anyway?" this warning is asking about, so each is confirmed on its own. */
+  confirm?: "closure" | "overlap";
   id?: string;
 }
 
@@ -388,7 +399,7 @@ export async function createPhoneJob(formData: FormData): Promise<ActionResult> 
       urgency: parsed.data.urgency,
       // A naive local string, so Postgres applies the London zone — the same
       // reasoning as scheduleJob below.
-      scheduled_start: booked ? `${parsed.data.date}T${parsed.data.time}:00` : null,
+      scheduled_start: booked ? londonWallTimeToIso(parsed.data.date!, parsed.data.time!) : null,
       duration_minutes: booked ? parsed.data.duration_minutes : null,
       status: booked ? "scheduled" : "new",
     })
@@ -635,17 +646,16 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createClient();
 
-  // Times are entered in local London time. Storing the naive string lets
-  // Postgres apply the zone, so a 09:00 booking stays 09:00 across the clock
-  // change rather than sliding to 08:00.
-  const startsAt = `${parsed.data.date}T${parsed.data.time}:00`;
-  const endsAt = new Date(
-    new Date(startsAt).getTime() + parsed.data.duration_minutes * 60_000,
-  ).toISOString();
+  // Times are entered as London wall-clock time and converted here. Saving
+  // the bare string let the UTC database read 09:00 as 09:00 UTC, which is
+  // 10:00 in British Summer Time.
+  const startsAt = londonWallTimeToIso(parsed.data.date, parsed.data.time);
+  const startMs = new Date(startsAt).getTime();
+  const endMs = startMs + parsed.data.duration_minutes * 60_000;
 
-  if (!parsed.data.confirm_overlap) {
-    // A day you have marked off in the diary. Warned about, like a clash,
-    // rather than refused: an emergency on a day off is still your call.
+  // A day you have marked off in the diary. Warned about, like a clash,
+  // rather than refused: an emergency on a day off is still your call.
+  if (formData.get("confirm_closure") !== "on") {
     const { data: closed } = await supabase
       .from("closures")
       .select("starts_on, ends_on, reason")
@@ -657,29 +667,37 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
     if (closed) {
       return {
         ok: false,
+        confirm: "closure",
         warning: `${formatDate(parsed.data.date)} is marked as a day off in your diary${closed.reason ? ` (${closed.reason})` : ""}. Book it anyway?`,
       };
     }
+  }
 
-    const { data: clashes } = await supabase
-      .from("jobs")
-      .select("id, title, scheduled_start")
-      .is("deleted_at", null)
-      .neq("id", parsed.data.job_id)
-      .not("scheduled_start", "is", null)
-      .gte("scheduled_start", `${parsed.data.date}T00:00:00`)
-      .lte("scheduled_start", `${parsed.data.date}T23:59:59`);
+  // Every booked day of every other live job, not just each job's next one:
+  // day three of a refurbishment is as real a clash as day one.
+  if (!parsed.data.confirm_overlap) {
+    const { start: dayStart, end: dayEnd } = londonDayBoundsIso(parsed.data.date);
+    const { data: sameDay } = await supabase
+      .from("job_visits")
+      .select("starts_at, duration_minutes, job:jobs(id, title, status, deleted_at)")
+      .neq("job_id", parsed.data.job_id)
+      .gte("starts_at", dayStart)
+      .lt("starts_at", dayEnd);
 
-    const overlap = (clashes ?? []).find((job) => {
-      if (!job.scheduled_start) return false;
-      const otherStart = new Date(job.scheduled_start).getTime();
-      return otherStart >= new Date(startsAt).getTime() && otherStart < new Date(endsAt).getTime();
+    const overlap = (sameDay ?? []).find((visit) => {
+      if (!visit.job || visit.job.deleted_at || ["cancelled", "declined"].includes(visit.job.status)) {
+        return false;
+      }
+      const otherStart = new Date(visit.starts_at).getTime();
+      const otherEnd = otherStart + visit.duration_minutes * 60_000;
+      return otherStart < endMs && startMs < otherEnd;
     });
 
-    if (overlap) {
+    if (overlap?.job) {
       return {
         ok: false,
-        warning: `You already have "${overlap.title}" booked around then. Save anyway?`,
+        confirm: "overlap",
+        warning: `You already have "${overlap.job.title}" booked at ${formatTime(overlap.starts_at)} that day. Save anyway?`,
       };
     }
   }
@@ -788,10 +806,37 @@ export async function removeVisit(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.from("job_visits").delete().eq("id", visitId);
+  const { data: removed, error } = await supabase
+    .from("job_visits")
+    .delete()
+    .eq("id", visitId)
+    .select("starts_at, job:jobs(title, client:clients(full_name, email))")
+    .maybeSingle();
 
   if (error) {
     return { ok: false, formError: "Could not remove that day. Try again." };
+  }
+
+  // The customer was told to expect you; tell them you are not coming, if
+  // the owner ticked the box and the day has not already happened.
+  const client = removed?.job?.client;
+  if (
+    formData.get("notify") === "on" &&
+    removed &&
+    new Date(removed.starts_at).getTime() > Date.now() &&
+    client?.email
+  ) {
+    const notice = await sendDocumentNotice(
+      client.email,
+      client.full_name,
+      `Change to your booking: ${formatDateTime(removed.starts_at)}`,
+      "A change to your booking",
+      [
+        `We have taken ${formatDateTime(removed.starts_at)} out of the booking for ${removed.job?.title ?? "your job"}, so please do not expect us then.`,
+        "We will be in touch about another day if one is needed.",
+      ],
+    );
+    if (!notice.sent) console.error("[visit] removal notice did not send", notice.error);
   }
 
   revalidatePath(`/app/jobs/${jobId}`);

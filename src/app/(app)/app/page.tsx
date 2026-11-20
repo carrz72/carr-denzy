@@ -31,6 +31,7 @@ import {
   formatTime,
   isPast,
   londonDateOf,
+  londonDayBoundsIso,
   todayInLondon,
 } from "@/lib/dates";
 import { cn } from "@/lib/cn";
@@ -53,8 +54,9 @@ export default async function OwnerDashboard() {
   const supabase = await createClient();
 
   const today = todayInLondon();
-  const dayStart = `${today}T00:00:00`;
-  const dayEnd = `${today}T23:59:59`;
+  // London midnight to midnight, as UTC instants. The bare strings were UTC
+  // midnight, which in summer dropped a 00:30 call-out and counted tomorrow's.
+  const { start: dayStart, end: dayEnd } = londonDayBoundsIso(today);
 
   // `mark_overdue_invoices` is housekeeping — it flips past-due invoices to
   // `overdue` and expires stale quotes. It used to be awaited on its own line
@@ -83,7 +85,7 @@ export default async function OwnerDashboard() {
       )
       .is("deleted_at", null)
       .gte("scheduled_start", dayStart)
-      .lte("scheduled_start", dayEnd)
+      .lt("scheduled_start", dayEnd)
       .order("scheduled_start", { ascending: true }),
 
     supabase
@@ -150,7 +152,7 @@ export default async function OwnerDashboard() {
       .select("id, scheduled_start, duration_minutes")
       .is("deleted_at", null)
       .not("scheduled_start", "is", null)
-      .gt("scheduled_start", dayEnd)
+      .gte("scheduled_start", dayEnd)
       .lte("scheduled_start", `${addDays(today, 7)}T23:59:59`)
       .not("status", "in", "(cancelled,declined)"),
   ]);
