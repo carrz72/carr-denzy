@@ -48,6 +48,14 @@ const geistMono = Geist_Mono({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
+/** An iPhone start-up screen for one screen size, in device pixels. */
+function splash(width: number, height: number, ratio: number) {
+  return {
+    url: `/splash/splash-${width}x${height}.png`,
+    media: `(device-width: ${width / ratio}px) and (device-height: ${height / ratio}px) and (-webkit-device-pixel-ratio: ${ratio}) and (orientation: portrait)`,
+  };
+}
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -87,6 +95,24 @@ export const metadata: Metadata = {
     capable: true,
     title: "Carrdenzy",
     statusBarStyle: "default",
+    // The screen an installed iPhone app shows while it loads. Without one,
+    // iOS shows plain white until the first page arrives, which makes a cold
+    // start feel longer than it is. One per screen size, portrait only (the
+    // manifest locks the app to portrait); a size not listed falls back to white.
+    startupImage: [
+      splash(1320, 2868, 3),
+      splash(1206, 2622, 3),
+      splash(1290, 2796, 3),
+      splash(1179, 2556, 3),
+      splash(1284, 2778, 3),
+      splash(1170, 2532, 3),
+      splash(1125, 2436, 3),
+      splash(1242, 2688, 3),
+      splash(828, 1792, 2),
+      splash(1242, 2208, 3),
+      splash(750, 1334, 2),
+      splash(640, 1136, 2),
+    ],
   },
   /**
    * Icons, ordered for Google as much as for browsers.
