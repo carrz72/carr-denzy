@@ -9,6 +9,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { DocumentLines, TotalsPanel } from "@/components/money-document";
 import {
   DeleteDraftQuoteButton,
+  RecordQuoteAnswer,
   SendQuoteButton,
   WithdrawQuoteButton,
 } from "@/components/owner/quote-actions";
@@ -182,6 +183,14 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                     : "This customer has no email address on file, so nothing was sent automatically. Text them this link — they can accept it without signing in."
                 }
               />
+
+              <div className="mt-5 border-t border-line pt-4">
+                <RecordQuoteAnswer
+                  quoteId={quote.id}
+                  clientName={quote.client?.full_name ?? "the customer"}
+                  totalLabel={formatPence(quote.total_pence)}
+                />
+              </div>
 
               <div className="mt-5 border-t border-line pt-4">
                 <WithdrawQuoteButton quoteId={quote.id} reference={quote.reference} />

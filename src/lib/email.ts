@@ -562,6 +562,46 @@ export async function sendPaymentReceipt(
 }
 
 /**
+ * A short notice that something the customer was sent has changed: an
+ * invoice cancelled, a quote withdrawn, a payment record corrected. Optional
+ * for the owner (a tick box beside each action), so a customer is never left
+ * holding a document that no longer stands without being told.
+ */
+export async function sendDocumentNotice(
+  to: string,
+  fullName: string,
+  subject: string,
+  heading: string,
+  paragraphs: string[],
+  link?: { href: string; label: string },
+): Promise<SendResult> {
+  const name = addressName(fullName) || fullName;
+  const phone = await businessPhone();
+
+  const html = await layout(
+    heading,
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(name)},</p>
+     ${paragraphs
+       .map((line) => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(line)}</p>`)
+       .join("")}
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Any questions, ring us on ${esc(phone)}.</p>
+     ${link ? button(`${siteUrl()}${link.href}`, link.label) : ""}`,
+  );
+
+  const text = [
+    `Hello ${name},`,
+    "",
+    ...paragraphs.flatMap((line) => [line, ""]),
+    `Any questions, ring us on ${phone}.`,
+    ...(link ? ["", `${link.label}: ${siteUrl()}${link.href}`] : []),
+    "",
+    `Carr Denzy Plumbing & Gas · ${phone}`,
+  ].join("\n");
+
+  return send(to, subject, html, text);
+}
+
+/**
  * A polite nudge about an invoice that has gone past its due date.
  *
  * Written to assume the customer forgot, because they almost always did. A

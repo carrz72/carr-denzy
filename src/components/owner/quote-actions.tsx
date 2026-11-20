@@ -4,14 +4,21 @@ import { useState, useTransition } from "react";
 import {
   ArrowUUpLeftIcon,
   CheckIcon,
+  XIcon,
   PaperPlaneTiltIcon,
   TrashIcon,
   WarningIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { FormError } from "@/components/ui/field";
-import { deleteDraftQuote, sendQuote, withdrawQuote } from "@/app/(app)/app/actions";
+import { FormError, TextAreaField } from "@/components/ui/field";
+import { NotifyToggle } from "@/components/owner/invoice-actions";
+import {
+  deleteDraftQuote,
+  recordQuoteAnswer,
+  sendQuote,
+  withdrawQuote,
+} from "@/app/(app)/app/actions";
 
 /**
  * Sending a quote is the moment it stops being editable and starts being an
@@ -122,21 +129,25 @@ function ConfirmLink({
   explanation,
   confirmLabel,
   run,
+  notifyLabel,
 }: {
   label: string;
   icon: React.ReactNode;
   explanation: string;
   confirmLabel: string;
-  run: () => Promise<{ ok: boolean; formError?: string }>;
+  run: (notify: boolean) => Promise<{ ok: boolean; formError?: string }>;
+  /** Shows a "tell the customer" tick box, ticked by default. */
+  notifyLabel?: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notify, setNotify] = useState(true);
 
   function go() {
     setError(null);
     startTransition(async () => {
-      const result = await run();
+      const result = await run(Boolean(notifyLabel) && notify);
       if (!result.ok) {
         setError(result.formError ?? "That did not work. Try again.");
         setConfirming(false);
@@ -148,6 +159,7 @@ function ConfirmLink({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-[0.9375rem] leading-relaxed text-ink-muted">{explanation}</p>
+        {notifyLabel ? <NotifyToggle checked={notify} onChange={setNotify} label={notifyLabel} /> : null}
         <div className="flex flex-wrap gap-2">
           <Button variant="destructive" loading={isPending} onClick={go} icon={icon}>
             {confirmLabel}
@@ -204,13 +216,112 @@ export function WithdrawQuoteButton({ quoteId, reference }: { quoteId: string; r
       icon={<ArrowUUpLeftIcon size={16} weight="bold" aria-hidden="true" />}
       explanation={`${reference} stays on file marked Withdrawn, and the customer can no longer accept it. Their link will say so. If the price was wrong, withdraw it and send a new one.`}
       confirmLabel="Yes, withdraw it"
-      run={async () => {
+      notifyLabel="Email the customer to say it is withdrawn"
+      run={async (notify) => {
         const formData = new FormData();
         formData.set("quote_id", quoteId);
+        if (notify) formData.set("notify", "on");
         const result = await withdrawQuote(formData);
         if (result.ok) router.refresh();
         return result;
       }}
     />
+  );
+}
+
+/**
+ * The customer answered by phone, text or in person. Records it for them, so
+ * the quote stops being chased and "Invoice this quote" appears. Two clear
+ * buttons, each with a confirm that names the outcome, because this speaks for
+ * the customer.
+ */
+export function RecordQuoteAnswer({
+  quoteId,
+  clientName,
+  totalLabel,
+}: {
+  quoteId: string;
+  clientName: string;
+  totalLabel: string;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [choice, setChoice] = useState<"accept" | "decline" | null>(null);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function confirm() {
+    if (!choice) return;
+    setError(null);
+
+    const formData = new FormData();
+    formData.set("quote_id", quoteId);
+    formData.set("answer", choice);
+    if (choice === "decline") formData.set("reason", reason);
+
+    startTransition(async () => {
+      const result = await recordQuoteAnswer(formData);
+      if (!result.ok) {
+        setError(result.formError ?? "Could not record that.");
+        return;
+      }
+      setChoice(null);
+      router.refresh();
+    });
+  }
+
+  if (choice) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-[0.9375rem] leading-relaxed text-ink-muted">
+          {choice === "accept"
+            ? `Record that ${clientName} accepted ${totalLabel}? The quote is marked accepted and stops being chased.`
+            : `Record that ${clientName} said no? The quote is marked declined and stops being chased.`}
+        </p>
+
+        {choice === "decline" ? (
+          <TextAreaField
+            id={`decline-reason-${quoteId}`}
+            name="reason"
+            label="What they said"
+            hint="Optional. Only you see this."
+            rows={2}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={choice === "accept" ? "primary" : "destructive"}
+            loading={isPending}
+            onClick={confirm}
+            icon={choice === "accept" ? <CheckIcon size={18} weight="bold" /> : <XIcon size={18} weight="bold" />}
+          >
+            {choice === "accept" ? "Yes, they accepted" : "Yes, they declined"}
+          </Button>
+          <Button variant="quiet" onClick={() => setChoice(null)}>
+            Back
+          </Button>
+        </div>
+        <FormError message={error} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <p className="text-sm leading-relaxed text-ink-muted">
+        Answered by phone, text or in person? Record it here.
+      </p>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Button variant="secondary" onClick={() => setChoice("accept")} icon={<CheckIcon size={18} />}>
+          They said yes
+        </Button>
+        <Button variant="secondary" onClick={() => setChoice("decline")} icon={<XIcon size={18} />}>
+          They said no
+        </Button>
+      </div>
+    </div>
   );
 }

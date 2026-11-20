@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/app-shell";
 import { Card } from "@/components/ui/surface";
 import {
   AddPropertyDisclosure,
+  CustomerHousekeeping,
   ClientDetailsEditForm,
   PropertyEditForm,
 } from "@/components/owner/client-edit-forms";
@@ -26,7 +27,15 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   await requireOwner();
   const supabase = await createClient();
 
-  const [{ data: client }, { data: properties }, { data: privateNotes }] = await Promise.all([
+  const [
+    { data: client },
+    { data: properties },
+    { data: privateNotes },
+    { data: others },
+    { count: jobCount },
+    { count: quoteCount },
+    { count: invoiceCount },
+  ] = await Promise.all([
     supabase
       .from("clients")
       .select("id, full_name, company_name, email, phone, profile_id")
@@ -39,7 +48,18 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
       .eq("client_id", id)
       .order("created_at", { ascending: true }),
     supabase.from("client_private_notes").select("notes").eq("client_id", id).maybeSingle(),
+    supabase
+      .from("clients")
+      .select("id, full_name, phone")
+      .is("deleted_at", null)
+      .neq("id", id)
+      .order("full_name", { ascending: true }),
+    supabase.from("jobs").select("id", { count: "exact", head: true }).eq("client_id", id).is("deleted_at", null),
+    supabase.from("quotes").select("id", { count: "exact", head: true }).eq("client_id", id).is("deleted_at", null),
+    supabase.from("invoices").select("id", { count: "exact", head: true }).eq("client_id", id).is("deleted_at", null),
   ]);
+
+  const hasHistory = (jobCount ?? 0) + (quoteCount ?? 0) + (invoiceCount ?? 0) > 0;
 
   if (!client) notFound();
 
@@ -85,6 +105,15 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
         ) : (
           <AddPropertyDisclosure clientId={client.id} />
         )}
+
+        <div className="border-t border-line pt-4">
+          <CustomerHousekeeping
+            clientId={client.id}
+            clientName={client.full_name}
+            others={others ?? []}
+            canDelete={!hasHistory}
+          />
+        </div>
       </div>
     </>
   );

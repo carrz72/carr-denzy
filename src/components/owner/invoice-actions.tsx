@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
-import { FormError, SelectField, TextAreaField, TextField } from "@/components/ui/field";
+import { CheckField, FormError, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import {
   deleteDraftInvoice,
   deletePayment,
@@ -373,6 +373,7 @@ export function RecordPaymentForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [amount, setAmount] = useState(() => formatPenceBare(Math.max(outstandingPence, 0)));
   const [saved, setSaved] = useState(false);
+  const [emailReceipt, setEmailReceipt] = useState(true);
 
   const parsed = parsePence(amount);
   const overpaying = parsed !== null && parsed > outstandingPence;
@@ -456,6 +457,17 @@ export function RecordPaymentForm({
 
         <TextAreaField name="note" label="Note" rows={2} error={errors.note} />
 
+        {/* Recording a payment used to email a receipt with no way to stop it,
+            including when a payment was entered only to tidy something up. */}
+        <input type="hidden" name="receipt" value={emailReceipt ? "send" : "skip"} />
+        <CheckField
+          name="email_receipt"
+          label="Email them a receipt"
+          hint="Goes to the email on their record, if they have one."
+          checked={emailReceipt}
+          onChange={(event) => setEmailReceipt(event.target.checked)}
+        />
+
         <FormError message={formError} />
 
         {saved ? (
@@ -497,12 +509,14 @@ export function VoidInvoiceButton({
   const [isPending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notify, setNotify] = useState(true);
 
   function cancelInvoice() {
     setError(null);
 
     const formData = new FormData();
     formData.set("invoice_id", invoiceId);
+    if (notify) formData.set("notify", "on");
 
     startTransition(async () => {
       const result = await voidInvoice(formData);
@@ -526,6 +540,7 @@ export function VoidInvoiceButton({
           is nothing to pay. Reminders stop. This cannot be undone, so if the figures were
           only wrong, cancel it and raise a corrected one.
         </p>
+        <NotifyToggle checked={notify} onChange={setNotify} label="Email the customer to say it is cancelled" />
         <div className="flex flex-wrap gap-2">
           <Button
             variant="destructive"
@@ -574,12 +589,14 @@ export function RemovePaymentButton({
   const [isPending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notify, setNotify] = useState(false);
 
   function remove() {
     setError(null);
 
     const formData = new FormData();
     formData.set("payment_id", paymentId);
+    if (notify) formData.set("notify", "on");
 
     startTransition(async () => {
       const result = await deletePayment(formData);
@@ -601,6 +618,11 @@ export function RemovePaymentButton({
           Remove this {amountLabel} payment? The amount owed goes back up by {amountLabel}.
           Only do this if it was entered by mistake.
         </p>
+        <NotifyToggle
+          checked={notify}
+          onChange={setNotify}
+          label="Email the customer a correction (if they were sent a receipt)"
+        />
         <div className="flex flex-wrap gap-2">
           <Button
             variant="destructive"
@@ -631,5 +653,32 @@ export function RemovePaymentButton({
       </button>
       <FormError message={error} />
     </div>
+  );
+}
+
+/**
+ * "Tell the customer" in a confirm step. A plain checkbox rather than
+ * CheckField: these confirms can appear once per row, and CheckField derives
+ * its id from the name, which would repeat.
+ */
+export function NotifyToggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[0.9375rem] text-ink">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-5 shrink-0 accent-accent"
+      />
+      {label}
+    </label>
   );
 }

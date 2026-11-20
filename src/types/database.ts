@@ -598,6 +598,8 @@ export type Database = {
       decline_quote: { Args: { p_quote_id: string; p_reason?: string | null }; Returns: undefined };
       mark_overdue_invoices: { Args: Record<string, never>; Returns: number };
       can_manage_client: { Args: { p_client_id: string }; Returns: boolean };
+      merge_clients: { Args: { p_source: string; p_target: string }; Returns: undefined };
+      recalc_draft_totals: { Args: Record<string, never>; Returns: number };
       current_closure: {
         Args: Record<string, never>;
         Returns: {

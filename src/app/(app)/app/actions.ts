@@ -24,6 +24,7 @@ import {
   explainSendFailure,
   sendEnquiryDeclined,
   sendInvoiceToClient,
+  sendDocumentNotice,
   sendPaymentReceipt,
   sendPortalInvite,
   sendQuoteToClient,
@@ -478,6 +479,49 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
     };
   }
 
+  // --- Cancelling tidies up after itself ----------------------------------
+  // A cancelled job used to keep an acceptable quote (whose acceptance then
+  // failed), booked days in the customer's portal, and unpaid invoices that
+  // nobody was reminded of. Quotes are withdrawn and future days removed here;
+  // money owed is the owner's call, so it is named, not cancelled for them.
+  let warning: string | undefined;
+
+  if (parsed.data.status === "cancelled") {
+    const nowIso = new Date().toISOString();
+    const [{ error: quoteError }, { error: visitError }, { data: unpaid }] = await Promise.all([
+      supabase
+        .from("quotes")
+        .update({ status: "withdrawn" })
+        .eq("job_id", parsed.data.job_id)
+        .eq("status", "sent")
+        .is("deleted_at", null),
+      supabase
+        .from("job_visits")
+        .delete()
+        .eq("job_id", parsed.data.job_id)
+        .gte("starts_at", nowIso),
+      supabase
+        .from("invoices")
+        .select("reference, total_pence, paid_pence")
+        .eq("job_id", parsed.data.job_id)
+        .in("status", [...UNPAID_ISSUED_STATUSES])
+        .is("deleted_at", null),
+    ]);
+
+    if (quoteError) console.error("[job] could not withdraw quotes on cancel", quoteError.message);
+    if (visitError) console.error("[job] could not clear visits on cancel", visitError.message);
+
+    if (unpaid?.length) {
+      const list = unpaid
+        .map((invoice) => `${invoice.reference} (${formatPence(invoice.total_pence - invoice.paid_pence)})`)
+        .join(", ");
+      warning = `Still unpaid on this job: ${list}. If the customer should not pay, cancel the invoice from its own page.`;
+    }
+
+    revalidatePath("/app/quotes");
+    revalidatePath("/app/diary");
+  }
+
   // Only completion is worth telling the customer about. Every other move —
   // quoted, accepted, in progress — is either already covered by its own email
   // or is internal bookkeeping, and a notification per status change would
@@ -505,7 +549,74 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
   revalidatePath(`/app/jobs/${parsed.data.job_id}`);
   revalidatePath("/app", "layout");
 
-  return { ok: true };
+  return { ok: true, warning };
+}
+
+/**
+ * Corrects a job's own details: title, description, urgency, type of work and
+ * which of the customer's addresses it is at. The customer it belongs to is
+ * fixed — moving a job between customers is what merging customers is for.
+ */
+export async function updateJobDetails(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const jobId = String(formData.get("job_id") ?? "");
+  if (!jobId) return { ok: false, formError: "Missing job." };
+
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("jobs")
+    .select("id, client_id")
+    .eq("id", jobId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, formError: "That job no longer exists." };
+
+  const parsed = jobSchema.safeParse({
+    client_id: existing.client_id,
+    property_id: formData.get("property_id") ?? "",
+    service_id: formData.get("service_id") ?? "",
+    title: formData.get("title") ?? "",
+    description: formData.get("description") ?? "",
+    urgency: formData.get("urgency") ?? "soon",
+  });
+
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+
+  // The address must be one of this customer's, not any id posted in.
+  if (parsed.data.property_id) {
+    const { data: property } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("id", parsed.data.property_id)
+      .eq("client_id", existing.client_id)
+      .maybeSingle();
+    if (!property) return { ok: false, errors: { property_id: "Pick one of this customer's addresses." } };
+  }
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      title: parsed.data.title,
+      description: parsed.data.description || null,
+      urgency: parsed.data.urgency,
+      service_id: parsed.data.service_id || null,
+      property_id: parsed.data.property_id || null,
+    })
+    .eq("id", jobId);
+
+  if (error) {
+    console.error("[job] update failed", error);
+    return { ok: false, formError: "Could not save those details. Try again." };
+  }
+
+  revalidatePath(`/app/jobs/${jobId}`);
+  revalidatePath("/app/jobs");
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: jobId };
 }
 
 /** Books a job in. Overlaps warn but never block (spec FR-35, E-10). */
@@ -533,6 +644,23 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
   ).toISOString();
 
   if (!parsed.data.confirm_overlap) {
+    // A day you have marked off in the diary. Warned about, like a clash,
+    // rather than refused: an emergency on a day off is still your call.
+    const { data: closed } = await supabase
+      .from("closures")
+      .select("starts_on, ends_on, reason")
+      .lte("starts_on", parsed.data.date)
+      .gte("ends_on", parsed.data.date)
+      .limit(1)
+      .maybeSingle();
+
+    if (closed) {
+      return {
+        ok: false,
+        warning: `${formatDate(parsed.data.date)} is marked as a day off in your diary${closed.reason ? ` (${closed.reason})` : ""}. Book it anyway?`,
+      };
+    }
+
     const { data: clashes } = await supabase
       .from("jobs")
       .select("id, title, scheduled_start")
@@ -818,6 +946,7 @@ export async function deleteJob(formData: FormData): Promise<ActionResult> {
       .select("id, status")
       .eq("job_id", jobId)
       .is("deleted_at", null)
+      .neq("status", "draft")
       .limit(1),
   ]);
 
@@ -833,9 +962,17 @@ export async function deleteJob(formData: FormData): Promise<ActionResult> {
     return {
       ok: false,
       formError:
-        "This job has an invoice on it, so it cannot be deleted. Cancel the job instead, and cancel or delete the invoice from its own page.",
+        "This job has an invoice the customer has been sent (even one since cancelled), so it stays on file. Cancel the job instead.",
     };
   }
+
+  // Draft invoices go with it, as never-sent paperwork.
+  await supabase
+    .from("invoices")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("job_id", jobId)
+    .eq("status", "draft")
+    .is("deleted_at", null);
 
   // Draft quotes go with it. Left behind they would be orphans with no job to
   // open, still counted on the quotes screen.
@@ -1311,7 +1448,7 @@ export async function withdrawQuote(formData: FormData): Promise<ActionResult> {
     .eq("id", quoteId)
     .eq("status", "sent")
     .is("deleted_at", null)
-    .select("id, job_id")
+    .select("id, job_id, reference, client:clients(full_name, email)")
     .maybeSingle();
 
   if (error || !quote) {
@@ -1340,10 +1477,73 @@ export async function withdrawQuote(formData: FormData): Promise<ActionResult> {
       .eq("status", "quoted");
   }
 
+  if (formData.get("notify") === "on" && quote.client?.email) {
+    const notice = await sendDocumentNotice(
+      quote.client.email,
+      quote.client.full_name,
+      `Quote ${quote.reference} withdrawn`,
+      "Quote withdrawn",
+      [
+        `We have withdrawn quote ${quote.reference}, so it can no longer be accepted.`,
+        "If a revised quote is due, it will come separately.",
+      ],
+    );
+    if (!notice.sent) console.error("[quote] withdraw notice did not send", notice.error);
+  }
+
   revalidatePath(`/app/quotes/${quoteId}`);
   revalidatePath(`/app/jobs/${quote.job_id}`);
   revalidatePath("/app/quotes");
   revalidatePath(`/quotes/view/${quoteId}`);
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: quoteId };
+}
+
+/**
+ * Records the customer's answer for them — they rang, texted or said so on
+ * site. Goes through the same accept_quote / decline_quote as the portal, on
+ * the owner channel, so the quote, the job and the audit log end up exactly
+ * as if the customer had tapped the button. The owner channel may also answer
+ * a quote whose date has passed, for a customer whose price is being honoured.
+ */
+export async function recordQuoteAnswer(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const quoteId = String(formData.get("quote_id") ?? "");
+  const answer = String(formData.get("answer") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 1000);
+
+  if (!quoteId || (answer !== "accept" && answer !== "decline")) {
+    return { ok: false, formError: "Missing quote or answer." };
+  }
+
+  const supabase = await createClient();
+
+  const { error } =
+    answer === "accept"
+      ? await supabase.rpc("accept_quote", { p_quote_id: quoteId })
+      : await supabase.rpc("decline_quote", { p_quote_id: quoteId, p_reason: reason || null });
+
+  if (error) {
+    console.error("[quote] owner answer failed", error.message);
+    return {
+      ok: false,
+      formError: error.message.includes("no longer open")
+        ? "This quote has already been answered or withdrawn. Reload the page."
+        : "Could not record that. Try again.",
+    };
+  }
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("job_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+
+  revalidatePath(`/app/quotes/${quoteId}`);
+  if (quote?.job_id) revalidatePath(`/app/jobs/${quote.job_id}`);
+  revalidatePath("/app/quotes");
   revalidatePath("/app", "layout");
 
   return { ok: true, id: quoteId };
@@ -1716,17 +1916,21 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
     supabase.from("settings").select("*").maybeSingle(),
     supabase
       .from("invoices")
-      .select("client_snapshot, client:clients(full_name, company_name, email, phone)")
+      .select(
+        "client_snapshot, client:clients(full_name, company_name, email, phone), job:jobs(property:properties(address_line1, address_line2, city, postcode))",
+      )
       .eq("id", invoiceId)
       .maybeSingle(),
   ]);
 
-  // The customer too: a name or phone corrected on their record while this sat
-  // as a draft belongs on the invoice they get. The address stays as captured
-  // from the job, which is where the work was done.
+  // The customer too: a name, phone or address corrected while this sat as a
+  // draft belongs on the invoice they get. The address is the job's address
+  // (where the work was done), read fresh in case it was fixed meanwhile.
+  const jobAddress = draft?.job?.property ?? null;
   const clientSnapshot = draft?.client
     ? {
         ...((draft.client_snapshot ?? {}) as Record<string, unknown>),
+        ...(jobAddress ? { address: jobAddress } : {}),
         full_name: draft.client.full_name,
         company_name: draft.client.company_name,
         email: draft.client.email,
@@ -1916,7 +2120,7 @@ export async function voidInvoice(formData: FormData): Promise<ActionResult> {
     .in("status", ["sent", "overdue"])
     .eq("paid_pence", 0)
     .is("deleted_at", null)
-    .select("id, reference, job_id")
+    .select("id, reference, job_id, client:clients(full_name, email)")
     .maybeSingle();
 
   if (error || !invoice) {
@@ -1948,6 +2152,21 @@ export async function voidInvoice(formData: FormData): Promise<ActionResult> {
     }
 
     revalidatePath(`/app/jobs/${invoice.job_id}`);
+  }
+
+  if (formData.get("notify") === "on" && invoice.client?.email) {
+    const notice = await sendDocumentNotice(
+      invoice.client.email,
+      invoice.client.full_name,
+      `Invoice ${invoice.reference} cancelled`,
+      "Invoice cancelled",
+      [
+        `We have cancelled invoice ${invoice.reference}, so there is nothing to pay on it.`,
+        "If a corrected invoice is due, it will come separately.",
+      ],
+      { href: `/invoices/view/${invoiceId}`, label: "See the invoice" },
+    );
+    if (!notice.sent) console.error("[invoice] cancel notice did not send", notice.error);
   }
 
   revalidatePath(`/app/invoices/${invoiceId}`);
@@ -2032,7 +2251,12 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
   // A failure here is logged, never surfaced: the payment is recorded, which is
   // what the owner asked for, and an email that did not send is not a reason to
   // make them think it wasn't.
-  if (invoice?.client?.email) {
+  // The owner can untick "Email them a receipt" (a payment recorded to tidy
+  // up, a cash job where the customer was handed a paper one). Absent means
+  // send, so older forms and the offline queue behave as before.
+  const sendReceipt = formData.get("receipt") !== "skip";
+
+  if (sendReceipt && invoice?.client?.email) {
     const receipt = await sendPaymentReceipt(
       invoice.client.email,
       invoice.client.full_name,
@@ -2112,9 +2336,26 @@ export async function deletePayment(formData: FormData): Promise<ActionResult> {
 
   const { data: invoice } = await supabase
     .from("invoices")
-    .select("status, job_id")
+    .select("status, job_id, reference, total_pence, paid_pence, client:clients(full_name, email)")
     .eq("id", payment.invoice_id)
     .maybeSingle();
+
+  if (formData.get("notify") === "on" && invoice?.client?.email) {
+    const notice = await sendDocumentNotice(
+      invoice.client.email,
+      invoice.client.full_name,
+      `Correction to invoice ${invoice.reference}`,
+      "A correction to your invoice",
+      [
+        `A payment of ${formatPence(payment.amount_pence)} was recorded against invoice ${invoice.reference} by mistake, and we have removed it.`,
+        invoice.total_pence - invoice.paid_pence > 0
+          ? `The invoice now shows ${formatPence(invoice.total_pence - invoice.paid_pence)} still to pay. Sorry for any confusion.`
+          : "Sorry for any confusion.",
+      ],
+      { href: `/invoices/view/${payment.invoice_id}`, label: "See the invoice" },
+    );
+    if (!notice.sent) console.error("[payment] correction notice did not send", notice.error);
+  }
 
   // A job marked paid because of this payment is not paid any more.
   if (invoice?.job_id && invoice.status !== "paid") {
@@ -2211,6 +2452,11 @@ export async function updateSettings(formData: FormData): Promise<ActionResult> 
 
   const supabase = await createClient();
 
+  const { data: before } = await supabase
+    .from("settings")
+    .select("vat_registered, cis_enabled, cis_deduction_rate_bp")
+    .maybeSingle();
+
   const { error } = await supabase
     .from("settings")
     .update({
@@ -2237,6 +2483,19 @@ export async function updateSettings(formData: FormData): Promise<ActionResult> 
   }
 
   await refreshUnpaidInvoicePaymentDetails(supabase);
+
+  // Drafts were priced under the old tax rules; bring them up to date.
+  if (
+    before &&
+    (before.vat_registered !== parsed.data.vat_registered ||
+      before.cis_enabled !== parsed.data.cis_enabled ||
+      before.cis_deduction_rate_bp !== parsed.data.cis_deduction_rate_bp)
+  ) {
+    const { error: recalcError } = await supabase.rpc("recalc_draft_totals");
+    if (recalcError) console.error("[settings] draft totals not recalculated", recalcError.message);
+    revalidatePath("/app/quotes");
+    revalidatePath("/app/invoices");
+  }
 
   revalidatePath("/app/settings");
   revalidatePath("/app", "layout");

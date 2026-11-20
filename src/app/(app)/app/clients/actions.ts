@@ -163,3 +163,81 @@ export async function addProperty(formData: FormData): Promise<ClientActionResul
 
   return { ok: true };
 }
+
+/**
+ * Folds a duplicate customer into the one being kept: every job, quote,
+ * invoice, address, enquiry, note and portal login moves across, then the
+ * duplicate is retired. One database transaction (merge_clients), so a merge
+ * never half-happens.
+ */
+export async function mergeClient(formData: FormData): Promise<ClientActionResult & { id?: string }> {
+  await requireOwner();
+
+  const sourceId = String(formData.get("client_id") ?? "");
+  const targetId = String(formData.get("target_id") ?? "");
+
+  if (!sourceId || !targetId) {
+    return { ok: false, errors: { target_id: "Pick the customer to keep." } };
+  }
+  if (sourceId === targetId) {
+    return { ok: false, errors: { target_id: "Pick a different customer." } };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("merge_clients", { p_source: sourceId, p_target: targetId });
+
+  if (error) {
+    console.error("[clients] merge failed", error.message);
+    return { ok: false, formError: "Could not merge those customers. Nothing was changed." };
+  }
+
+  revalidatePath("/app/clients");
+  revalidatePath(`/app/clients/${targetId}`);
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: targetId };
+}
+
+/**
+ * Removes a customer added by mistake. Only when nothing hangs off them — a
+ * customer with any job, quote or invoice is history, and merging is the way
+ * to tidy a duplicate of that kind.
+ */
+export async function deleteClient(formData: FormData): Promise<ClientActionResult> {
+  await requireOwner();
+
+  const clientId = String(formData.get("client_id") ?? "");
+  if (!clientId) return { ok: false, formError: "Missing customer." };
+
+  const supabase = await createClient();
+
+  const [{ count: jobs }, { count: quotes }, { count: invoices }] = await Promise.all([
+    supabase.from("jobs").select("id", { count: "exact", head: true }).eq("client_id", clientId).is("deleted_at", null),
+    supabase.from("quotes").select("id", { count: "exact", head: true }).eq("client_id", clientId).is("deleted_at", null),
+    supabase.from("invoices").select("id", { count: "exact", head: true }).eq("client_id", clientId).is("deleted_at", null),
+  ]);
+
+  if ((jobs ?? 0) + (quotes ?? 0) + (invoices ?? 0) > 0) {
+    return {
+      ok: false,
+      formError:
+        "This customer has jobs, quotes or invoices, so they stay on file. If they are a duplicate, merge them into the right customer instead.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", clientId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("[clients] delete failed", error.message);
+    return { ok: false, formError: "Could not delete that customer. Try again." };
+  }
+
+  revalidatePath("/app/clients");
+  revalidatePath("/app", "layout");
+
+  return { ok: true };
+}

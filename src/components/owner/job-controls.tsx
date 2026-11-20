@@ -5,6 +5,7 @@ import {
   CalendarPlusIcon,
   CheckIcon,
   NotePencilIcon,
+  ReceiptIcon,
   TrashIcon,
   WarningIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -33,6 +34,7 @@ import {
   todayInLondon,
 } from "@/lib/dates";
 import { cn } from "@/lib/cn";
+import Link from "next/link";
 import type { JobStatus } from "@/types/database";
 
 /**
@@ -51,9 +53,11 @@ const nextSteps: Record<JobStatus, JobStatus[]> = {
   declined: ["quoted", "cancelled"],
   scheduled: ["in_progress", "completed", "cancelled"],
   in_progress: ["completed", "cancelled"],
-  completed: ["invoiced", "in_progress", "cancelled"],
-  invoiced: ["paid", "completed", "cancelled"],
-  paid: ["invoiced"],
+  // "Invoice sent" and "Paid" are not offered as taps. They follow the real
+  // invoice and payment, so the job can never say Paid with no money in.
+  completed: ["in_progress", "cancelled"],
+  invoiced: ["cancelled"],
+  paid: [],
   cancelled: ["new"],
 };
 
@@ -70,7 +74,7 @@ const nextSteps: Record<JobStatus, JobStatus[]> = {
 const primaryStep: Partial<Record<JobStatus, { to: JobStatus; label: string }>> = {
   scheduled: { to: "in_progress", label: "Start work" },
   in_progress: { to: "completed", label: "Mark finished" },
-  completed: { to: "invoiced", label: "Invoice it" },
+  // completed: handled below as a link to the invoice screen, not a status tap.
 };
 
 /**
@@ -82,7 +86,8 @@ const primaryStep: Partial<Record<JobStatus, { to: JobStatus; label: string }>> 
  */
 const needsCare: Partial<Record<JobStatus, string>> = {
   completed: "This tells the customer their job is done.",
-  cancelled: "This closes the job off.",
+  cancelled:
+    "This closes the job off. Any quote still waiting on an answer is withdrawn and days booked from today are taken out of the diary. The customer is not emailed.",
 };
 
 export function JobStatusControl({
@@ -102,6 +107,7 @@ export function JobStatusControl({
   /** The move being confirmed, or null when nothing is pending. */
   const [confirming, setConfirming] = useState<JobStatus | null>(null);
   const [note, setNote] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
 
   const primary = primaryStep[status];
   const options = nextSteps[status] ?? [];
@@ -134,6 +140,7 @@ export function JobStatusControl({
       setShowAll(false);
       setConfirming(null);
       setNote("");
+      setNotice(result.warning ?? null);
     });
   }
 
@@ -158,7 +165,7 @@ export function JobStatusControl({
 
           <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-ink">
             {needsCare[confirming]}
-            {clientName ? ` ${clientName} will be told.` : ""}
+            {confirming === "completed" && clientName ? ` ${clientName} will be told.` : ""}
           </p>
 
           {confirming === "completed" ? (
@@ -216,6 +223,24 @@ export function JobStatusControl({
         >
           {primary.label}
         </Button>
+      ) : null}
+
+      {/* A finished job's next move is an invoice, and the invoice moves the
+          status. Tapping a status here used to say "Invoice sent" with none. */}
+      {status === "completed" && !confirming ? (
+        <Link
+          href={`/app/jobs/${jobId}/invoice`}
+          className={cn(buttonClasses({ size: "lg" }), "mt-4 w-full")}
+        >
+          <ReceiptIcon size={19} weight="fill" aria-hidden="true" />
+          Invoice it
+        </Link>
+      ) : null}
+
+      {notice ? (
+        <p role="status" className="mt-4 rounded-md border border-caution/30 bg-caution-soft px-4 py-3 text-[0.9375rem] text-caution-ink">
+          {notice}
+        </p>
       ) : null}
 
       {/* An accepted job's next move is a date, not a status. */}

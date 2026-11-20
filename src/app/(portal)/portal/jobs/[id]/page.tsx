@@ -202,7 +202,9 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
 
               {job.service ? <DetailRow label="Type of work">{job.service.name}</DetailRow> : null}
 
-              {job.scheduled_start ? (
+              {/* A cancelled job is not coming: no "Booked for" on it, even if
+                  a past day is still on record. */}
+              {job.scheduled_start && job.status !== "cancelled" ? (
                 <DetailRow label={(visits ?? []).length > 1 ? "Next with you" : "Booked for"}>
                   {formatDateTime(job.scheduled_start)}
                   {job.duration_minutes ? (
@@ -273,7 +275,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
             refurbishment that runs for weeks — it is the list the booking email
             promises, and the answer to the question customers ring about most.
           */}
-          {(visits ?? []).length > 1 ? (
+          {(visits ?? []).length > 1 && job.status !== "cancelled" ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">When we are with you</h2>
 

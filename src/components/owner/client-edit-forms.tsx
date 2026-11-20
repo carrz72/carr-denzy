@@ -2,11 +2,19 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckIcon, FloppyDiskIcon, PlusIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowsMergeIcon,
+  CheckIcon,
+  FloppyDiskIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
-import { FormError, TextAreaField, TextField } from "@/components/ui/field";
+import { FormError, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import {
   addProperty,
+  deleteClient,
+  mergeClient,
   updateClientDetails,
   updateProperty,
   type ClientActionResult,
@@ -269,6 +277,146 @@ export function AddPropertyDisclosure({ clientId }: { clientId: string }) {
       <Button variant="quiet" onClick={() => setOpen(false)} className="self-start">
         Never mind
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Tidying up a customer record: merge a duplicate into the right customer, or
+ * delete one added by mistake. Both behind a confirm that says exactly what
+ * happens, because neither can be undone from the app.
+ */
+export function CustomerHousekeeping({
+  clientId,
+  clientName,
+  others,
+  canDelete,
+}: {
+  clientId: string;
+  clientName: string;
+  others: { id: string; full_name: string; phone: string | null }[];
+  canDelete: boolean;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [mode, setMode] = useState<"merge" | "delete" | null>(null);
+  const [targetId, setTargetId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const target = others.find((other) => other.id === targetId);
+
+  function run() {
+    setError(null);
+    const formData = new FormData();
+    formData.set("client_id", clientId);
+    if (mode === "merge") formData.set("target_id", targetId);
+
+    startTransition(async () => {
+      if (mode === "merge") {
+        const result = await mergeClient(formData);
+        if (!result.ok) {
+          setError(result.errors?.target_id ?? result.formError ?? "Could not merge.");
+          return;
+        }
+        router.push(`/app/clients/${targetId}`);
+      } else {
+        const result = await deleteClient(formData);
+        if (!result.ok) {
+          setError(result.formError ?? "Could not delete.");
+          return;
+        }
+        router.push("/app/clients");
+      }
+    });
+  }
+
+  if (mode === "merge") {
+    return (
+      <div className="flex flex-col gap-4">
+        <SelectField
+          name="target_id"
+          label="Merge into"
+          hint={`Everything for ${clientName} moves onto this customer, and ${clientName} is removed.`}
+          value={targetId}
+          onChange={(event) => setTargetId(event.target.value)}
+        >
+          <option value="">Pick the customer to keep</option>
+          {others.map((other) => (
+            <option key={other.id} value={other.id}>
+              {other.full_name}
+              {other.phone ? ` — ${other.phone}` : ""}
+            </option>
+          ))}
+        </SelectField>
+
+        {target ? (
+          <p className="text-[0.9375rem] leading-relaxed text-ink-muted">
+            All of {clientName}&apos;s jobs, quotes, invoices, addresses and notes move to{" "}
+            <strong className="text-ink">{target.full_name}</strong>. Sent invoices keep the name
+            they were sent with. This cannot be undone.
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="destructive"
+            disabled={!target}
+            loading={isPending}
+            onClick={run}
+            icon={<ArrowsMergeIcon size={18} />}
+          >
+            Merge them
+          </Button>
+          <Button variant="quiet" onClick={() => setMode(null)}>
+            Never mind
+          </Button>
+        </div>
+        <FormError message={error} />
+      </div>
+    );
+  }
+
+  if (mode === "delete") {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-[0.9375rem] leading-relaxed text-ink-muted">
+          Delete {clientName}? They have no jobs, quotes or invoices, so nothing else is affected.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="destructive" loading={isPending} onClick={run} icon={<TrashIcon size={18} />}>
+            Yes, delete them
+          </Button>
+          <Button variant="quiet" onClick={() => setMode(null)}>
+            Keep them
+          </Button>
+        </div>
+        <FormError message={error} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {others.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => setMode("merge")}
+          className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-medium text-ink-subtle hover:text-ink"
+        >
+          <ArrowsMergeIcon size={16} aria-hidden="true" />
+          Entered twice? Merge into another customer
+        </button>
+      ) : null}
+      {canDelete ? (
+        <button
+          type="button"
+          onClick={() => setMode("delete")}
+          className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-medium text-ink-subtle hover:text-critical"
+        >
+          <TrashIcon size={16} aria-hidden="true" />
+          Delete this customer
+        </button>
+      ) : null}
     </div>
   );
 }

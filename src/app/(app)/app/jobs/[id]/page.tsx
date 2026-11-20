@@ -6,6 +6,7 @@ import {
   EnvelopeSimpleIcon,
   FileTextIcon,
   MapPinIcon,
+  PencilSimpleIcon,
   PhoneIcon,
   ReceiptIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -113,12 +114,13 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
   // delete button is never offered and then refused — the same rule the action
   // enforces server-side.
   const sentQuote = (quotes ?? []).some((quote) => quote.status !== "draft");
-  const hasInvoice = (invoices ?? []).length > 0;
+  // Drafts never left the account, so they go with the job like draft quotes.
+  const hasInvoice = (invoices ?? []).some((invoice) => invoice.status !== "draft");
 
   const deleteBlockedReason = sentQuote
     ? "This job has a quote the customer has already been sent."
     : hasInvoice
-      ? "This job has an invoice on it."
+      ? "This job has an invoice the customer has been sent, even if it was later cancelled."
       : null;
 
   return (
@@ -137,7 +139,18 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-8">
         <div className="flex min-w-0 flex-col gap-6">
           <Card>
-            <h2 className="text-label uppercase text-ink-subtle">The job</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-label uppercase text-ink-subtle">The job</h2>
+              {user?.role === "owner" ? (
+                <Link
+                  href={`/app/jobs/${job.id}/edit`}
+                  className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-accent hover:underline hover:underline-offset-4"
+                >
+                  <PencilSimpleIcon size={15} aria-hidden="true" />
+                  Edit
+                </Link>
+              ) : null}
+            </div>
 
             {job.description ? (
               <p className="mt-3 whitespace-pre-wrap leading-relaxed text-ink">
