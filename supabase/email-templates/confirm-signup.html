@@ -1,4 +1,12 @@
 <!--
+  The button links straight to the app with a token hash, not to
+  {{ .ConfirmationURL }}. That one goes through Supabase and comes back
+  with a PKCE code that only works in the browser that asked for the link,
+  so a link requested in the home-screen app and opened in Safari, or asked
+  for on a phone and opened on a PC, failed as "invalid". It also fell back
+  to the dashboard Site URL whenever the return address did not match the
+  allow list. src/app/auth/callback/route.ts verifies token_hash directly.
+
   Supabase → Authentication → Email Templates → "Confirm signup"
 
   DO NOT SKIP THIS ONE.
@@ -44,7 +52,7 @@
           </p>
 
           <p style="margin:24px 0;">
-            <a href="{{ .ConfirmationURL }}"
+            <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email"
                style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:600;font-size:15px;">
               Sign me in
             </a>
