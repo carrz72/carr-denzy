@@ -1,12 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { EnvelopeSimpleIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  ClipboardTextIcon,
+  EnvelopeSimpleIcon,
+  EnvelopeOpenIcon,
+  PaperPlaneTiltIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
 import { FormError, TextField } from "@/components/ui/field";
 import { createClient } from "@/lib/supabase/client";
 import { finishSignIn } from "@/app/auth/complete/actions";
+
+/** Digits in the emailed code (Supabase: Auth → Email → Email OTP length). */
+const CODE_LENGTH = 8;
+
+/** Where this device remembers the last email used, like any other site. */
+const EMAIL_KEY = "carr-denzy:last-email";
+
+/** Digits only, so a code pasted as "1234 5678" or "Your code is 12345678" still works. */
+function cleanCode(raw: string): string {
+  return raw.replace(/\D/g, "").slice(0, CODE_LENGTH);
+}
+
+function isGmail(address: string): boolean {
+  return /@(gmail|googlemail)\.com$/i.test(address.trim());
+}
+
+/** The Gmail app on an iPhone opens from its own link; everywhere else, the website. */
+function gmailHref(): string {
+  if (typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    return "googlegmail://";
+  }
+  return "https://mail.google.com/mail/";
+}
 
 const errorMessages: Record<string, string> = {
   expired: "That sign-in link has expired. Put your email in again and we will send a fresh one.",
@@ -43,6 +71,20 @@ export function SignInForm({
   const [code, setCode] = useState("");
   const [codeBusy, setCodeBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | undefined>();
+  const [canPaste, setCanPaste] = useState(false);
+
+  // Remember the email on this device, the way other sites do, so next time
+  // it is already filled in. Only ever in this browser; never sent anywhere.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(EMAIL_KEY);
+      if (saved) setEmail(saved);
+    } catch {
+      // Private browsing or blocked storage: just start empty.
+    }
+    setCanPaste(typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function");
+  }, []);
+
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,9 +117,17 @@ export function SignInForm({
         return;
       }
 
+      try {
+        window.localStorage.setItem(EMAIL_KEY, trimmed);
+      } catch {
+        // Not remembered this time; nothing else depends on it.
+      }
+
       // Always report success, even for an address with no account. Saying
       // "no such user" would let anyone test whether a given email is a
       // customer of ours.
+      setCode("");
+      setCodeError(undefined);
       setSent(true);
     } catch {
       setFormError(
@@ -93,9 +143,35 @@ export function SignInForm({
   // reaches the app. Typing the code back in here avoids that switch entirely.
   async function handleVerifyCode(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await verifyCode(code);
+  }
+
+  // Typing or pasting the last digit signs you in; no button press needed.
+  function changeCode(raw: string) {
+    const next = cleanCode(raw);
+    setCode(next);
+    setCodeError(undefined);
+    if (next.length === CODE_LENGTH && !codeBusy) void verifyCode(next);
+  }
+
+  async function pasteCode() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const next = cleanCode(text);
+      if (!next) {
+        setCodeError("There is no code on your clipboard. Copy it from the email first.");
+        return;
+      }
+      changeCode(next);
+    } catch {
+      setCodeError("Your browser would not let us paste. Long-press the box and choose Paste.");
+    }
+  }
+
+  async function verifyCode(value: string) {
     setCodeError(undefined);
 
-    const trimmedCode = code.trim();
+    const trimmedCode = cleanCode(value);
 
     if (!trimmedCode) {
       setCodeError("Enter the code from the email");
@@ -142,24 +218,52 @@ export function SignInForm({
 
         <p className="mt-3 leading-relaxed text-ink-muted">
           If we have an account for <strong className="text-ink">{email.trim()}</strong>,
-          a sign-in link is on its way. It works once and lasts an hour.
+          we have emailed a code. It is in the subject line too, so you can usually read
+          it straight from the notification.
         </p>
+
+        {isGmail(email) ? (
+          <a
+            href={gmailHref()}
+            target="_blank"
+            rel="noopener"
+            className="mt-4 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:underline hover:underline-offset-4"
+          >
+            <EnvelopeOpenIcon size={18} aria-hidden="true" />
+            Open Gmail
+          </a>
+        ) : null}
 
         <form onSubmit={handleVerifyCode} noValidate className="mt-6 flex flex-col gap-3 text-left">
           <TextField
+            autoFocus
             name="code"
-            label="Or enter the code from the email"
-            hint="Using the installed app? The link opens in your browser instead, so type the code here to stay signed in on the app."
+            label="Enter the code"
+            hint="It signs you in as soon as the last digit goes in. Tapping the link in the email works too, but in the installed app the code keeps you signed in on the app."
             inputMode="numeric"
             autoComplete="one-time-code"
-            placeholder="123456"
+            pattern="[0-9]*"
+            maxLength={CODE_LENGTH + 4}
+            placeholder={"•".repeat(CODE_LENGTH)}
+            className="text-center font-mono text-2xl tracking-[0.3em]"
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => changeCode(event.target.value)}
             error={codeError}
           />
 
-          <Button type="submit" loading={codeBusy} loadingLabel="Checking…">
-            Confirm code
+          {canPaste ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={pasteCode}
+              icon={<ClipboardTextIcon size={18} />}
+            >
+              Paste code
+            </Button>
+          ) : null}
+
+          <Button type="submit" loading={codeBusy} loadingLabel="Signing you in…">
+            Sign in
           </Button>
         </form>
 
@@ -201,10 +305,10 @@ export function SignInForm({
         size="lg"
         fullWidth
         loading={busy}
-        loadingLabel="Sending your link…"
+        loadingLabel="Sending your code…"
         icon={<EnvelopeSimpleIcon size={19} />}
       >
-        Email me a sign-in link
+        Email me a sign-in code
       </Button>
     </form>
   );
