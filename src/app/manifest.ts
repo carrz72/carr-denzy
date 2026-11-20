@@ -11,7 +11,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Carrdenzy Heating & Gas",
-    short_name: "Carr Denzy",
+    short_name: "Carrdenzy",
     description:
       "Jobs, quotes and invoices for Carrdenzy Heating & Gas — works with no signal.",
     start_url: "/app",

@@ -375,7 +375,7 @@ export default async function HomePage() {
               <div className="overflow-hidden rounded-xl shadow-lifted">
                 <Image
                   src="/images/work-05.webp"
-                  alt="A Carr Denzy engineer working on a domestic heating system"
+                  alt="A Carrdenzy engineer working on a domestic heating system"
                   width={900}
                   height={700}
                   sizes="(min-width: 1024px) 50vw, 100vw"

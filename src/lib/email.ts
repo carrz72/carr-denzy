@@ -27,7 +27,7 @@ export interface SendResult {
   error?: string;
 }
 
-const from = process.env.EMAIL_FROM ?? "Carr Denzy <onboarding@resend.dev>";
+const from = process.env.EMAIL_FROM ?? "Carrdenzy <onboarding@resend.dev>";
 
 function siteUrl(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -400,7 +400,7 @@ export async function sendPortalInvite(
     `Carrdenzy Heating & Gas · ${await businessPhone()}`,
   ].join("\n");
 
-  return send(to, "See your jobs with Carr Denzy online", html, text);
+  return send(to, "See your jobs with Carrdenzy online", html, text);
 }
 
 export async function sendQuoteToClient(

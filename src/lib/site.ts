@@ -15,14 +15,14 @@
 
 export const business = {
   name: "Carrdenzy Heating & Gas",
-  shortName: "Carr Denzy",
+  shortName: "Carrdenzy",
   // Fallback only — the live value comes from Settings via getBusiness().
   // Kept in step with it deliberately: this is what the public site shows if
   // the database is ever unreachable, so a wrong number here is a silent
   // failure that only appears on the worst day.
   phone: "07938 463358",
   phoneHref: "tel:+447938463358",
-  email: "carrdenzy@gmail.com",
+  email: "carrdenz@gmail.com",
   /**
    * The Google Business Profile's own "leave a review" link (Ask for reviews
    * in the profile). Opens the star rating straight away, signed in or not.

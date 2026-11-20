@@ -64,7 +64,7 @@ export function AppShell({
 
             <span className="flex flex-col leading-none">
               <span className="sign whitespace-nowrap text-[0.8125rem] text-ink">
-                Carr Denzy
+                Carrdenzy
               </span>
               <span className="mt-0.5 text-[0.6875rem] text-ink-subtle">{brandLabel}</span>
             </span>

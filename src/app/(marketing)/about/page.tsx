@@ -43,7 +43,7 @@ export default function AboutPage() {
           </h1>
 
           <p className="container-prose mt-5 text-lg leading-relaxed text-ink-muted">
-            Carr Denzy started as one van and a mobile number. It is now a small team of
+            Carrdenzy started as one van and a mobile number. It is now a small team of
             Gas Safe registered engineers and builders working across Nottingham, and the way
             we work has not really changed: turn up when we said, explain what we found,
             and charge what we quoted.
@@ -58,7 +58,7 @@ export default function AboutPage() {
               <div className="overflow-hidden rounded-xl shadow-lifted">
                 <Image
                   src="/images/work-05.webp"
-                  alt="A Carr Denzy engineer working on a domestic heating system"
+                  alt="A Carrdenzy engineer working on a domestic heating system"
                   width={900}
                   height={1100}
                   sizes="(min-width: 1024px) 45vw, 100vw"

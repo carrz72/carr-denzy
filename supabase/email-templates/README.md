@@ -23,8 +23,8 @@ Supabase has no way to load these from the repo, so they are pasted in by hand.
 
 3. Set the subject lines too — they are a separate field above the body:
 
-   - Confirm signup → `Your sign-in link for Carr Denzy`
-   - Magic Link → `Your sign-in link for Carr Denzy`
+   - Confirm signup → `Your sign-in link for Carrdenzy`
+   - Magic Link → `Your sign-in link for Carrdenzy`
    - Change Email Address → `Confirm your new email address`
 
 **Do not skip "Confirm signup".** It is tempting to think only Magic Link

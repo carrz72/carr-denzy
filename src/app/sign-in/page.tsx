@@ -6,7 +6,7 @@ import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to your Carr Denzy account to see your jobs, quotes and invoices.",
+  description: "Sign in to your Carrdenzy account to see your jobs, quotes and invoices.",
   robots: { index: false, follow: false },
 };
 

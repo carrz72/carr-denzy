@@ -52,11 +52,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: "Carrdenzy Heating & Gas — plumbers, heating and building repairs",
-    template: "%s · Carr Denzy",
+    template: "%s · Carrdenzy",
   },
   description:
     "Gas Safe registered plumbers covering Nottingham and the surrounding areas. Leaks and repairs, boiler servicing, heating, bathrooms and building work. Same-day emergency call-outs.",
-  applicationName: "Carr Denzy",
+  applicationName: "Carrdenzy",
   keywords: [
     "plumber Nottingham",
     "Gas Safe engineer",
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
     title: "Carrdenzy Heating & Gas",
     description:
       "Gas Safe registered plumbers covering Nottingham. Leaks, boilers, heating, bathrooms and building work.",
-    images: [{ url: "/images/work-33.webp", width: 1200, height: 630, alt: "Carr Denzy at work" }],
+    images: [{ url: "/images/work-33.webp", width: 1200, height: 630, alt: "Carrdenzy at work" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -85,7 +85,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Carr Denzy",
+    title: "Carrdenzy",
     statusBarStyle: "default",
   },
   /**

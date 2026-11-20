@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 
 /**
- * Carr Denzy service worker.
+ * Carrdenzy service worker.
  *
  * Three jobs, and deliberately no more:
  *
@@ -25,7 +25,7 @@
  */
 
 // Bumped when the cached asset set changes. Old caches are swept on activate.
-const VERSION = "v4";
+const VERSION = "v5";
 const ASSET_CACHE = `carr-denzy-assets-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
@@ -213,7 +213,7 @@ self.addEventListener("push", (event) => {
   // penalise — and on some platforms forcibly display a generic notification
   // for — a push event that shows nothing at all, so there is no silent path.
   let data = {
-    title: "Carr Denzy",
+    title: "Carrdenzy",
     body: "Something needs your attention.",
     url: "/app",
     tag: "carr-denzy",
