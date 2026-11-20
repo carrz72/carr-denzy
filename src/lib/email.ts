@@ -3,6 +3,7 @@ import "server-only";
 import { Resend } from "resend";
 
 import { getBusiness } from "@/lib/business";
+import { business } from "@/lib/site";
 import { formatPence } from "@/lib/money";
 import { formatWorkingDayRange } from "@/lib/dates";
 import { addressName } from "@/lib/names";
@@ -525,6 +526,14 @@ export async function sendPaymentReceipt(
   const amount = formatPence(amountPence);
   const outstanding = formatPence(outstandingPence);
 
+  // Paid in full is the moment the job is properly over, and the moment a
+  // happy customer is most likely to say so. Only then: a review request on a
+  // part payment reads as asking for praise before the work is settled.
+  const reviewHtml = settled
+    ? `<p style="margin:24px 0 8px;font-size:15px;line-height:1.6;">If you were happy with the work, a Google review would mean a lot. It takes a minute and helps people nearby find us.</p>
+     <p style="margin:0 0 8px;font-size:15px;line-height:1.6;"><a href="${business.googleReviewUrl}" style="color:#be4a33;font-weight:600;">Leave a Google review</a></p>`
+    : "";
+
   const closing = settled
     ? "That settles the invoice in full — there is nothing more to pay. Thank you."
     : `That leaves <strong>${esc(outstanding)}</strong> outstanding on this invoice.`;
@@ -538,7 +547,8 @@ export async function sendPaymentReceipt(
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(fullName)},</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">We have received your payment of <strong>${esc(amount)}</strong> against invoice <strong>${esc(reference)}</strong>.</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${closing}</p>
-     ${button(`${siteUrl()}/invoices/view/${invoiceId}`, "See the invoice")}`,
+     ${button(`${siteUrl()}/invoices/view/${invoiceId}`, "See the invoice")}
+     ${reviewHtml}`,
   );
 
   const text = [
@@ -549,6 +559,9 @@ export async function sendPaymentReceipt(
     closingText,
     "",
     `See the invoice: ${siteUrl()}/invoices/view/${invoiceId}`,
+    ...(settled
+      ? ["", `Happy with the work? A Google review helps people nearby find us: ${business.googleReviewUrl}`]
+      : []),
     "",
     `Carrdenzy Heating & Gas · ${await businessPhone()}`,
   ].join("\n");

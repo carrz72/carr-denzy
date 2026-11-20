@@ -24,6 +24,11 @@ export const business = {
   phoneHref: "tel:+447938463358",
   email: "carrdenzy@gmail.com",
   /**
+   * The Google Business Profile's own "leave a review" link (Ask for reviews
+   * in the profile). Opens the star rating straight away, signed in or not.
+   */
+  googleReviewUrl: "https://g.page/r/CSEn0xZeHNTdEBM/review",
+  /**
    * Locality and region only, with no street address — deliberately.
    *
    * This is a mobile trade business working out of a van. There is no premises

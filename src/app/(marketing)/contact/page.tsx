@@ -6,6 +6,7 @@ import {
   EnvelopeSimpleIcon,
   MapPinIcon,
   PhoneIcon,
+  StarIcon,
   WarningIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
@@ -130,6 +131,30 @@ export default async function ContactPage() {
                   </p>
                 </div>
               </div>
+
+              {/* For customers who have already had the work done. Most people
+                  choose a trade by its Google reviews, and a local firm with
+                  a handful of them is easy to pass over. */}
+              <a
+                href={business.googleReviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-start gap-4 rounded-xl border border-line bg-surface-raised p-5 transition-colors hover:border-accent-line"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                  <StarIcon size={22} weight="fill" aria-hidden="true" />
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-ink-muted">Had work done by us?</p>
+                  <p className="mt-0.5 font-medium text-ink group-hover:underline group-hover:underline-offset-4">
+                    Leave us a Google review
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-subtle">
+                    It takes a minute and helps people nearby find a trade they can trust.
+                  </p>
+                </div>
+              </a>
             </div>
           </div>
 

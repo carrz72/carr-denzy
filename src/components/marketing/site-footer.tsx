@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EnvelopeSimpleIcon, MapPinIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
+import { EnvelopeSimpleIcon, MapPinIcon, PhoneIcon, StarIcon } from "@phosphor-icons/react/dist/ssr";
 import { business, services } from "@/lib/site";
 import type { BusinessContact } from "@/lib/business";
 
@@ -53,6 +53,18 @@ export function SiteFooter({ contact }: { contact: BusinessContact }) {
                   {business.address.city}, {business.address.region}
                 </span>
               </p>
+
+              <a
+                href={business.googleReviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex min-h-11 items-center gap-2.5 self-start text-ink-muted"
+              >
+                <StarIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
+                <span className="group-hover:underline group-hover:underline-offset-4">
+                  Leave us a Google review
+                </span>
+              </a>
             </div>
           </div>
 
