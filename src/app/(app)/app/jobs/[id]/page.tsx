@@ -110,6 +110,14 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
 
   const acceptedQuote = (quotes ?? []).find((quote) => quote.status === "accepted");
 
+  // Nothing open, but an earlier quote that ran out, was turned down or was
+  // withdrawn: the job came back, so offer to start from what was quoted.
+  // Quotes are newest first, so this is the most recent one.
+  const hasOpenQuote = (quotes ?? []).some((quote) => ["draft", "sent", "accepted"].includes(quote.status));
+  const lastClosedQuote = hasOpenQuote
+    ? null
+    : ((quotes ?? []).find((quote) => ["declined", "expired", "withdrawn"].includes(quote.status)) ?? null);
+
   // Whether this job can be swept up as a mistake, or has to be cancelled
   // because the customer has already seen something. Worked out here so the
   // delete button is never offered and then refused — the same rule the action
@@ -365,6 +373,16 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
                 ))}
               </ul>
             )}
+
+            {lastClosedQuote && job.status !== "declined" ? (
+              <Link
+                href={`/app/jobs/${job.id}/quote?from=${lastClosedQuote.id}`}
+                className={buttonClasses({ fullWidth: true, className: "mt-4" })}
+              >
+                <FileTextIcon size={18} aria-hidden="true" />
+                Start from {lastClosedQuote.reference}
+              </Link>
+            ) : null}
           </Card>
 
           <Card>

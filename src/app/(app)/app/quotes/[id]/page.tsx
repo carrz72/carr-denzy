@@ -205,10 +205,30 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                 You took this quote back, so the customer can no longer accept it.
               </p>
               <Link
-                href={`/app/jobs/${quote.job_id}/quote`}
+                href={`/app/jobs/${quote.job_id}/quote?from=${quote.id}`}
                 className={buttonClasses({ variant: "secondary", fullWidth: true, className: "mt-5" })}
               >
-                Write a new quote
+                Copy into a new quote
+              </Link>
+            </Card>
+          ) : null}
+
+          {/* Ran out unanswered. The customer may still come back: start a
+              fresh quote from this one rather than typing it all again. */}
+          {quote.status === "expired" ? (
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">Ran out</h2>
+              <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
+                {quote.valid_until
+                  ? `This quote was open until ${formatDate(quote.valid_until)} and was not answered.`
+                  : "This quote ran out without an answer."}{" "}
+                If the customer comes back, copy it into a new quote and send that.
+              </p>
+              <Link
+                href={`/app/jobs/${quote.job_id}/quote?from=${quote.id}`}
+                className={buttonClasses({ variant: "secondary", fullWidth: true, className: "mt-5" })}
+              >
+                Copy into a new quote
               </Link>
             </Card>
           ) : null}
@@ -254,7 +274,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                   : "They declined without leaving a reason."}
               </p>
               <Link
-                href={`/app/jobs/${quote.job_id}/quote`}
+                href={`/app/jobs/${quote.job_id}/quote?from=${quote.id}`}
                 className={buttonClasses({ variant: "secondary", fullWidth: true, className: "mt-5" })}
               >
                 Quote it again
