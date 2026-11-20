@@ -78,8 +78,10 @@
   --color-info-ink: #2a4351;
 
   /* --- Type ------------------------------------------------------------- */
-  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-zilla), ui-serif, Georgia, serif;
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Wide, heavy signwriting face for the wordmark, phone numbers and labels. */
+  --font-sign: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   /* Display sizes carry negative tracking; small labels carry positive. */
@@ -95,22 +97,22 @@
      survives at 320px rather than collapsing into one size. */
   --text-display: clamp(2.5rem, 1.6rem + 4.5vw, 4rem);
   --text-display--line-height: 1.04;
-  --text-display--letter-spacing: -0.035em;
+  --text-display--letter-spacing: -0.015em;
   --text-display--font-weight: 700;
 
   --text-title: clamp(1.875rem, 1.35rem + 2.6vw, 2.5rem);
   --text-title--line-height: 1.12;
-  --text-title--letter-spacing: -0.028em;
+  --text-title--letter-spacing: -0.01em;
   --text-title--font-weight: 700;
 
   --text-heading: clamp(1.375rem, 1.2rem + 0.85vw, 1.625rem);
   --text-heading--line-height: 1.2;
-  --text-heading--letter-spacing: -0.02em;
-  --text-heading--font-weight: 650;
+  --text-heading--letter-spacing: -0.005em;
+  --text-heading--font-weight: 600;
 
   --text-subheading: 1.1875rem;
   --text-subheading--line-height: 1.32;
-  --text-subheading--letter-spacing: -0.012em;
+  --text-subheading--letter-spacing: 0em;
   --text-subheading--font-weight: 600;
 
   --text-label: 0.75rem;
@@ -477,7 +479,61 @@
   }
 }
 
+/* Hero entrance: the photo settles, then the words land in reading order. */
+@keyframes settle {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* The phone bar slides in like a van pulling up. */
+@keyframes pull-up {
+  from {
+    opacity: 0;
+    transform: translateX(-2.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @layer utilities {
+  /* Van-door signwriting: wide, heavy, upper case. */
+  .sign {
+    font-family: var(--font-sign);
+    font-weight: 800;
+    font-stretch: 125%;
+    font-variation-settings: "wdth" 125;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+
+  .animate-settle {
+    animation: settle 1400ms var(--ease-out-soft) both;
+  }
+
+  .animate-pull-up {
+    animation: pull-up 700ms var(--ease-out-soft) both;
+  }
+
+  /* Scroll reveal, as an enhancement only: everything is fully visible by
+     default, and only browsers with scroll-driven animations (and no
+     reduced-motion preference) fade sections up as they arrive. Nothing is
+     hidden waiting for JavaScript or an observer to fire. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .reveal {
+        animation: rise-in linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 40%;
+      }
+    }
+  }
+
   /* Transform and opacity only — both run on the compositor. Animating top,
      left, width or height forces layout on every frame. */
   .animate-rise {

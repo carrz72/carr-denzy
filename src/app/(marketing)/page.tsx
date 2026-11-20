@@ -97,9 +97,10 @@ export default async function HomePage() {
   return (
     <>
       {/* ---------------------------------------------------------------
-          Hero. Photography with a warm scrim rather than a flat colour
-          block — the imagery is the credibility, and a plumber's site
-          that shows no actual work is asking to be distrusted.
+          Hero. A real job, lightly shaded so the words read. On first load
+          the photograph settles and the words land in reading order. The
+          imagery is the credibility: a plumber's site that shows no actual
+          work is asking to be distrusted.
           --------------------------------------------------------------- */}
       <section className="relative isolate overflow-hidden">
         <Image
@@ -108,32 +109,31 @@ export default async function HomePage() {
           fill
           priority
           sizes="100vw"
-          className="-z-10 object-cover"
+          className="animate-settle -z-10 object-cover"
         />
 
         {/* Scrim tinted from the palette's ink, not neutral black, so the
             photograph belongs to the page rather than sitting on top of it. */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,color-mix(in_srgb,var(--color-scrim)_94%,transparent)_0%,color-mix(in_srgb,var(--color-scrim)_82%,transparent)_42%,color-mix(in_srgb,var(--color-scrim)_42%,transparent)_72%,color-mix(in_srgb,var(--color-scrim)_28%,transparent)_100%)]"
+          className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,color-mix(in_srgb,var(--color-scrim)_90%,transparent)_0%,color-mix(in_srgb,var(--color-scrim)_74%,transparent)_40%,color-mix(in_srgb,var(--color-scrim)_30%,transparent)_70%,color-mix(in_srgb,var(--color-scrim)_8%,transparent)_100%)]"
         />
 
         <div className="container-page">
           <div className="flex min-h-[max(34rem,72dvh)] flex-col justify-center py-20 md:py-28">
-            <div className="max-w-2xl">
-              <p className="flex items-center gap-2.5 text-label uppercase text-ink-inverse-strong">
-                <SealCheckIcon size={17} weight="fill" className="text-accent" aria-hidden="true" />
-                Gas Safe registered · since {business.established}
+            <div className="stagger max-w-2xl">
+              <p className="flex items-center gap-2.5 font-display text-lg font-semibold text-ink-inverse-strong">
+                <SealCheckIcon size={19} weight="fill" className="text-accent" aria-hidden="true" />
+                Est. {business.established} · Gas Safe registered
               </p>
 
-              <h1 className="mt-5 font-display text-[clamp(2.5rem,7vw,4.25rem)] font-bold leading-[1.02] tracking-[-0.035em] text-white">
-                When something has gone wrong with the water, the heating or the gas.
+              <h1 className="mt-4 font-display text-[clamp(2.6rem,7.5vw,4.5rem)] font-bold leading-[1.02] tracking-[-0.015em] text-white">
+                Plumbers and builders you can actually get hold of.
               </h1>
 
               <p className="mt-6 max-w-xl text-[1.0625rem] leading-relaxed text-ink-inverse-muted sm:text-lg">
-                We are plumbers and builders working across Nottingham. Send a photo of the
-                problem and we will tell you what it needs and what it costs — before
-                anyone turns up at your door.
+                We work across Nottingham. Send a photo of the problem and we will tell
+                you what it needs and what it costs, before anyone comes out.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -177,6 +177,24 @@ export default async function HomePage() {
               </ul>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------
+          The number, painted on like a van door. It is what most visitors
+          came for, so it is the biggest thing after the photograph.
+          --------------------------------------------------------------- */}
+      <section aria-label="Phone" className="overflow-hidden bg-accent text-white">
+        <div className="container-page flex flex-col gap-1.5 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:py-6">
+          <p className="sign text-[0.7rem] tracking-[0.16em] text-white">
+            Plumbing · Heating · Building · Nottingham
+          </p>
+          <a
+            href={contact.phoneHref}
+            className="sign animate-pull-up tabular text-[clamp(1.9rem,7.5vw,3.25rem)] leading-none text-white [animation-delay:500ms] hover:underline hover:decoration-2 hover:underline-offset-8"
+          >
+            {contact.phone}
+          </a>
         </div>
       </section>
 
@@ -225,9 +243,11 @@ export default async function HomePage() {
         <div className="container-page">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
-              <h2 className="font-display text-title text-ink">
-                One firm for the pipe, the boiler and the wall you had to open to reach them.
-              </h2>
+              <h2 className="font-display text-title text-ink">What we do</h2>
+              <p className="mt-3 text-ink-muted">
+                Plumbing, heating and building work, so the same firm that fixes the pipe
+                can make good the wall behind it.
+              </p>
             </div>
 
             <Link
@@ -239,7 +259,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="mt-12 grid gap-4 lg:grid-cols-3">
+          <div className="reveal mt-12 grid gap-4 lg:grid-cols-3">
             {lead ? (
               <Link
                 href={`/services/${lead.slug}`}
@@ -318,7 +338,7 @@ export default async function HomePage() {
             ))}
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div className="reveal mt-4 grid gap-4 sm:grid-cols-3">
             {rest.slice(4).map((service) => (
               <Link
                 key={service.slug}
@@ -351,7 +371,7 @@ export default async function HomePage() {
       <section className="bg-surface-sunken">
         <div className="container-page section-y">
           <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
-            <div className="relative">
+            <div className="reveal relative">
               <div className="overflow-hidden rounded-xl shadow-lifted">
                 <Image
                   src="/images/work-05.webp"
@@ -366,7 +386,7 @@ export default async function HomePage() {
               {/* Overlapping panel — depth through layering rather than
                   everything sitting flat side by side. */}
               <div className="relative z-10 -mt-10 ml-6 max-w-xs rounded-lg bg-accent p-6 text-white shadow-lifted sm:-mt-14 sm:ml-10">
-                <p className="font-display text-[2.25rem] font-bold leading-none">
+                <p className="sign text-[2.5rem] leading-none">
                   {new Date().getFullYear() - business.established}
                 </p>
                 <p className="mt-1.5 text-sm leading-snug text-white/85">
@@ -381,10 +401,10 @@ export default async function HomePage() {
               </h2>
 
               <p className="container-prose mt-5 leading-relaxed text-ink-muted">
-                A locked-out boiler is not automatically a new boiler. We diagnose first
-                and quote second, in writing, with the parts and the labour listed
-                separately. If a repair will hold for another five years, we will say so —
-                and if it will not, we will say that too.
+                A locked-out boiler is not automatically a new boiler. We find the fault
+                first and quote second, in writing, with the parts and the labour listed
+                separately. If a repair will hold for another five years, we will say so.
+                If it will not, we will say that too.
               </p>
 
               <ul className="mt-8 flex flex-col gap-3">
@@ -419,19 +439,15 @@ export default async function HomePage() {
       <section className="section-y">
         <div className="container-page">
           <div className="max-w-2xl">
-            <h2 className="font-display text-title text-ink">
-              Four steps, and you can see all of them from your phone.
-            </h2>
+            <h2 className="font-display text-title text-ink">How it works</h2>
+            <p className="mt-3 text-ink-muted">Every step shows up in your account, on your phone.</p>
           </div>
 
-          <ol className="mt-12 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          <ol className="reveal mt-12 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map((step, index) => (
               <li key={step.title} className="relative">
-                <span
-                  aria-hidden="true"
-                  className="font-mono text-sm font-semibold tabular-nums text-accent"
-                >
-                  {String(index + 1).padStart(2, "0")}
+                <span aria-hidden="true" className="sign text-2xl leading-none text-accent">
+                  {index + 1}
                 </span>
 
                 <span
@@ -455,7 +471,7 @@ export default async function HomePage() {
         <div className="container-page section-y">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
-              <h2 className="font-display text-title text-ink">Jobs we have finished.</h2>
+              <h2 className="font-display text-title text-ink">Recent jobs</h2>
             </div>
 
             <Link
@@ -468,7 +484,7 @@ export default async function HomePage() {
           </div>
 
           {featured?.before_path ? (
-            <div className="mx-auto mt-11 max-w-3xl">
+            <div className="reveal mx-auto mt-11 max-w-3xl">
               <BeforeAfter
                 beforeSrc={portfolioImageUrl(featured.before_path)}
                 afterSrc={portfolioImageUrl(featured.after_path)}
@@ -491,7 +507,7 @@ export default async function HomePage() {
               <li
                 key={item.id}
                 className={cn(
-                  "group overflow-hidden rounded-lg",
+                  "reveal group overflow-hidden rounded-lg",
                   // Two of the four are taller. The break in rhythm is what
                   // stops this reading as a stock four-up grid.
                   index % 3 === 0 ? "sm:row-span-2" : "",
@@ -530,82 +546,63 @@ export default async function HomePage() {
       </section>
 
       {/* ---------------------------------------------------------------
-          Closing call to action
+          Closing call to action: the van door again, full width. Replaced a
+          dark box with a blurred glowing circle, which is one of the most
+          recognisable marks of an AI-built page.
           --------------------------------------------------------------- */}
-      <section className="section-y">
-        <div className="container-page">
-          <div className="relative isolate overflow-hidden rounded-2xl bg-surface-inverse px-7 py-14 sm:px-12 sm:py-16">
-            <div
-              aria-hidden="true"
-              className="absolute -right-24 -top-24 -z-10 size-80 rounded-full bg-accent/25 blur-3xl"
-            />
+      <section className="bg-accent text-white">
+        <div className="container-page section-y">
+          <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr] lg:items-end">
+            <div className="reveal">
+              <h2 className="font-display text-title text-white">Tell us what has gone wrong.</h2>
 
-            <div className="grid gap-10 lg:grid-cols-[1.3fr_1fr] lg:items-center">
-              <div>
-                <h2 className="font-display text-title text-white">
-                  Tell us what has gone wrong.
-                </h2>
+              <a
+                href={contact.phoneHref}
+                className="sign tabular mt-5 block text-[clamp(2.25rem,9vw,4.25rem)] leading-none text-white hover:underline hover:decoration-2 hover:underline-offset-8"
+              >
+                {contact.phone}
+              </a>
 
-                <p className="container-prose mt-4 leading-relaxed text-ink-inverse-subtle">
-                  It takes about two minutes, you can attach photos, and you do not need
-                  to make an account. We usually reply the same working day.
-                </p>
+              <p className="container-prose mt-5 leading-relaxed text-white">
+                Or send the details and a photo. It takes about two minutes, you do not
+                need an account, and we usually reply the same working day.
+              </p>
 
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <Link href="/request" className={buttonClasses({ size: "lg" })}>
-                    Request a job
-                    <ArrowRightIcon size={19} weight="bold" aria-hidden="true" />
-                  </Link>
+              <Link
+                href="/request"
+                className={cn(
+                  buttonClasses({ variant: "secondary", size: "lg" }),
+                  "mt-8 border-white bg-white text-accent-ink hover:border-white hover:bg-white/90",
+                )}
+              >
+                Request a job
+                <ArrowRightIcon size={19} weight="bold" aria-hidden="true" />
+              </Link>
+            </div>
 
-                  <a
-                    href={contact.phoneHref}
-                    className={cn(
-                      buttonClasses({ variant: "secondary", size: "lg" }),
-                      "border-white/25 bg-white/10 text-white hover:border-white/40 hover:bg-white/20",
-                    )}
-                  >
-                    <PhoneIcon size={19} weight="fill" aria-hidden="true" />
-                    <span className="tabular">{contact.phone}</span>
-                  </a>
+            <dl className="reveal flex flex-col gap-5 border-t border-white/30 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
+              <div className="flex items-start gap-3">
+                <ClockIcon size={20} className="mt-0.5 shrink-0 text-white" aria-hidden="true" />
+                <div>
+                  <dt className="font-semibold text-white">Opening hours</dt>
+                  <dd className="mt-0.5 text-sm text-white">
+                    Mon–Sat {business.hours.weekdays}
+                    <br />
+                    Sun · {business.hours.sunday}
+                    <br />
+                    Emergency call-outs Mon–Sat, outside these hours
+                  </dd>
                 </div>
               </div>
 
-              <dl className="flex flex-col gap-5 border-t border-white/15 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
-                <div className="flex items-start gap-3">
-                  <ClockIcon
-                    size={20}
-                    className="mt-0.5 shrink-0 text-accent"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <dt className="font-medium text-white">Opening hours</dt>
-                    <dd className="mt-0.5 text-sm text-ink-inverse-subtle">
-                      Mon–Sat {business.hours.weekdays}
-                      <br />
-                      Sun · {business.hours.sunday}
-                      <br />
-                      <span className="text-ink-inverse-faint">
-                        Emergency call-outs Mon–Sat, outside these hours
-                      </span>
-                    </dd>
-                  </div>
+              <div className="flex items-start gap-3">
+                <ShieldCheckIcon size={20} className="mt-0.5 shrink-0 text-white" aria-hidden="true" />
+                <div>
+                  <dt className="font-semibold text-white">Where we work</dt>
+                  <dd className="mt-0.5 text-sm text-white">{business.serviceAreas.join(" · ")}</dd>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <ShieldCheckIcon
-                    size={20}
-                    className="mt-0.5 shrink-0 text-accent"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <dt className="font-medium text-white">Where we work</dt>
-                    <dd className="mt-0.5 text-sm text-ink-inverse-subtle">
-                      {business.serviceAreas.join(" · ")}
-                    </dd>
-                  </div>
-                </div>
-              </dl>
-            </div>
+              </div>
+            </dl>
           </div>
         </div>
       </section>

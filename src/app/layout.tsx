@@ -1,35 +1,43 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Geist_Mono, Public_Sans, Zilla_Slab } from "next/font/google";
 import "./globals.css";
 
 /**
- * Fonts.
+ * Fonts. Chosen for a Nottingham plumber and builder, not for "a website":
+ * sturdy, local, straight-talking — van signwriting and a builders' merchant
+ * sign rather than a software product.
  *
- * Not Inter. Inter is the default of every AI-generated interface and reads as
- * "no decision was made here".
+ *   Zilla Slab — headings. A slab serif with the weight of a painted shop
+ *     sign. Replaced Bricolage Grotesque, which (with Geist) had become the
+ *     default pairing of AI-generated sites and made this one look like them.
+ *   Public Sans — reading text. Plain, very legible at small sizes on a phone
+ *     held at arm's length, and without a "designed" personality of its own.
+ *   Archivo (wide) — the wordmark, phone numbers and short labels, set wide
+ *     and heavy the way a number is painted on a van door.
+ *   Geist Mono — figures only, in the owner app. Money lines up in columns.
  *
- *   Bricolage Grotesque — display. Slightly irregular, industrial, and it has
- *     an opinion. Suits a trade business far better than a neutral grotesque.
- *   Geist — body. Highly legible at small sizes, which matters when the reader
- *     may be sixty and holding a phone at arm's length.
- *   Geist Mono — figures only. Money lines up in columns and stops jittering
- *     as it changes.
- *
- * All three are self-hosted by next/font, so there is no request to Google at
- * runtime, no layout shift, and no third-party origin to allow in the CSP.
+ * All self-hosted by next/font: no request to Google at runtime, no layout
+ * shift, no third-party origin to allow in the CSP.
  */
 
-const bricolage = Bricolage_Grotesque({
+const zilla = Zilla_Slab({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-bricolage",
-  weight: ["500", "600", "700", "800"],
+  variable: "--font-zilla",
+  weight: ["500", "600", "700"],
 });
 
-const geist = Geist({
+const publicSans = Public_Sans({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-geist",
+  variable: "--font-public-sans",
+});
+
+const archivo = Archivo({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-archivo",
+  axes: ["wdth"],
 });
 
 const geistMono = Geist_Mono({
@@ -122,7 +130,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en-GB"
-      className={`${bricolage.variable} ${geist.variable} ${geistMono.variable}`}
+      className={`${zilla.variable} ${publicSans.variable} ${archivo.variable} ${geistMono.variable}`}
     >
       <body className="grain min-h-dvh antialiased">
         <a href="#main" className="skip-link">

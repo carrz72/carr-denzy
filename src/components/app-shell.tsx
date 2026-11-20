@@ -63,7 +63,7 @@ export function AppShell({
             />
 
             <span className="flex flex-col leading-none">
-              <span className="font-display text-[0.9375rem] font-bold tracking-tight text-ink">
+              <span className="sign whitespace-nowrap text-[0.8125rem] text-ink">
                 Carr Denzy
               </span>
               <span className="mt-0.5 text-[0.6875rem] text-ink-subtle">{brandLabel}</span>
