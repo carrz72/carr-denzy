@@ -54,7 +54,7 @@ account works:
 | Username | `resend` |
 | Password | your Resend API key |
 | Sender email | an address on a domain verified with Resend |
-| Sender name | `Carr Denzy Plumbing & Gas` |
+| Sender name | `Carrdenzy Heating & Gas` |
 
 Then raise the rate limit under Authentication → Rate Limits, which stays low
 while the built-in service is in use.

@@ -19,7 +19,7 @@ export function SiteFooter({ contact }: { contact: BusinessContact }) {
       <div className="container-page py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <p className="font-display text-heading text-ink">Carr Denzy Plumbing &amp; Gas</p>
+            <p className="font-display text-heading text-ink">Carrdenzy Heating &amp; Gas</p>
 
             <p className="container-prose mt-3 text-[0.9375rem] leading-relaxed text-ink-muted">
               Gas Safe registered plumbers and builders working across Nottingham and the

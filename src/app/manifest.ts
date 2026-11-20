@@ -10,10 +10,10 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Carr Denzy Plumbing & Gas",
+    name: "Carrdenzy Heating & Gas",
     short_name: "Carr Denzy",
     description:
-      "Jobs, quotes and invoices for Carr Denzy Plumbing & Gas — works with no signal.",
+      "Jobs, quotes and invoices for Carrdenzy Heating & Gas — works with no signal.",
     start_url: "/app",
     scope: "/",
     display: "standalone",

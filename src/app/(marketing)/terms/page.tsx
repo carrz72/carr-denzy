@@ -4,7 +4,7 @@ import { getBusiness } from "@/lib/business";
 export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
   title: "Terms of service",
-  description: "The terms on which Carr Denzy Plumbing & Gas quotes for and carries out work.",
+  description: "The terms on which Carrdenzy Heating & Gas quotes for and carries out work.",
   robots: { index: false, follow: true },
 };
 

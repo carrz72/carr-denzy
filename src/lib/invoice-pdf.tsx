@@ -162,7 +162,7 @@ function InvoiceDocument(data: InvoicePdfData) {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.businessName}>
-              {text(data.business, "trading_name") ?? "Carr Denzy Plumbing & Gas"}
+              {text(data.business, "trading_name") ?? "Carrdenzy Heating & Gas"}
             </Text>
             {text(data.business, "legal_name") ? (
               <Text style={styles.muted}>{text(data.business, "legal_name")}</Text>

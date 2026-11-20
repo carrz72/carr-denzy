@@ -14,7 +14,7 @@
  */
 
 export const business = {
-  name: "Carr Denzy Plumbing & Gas",
+  name: "Carrdenzy Heating & Gas",
   shortName: "Carr Denzy",
   // Fallback only — the live value comes from Settings via getBusiness().
   // Kept in step with it deliberately: this is what the public site shows if
@@ -42,8 +42,8 @@ export const business = {
   },
   serviceAreas: ["Nottingham", "Nottinghamshire", "Derbyshire", "Leicestershire"],
   hours: {
-    weekdays: "9:00am – 5:00pm",
-    saturday: "9:00am – 5:00pm",
+    weekdays: "8:00am – 8:00pm",
+    saturday: "8:00am – 8:00pm",
     /**
      * Sunday is closed. Not "emergencies only" — closed.
      *
@@ -280,8 +280,8 @@ export function localBusinessJsonLd(
       {
         "@type": "OpeningHoursSpecification",
         dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-        opens: "09:00",
-        closes: "17:00",
+        opens: "08:00",
+        closes: "20:00",
       },
     ],
     makesOffer: services.map((service) => ({

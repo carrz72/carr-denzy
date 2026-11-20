@@ -5,7 +5,7 @@ import { getBusiness } from "@/lib/business";
 export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
   title: "Privacy policy",
-  description: "How Carr Denzy Plumbing & Gas handles your personal information.",
+  description: "How Carrdenzy Heating & Gas handles your personal information.",
   robots: { index: false, follow: true },
 };
 

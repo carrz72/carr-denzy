@@ -95,10 +95,10 @@ export function SiteHeader({ contact }: { contact: BusinessContact }) {
 
             <span className="flex flex-col leading-none">
               <span className="sign whitespace-nowrap text-[0.8125rem] text-ink sm:text-[0.9375rem]">
-                Carr Denzy
+                Carrdenzy
               </span>
               <span className="mt-0.5 text-[0.6875rem] font-medium tracking-wide text-ink-subtle">
-                Plumbing &amp; Gas
+                Heating &amp; Gas
               </span>
             </span>
           </Link>

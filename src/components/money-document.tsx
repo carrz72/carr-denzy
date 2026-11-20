@@ -324,7 +324,7 @@ export function BusinessBlock({
   return (
     <div className={cn("text-sm leading-relaxed text-ink-muted", className)}>
       <p className="font-display text-subheading text-ink">
-        {text("trading_name") ?? "Carr Denzy Plumbing & Gas"}
+        {text("trading_name") ?? "Carrdenzy Heating & Gas"}
       </p>
 
       {text("legal_name") ? <p>{text("legal_name")}</p> : null}
