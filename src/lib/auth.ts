@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,7 +20,7 @@ export interface SessionUser {
  * `syncUserRole()` below using the service key, so a user cannot set it — the
  * only writable copy of a role lives behind an RLS policy that pins it.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createClient();
 
   const {
@@ -37,7 +38,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       (user.app_metadata?.full_name as string | undefined) ??
       null,
   };
-}
+});
 
 /** Redirects to sign-in when there is no session. */
 export async function requireUser(returnTo?: string): Promise<SessionUser> {

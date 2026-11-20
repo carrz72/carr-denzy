@@ -25,7 +25,7 @@
  */
 
 // Bumped when the cached asset set changes. Old caches are swept on activate.
-const VERSION = "v3";
+const VERSION = "v4";
 const ASSET_CACHE = `carr-denzy-assets-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
@@ -233,7 +233,10 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      // The small icon in Android's status bar. Android draws it as a white
+      // silhouette from the alpha channel alone, so it has to be a cut-out on
+      // transparency — the full-colour app icon came out as a blank square.
+      badge: "/icons/badge-96.png",
       // The tag collapses repeats: three enquiries in a minute become one
       // updated notification rather than three separate buzzes. Emergencies
       // get their own tag so they are never collapsed into routine ones.
@@ -305,11 +308,26 @@ self.addEventListener("notificationclick", (event) => {
       // Reuse an already-open window rather than stacking a second copy of the
       // app on top of the one the owner already had. Tapping a notification
       // should feel like switching to the app, not launching a new one.
-      for (const client of clients) {
-        if ("focus" in client) {
-          client.navigate(target).catch(() => {});
-          return client.focus();
-        }
+      //
+      // An installed app window (already inside /app or /portal) is preferred
+      // over a browser tab that happens to be on the public site. Focus comes
+      // first: Android only lets a page be brought forward while the tap is
+      // still fresh, and a navigation that is awaited first can lose that.
+      const windows = clients.filter((client) => "focus" in client);
+      const best =
+        windows.find((client) => {
+          const path = new URL(client.url).pathname;
+          return path.startsWith("/app") || path.startsWith("/portal");
+        }) || windows[0];
+
+      if (best) {
+        return best.focus().then((focused) => {
+          const win = focused || best;
+          if ("navigate" in win && new URL(win.url).pathname + new URL(win.url).search !== target) {
+            return win.navigate(target).catch(() => self.clients.openWindow(target));
+          }
+          return win;
+        });
       }
 
       return self.clients.openWindow(target);
@@ -343,7 +361,8 @@ self.addEventListener("pushsubscriptionchange", (event) => {
           body: JSON.stringify({ subscription: fresh, replaces: old?.endpoint ?? null }),
         });
       } catch {
-        // Nothing useful to do from here — the app re-registers on next open.
+        // Nothing useful to do from here — the app re-registers on next open
+        // (src/components/push-resync.tsx).
       }
     })(),
   );

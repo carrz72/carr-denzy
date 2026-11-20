@@ -8,6 +8,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { AppShell } from "@/components/app-shell";
 import { AppBadge } from "@/components/app-badge";
+import { PushResync } from "@/components/push-resync";
 import { buttonClasses } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -111,6 +112,7 @@ export default async function PortalLayout({ children }: { children: React.React
       ) : null}
 
       <AppBadge count={waiting} />
+      <PushResync />
       <div className="container-page py-8 md:py-12">{children}</div>
     </AppShell>
   );

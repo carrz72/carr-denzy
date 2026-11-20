@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { AppShell } from "@/components/app-shell";
 import { AppBadge } from "@/components/app-badge";
+import { PushResync } from "@/components/push-resync";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { countUnreadMessages } from "@/lib/unread";
@@ -88,6 +89,7 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
       ]}
     >
       <AppBadge count={waiting} />
+      <PushResync />
       <div className="container-page py-8 md:py-10">{children}</div>
     </AppShell>
   );
