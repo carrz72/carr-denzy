@@ -51,7 +51,7 @@ export default async function QuotesPage() {
   ]);
 
   const all = quotes ?? [];
-  const closed = all.filter((quote) => ["declined", "expired"].includes(quote.status));
+  const closed = all.filter((quote) => ["declined", "expired", "withdrawn"].includes(quote.status));
 
   const openValue = all
     .filter((quote) => quote.status === "sent")
@@ -115,7 +115,7 @@ export default async function QuotesPage() {
           {closed.length > 0 ? (
             <section>
               <h2 className="font-display text-subheading text-ink">
-                Declined and expired
+                Declined, expired or withdrawn
                 <span className="ml-2 font-sans text-sm font-normal text-ink-subtle">
                   {closed.length}
                 </span>

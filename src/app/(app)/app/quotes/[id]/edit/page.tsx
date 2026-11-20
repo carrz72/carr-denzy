@@ -5,6 +5,7 @@ import { QuoteBuilder } from "@/components/owner/quote-builder";
 import { linesFromItems } from "@/lib/draft-lines";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
+import { isPast } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Edit quote", robots: { index: false } };
 
@@ -69,7 +70,11 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
           settings={settings}
           defaultTerms={quote.terms ?? ""}
           initialIntro={quote.intro_note}
-          initialValidUntil={quote.valid_until}
+          // A draft left long enough for its date to pass would otherwise be
+          // unsaveable: the date box refuses anything before today, so the
+          // form would not submit until the owner spotted a field they never
+          // touched. Offer the usual period from today instead.
+          initialValidUntil={isPast(quote.valid_until) ? null : quote.valid_until}
           initialLines={linesFromItems(ordered)}
         />
       </div>

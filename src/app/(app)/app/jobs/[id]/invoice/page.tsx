@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/app-shell";
@@ -43,6 +44,7 @@ export default async function NewInvoicePage({
   // only a pointer, and it must belong to this job.
   let initialLines: DraftLine[] = [];
   let quoteId: string | null = null;
+  let alreadyInvoiced: { id: string; reference: string } | null = null;
 
   if (from) {
     const { data: quote } = await supabase
@@ -54,6 +56,20 @@ export default async function NewInvoicePage({
       .maybeSingle();
 
     if (quote) {
+      const { data: existing } = await supabase
+        .from("invoices")
+        .select("id, reference")
+        .eq("quote_id", quote.id)
+        .is("deleted_at", null)
+        .neq("status", "void")
+        .limit(1)
+        .maybeSingle();
+      alreadyInvoiced = existing;
+    }
+
+    // Already billed: start a blank invoice rather than carry the quote over
+    // a second time, and say where the first one is.
+    if (quote && !alreadyInvoiced) {
       const { data: items } = await supabase
         .from("quote_items")
         .select("description, kind, quantity_milli, unit_price_pence, vat_rate_bp")
@@ -76,6 +92,18 @@ export default async function NewInvoicePage({
       />
 
       <div className="mx-auto max-w-4xl">
+        {alreadyInvoiced ? (
+          <p className="mb-6 rounded-md border border-caution/30 bg-caution-soft px-4 py-3 text-[0.9375rem] text-ink">
+            This quote has already been invoiced as{" "}
+            <Link
+              href={`/app/invoices/${alreadyInvoiced.id}`}
+              className="font-medium text-accent underline underline-offset-4"
+            >
+              {alreadyInvoiced.reference}
+            </Link>
+            . Anything you raise here is a separate, extra invoice.
+          </p>
+        ) : null}
         <InvoiceBuilder
           jobId={job.id}
           clientId={job.client.id}

@@ -27,12 +27,12 @@ import { cn } from "@/lib/cn";
  */
 
 const controlBase = [
-  "w-full rounded-md border bg-surface-raised px-3.5 py-3",
+  "w-full rounded-md border border-line-input bg-surface-raised px-3.5 py-3",
   "text-ink placeholder:text-ink-subtle",
   "shadow-subtle",
   "transition-[border-color,box-shadow] duration-200",
   "[transition-timing-function:var(--ease-standard)]",
-  "hover:border-line-strong",
+  "hover:border-ink-subtle",
   "focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25",
   "disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle",
 ].join(" ");
@@ -124,7 +124,7 @@ function describedBy(id: string, hint?: string, error?: string): string | undefi
 // Text input
 // ---------------------------------------------------------------------------
 
-export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
+export interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   hint?: string;
   error?: string;
@@ -151,7 +151,9 @@ export function TextField({
   ...props
 }: TextFieldProps) {
   const generatedId = useId();
-  const id = props.name ? `field-${props.name}` : generatedId;
+  // An explicit id wins, so two forms on one page with the same field names
+  // (several addresses, say) do not share label targets.
+  const id = props.id ?? (props.name ? `field-${props.name}` : generatedId);
 
   return (
     <FieldShell
@@ -190,8 +192,7 @@ export function TextField({
 // Textarea
 // ---------------------------------------------------------------------------
 
-export interface TextAreaFieldProps
-  extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id"> {
+export interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   hint?: string;
   error?: string;
@@ -224,7 +225,9 @@ export function TextAreaField({
   ...props
 }: TextAreaFieldProps) {
   const generatedId = useId();
-  const id = props.name ? `field-${props.name}` : generatedId;
+  // An explicit id wins, so two forms on one page with the same field names
+  // (several addresses, say) do not share label targets.
+  const id = props.id ?? (props.name ? `field-${props.name}` : generatedId);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 

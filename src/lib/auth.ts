@@ -83,11 +83,28 @@ export async function requireOwner(): Promise<SessionUser> {
 export async function getMyClient(): Promise<Client | null> {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  // Filtered on the login explicitly, and limited to one, rather than leaning
+  // on RLS and `.maybeSingle()`. That combination errored, and so returned
+  // null, in two real cases: staff, whom RLS lets see every client, and a
+  // customer whose email matched more than one client record (a phone job and
+  // an online enquiry each creating one). The oldest record is the one their
+  // history started on, so it is the one treated as theirs.
+  const { data, error } = await supabase
     .from("clients")
     .select("*")
+    .eq("profile_id", user.id)
     .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
+
+  if (error) console.error("[auth] could not load client record", error.message);
 
   return data ?? null;
 }

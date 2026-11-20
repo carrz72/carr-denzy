@@ -118,7 +118,7 @@ export function SkeletonList({ rows = 4 }: { rows?: number }) {
  */
 export function ErrorState({
   title = "Something went wrong at our end",
-  description = "Nothing you entered was lost. Try again, and if it keeps happening give us a ring on 07934 633583.",
+  description = "Nothing you entered was lost. Try again, and if it keeps happening give us a ring.",
   retry,
   className,
 }: {

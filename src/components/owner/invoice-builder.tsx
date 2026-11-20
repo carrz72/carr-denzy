@@ -13,7 +13,7 @@ import {
   TextField,
 } from "@/components/ui/field";
 import { LineItemEditor, type DraftLine } from "@/components/owner/line-items";
-import { createInvoice } from "@/app/(app)/app/actions";
+import { createInvoice, updateInvoice } from "@/app/(app)/app/actions";
 import { formatPence } from "@/lib/money";
 import { addDaysToToday, todayInLondon } from "@/lib/dates";
 import type { PriceItem, Settings } from "@/types/database";
@@ -36,6 +36,11 @@ export function InvoiceBuilder({
   priceItems,
   settings,
   clients,
+  invoiceId,
+  initialIssueDate,
+  initialDueDate,
+  initialNotes,
+  initialReverseCharge = false,
 }: {
   /** Absent for a standalone invoice with no job behind it. */
   jobId?: string;
@@ -49,12 +54,19 @@ export function InvoiceBuilder({
   settings: Settings;
   /** Supplied only for a standalone invoice: turns on the customer picker. */
   clients?: { id: string; full_name: string; phone: string | null }[];
+  /** Set when changing an existing draft rather than raising a new invoice. */
+  invoiceId?: string;
+  initialIssueDate?: string | null;
+  initialDueDate?: string | null;
+  initialNotes?: string | null;
+  initialReverseCharge?: boolean;
 }) {
+  const editing = Boolean(invoiceId);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [reverseCharge, setReverseCharge] = useState(false);
+  const [reverseCharge, setReverseCharge] = useState(initialReverseCharge);
   const [totalPence, setTotalPence] = useState(0);
   const [lineCount, setLineCount] = useState(0);
 
@@ -76,7 +88,7 @@ export function InvoiceBuilder({
     }
 
     startTransition(async () => {
-      const result = await createInvoice(formData);
+      const result = editing ? await updateInvoice(formData) : await createInvoice(formData);
 
       if (!result.ok || !result.id) {
         setErrors(result.errors ?? {});
@@ -90,6 +102,7 @@ export function InvoiceBuilder({
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-6">
+      {invoiceId ? <input type="hidden" name="invoice_id" value={invoiceId} /> : null}
       <input type="hidden" name="job_id" value={jobId ?? ""} />
       <input type="hidden" name="quote_id" value={quoteId ?? ""} />
       {!picksCustomer ? <input type="hidden" name="client_id" value={clientId ?? ""} /> : null}
@@ -155,7 +168,7 @@ export function InvoiceBuilder({
           </>
         )}
 
-        {quoteId ? (
+        {quoteId && !editing ? (
           <p className="mt-4 rounded-md border border-info/25 bg-info-soft px-4 py-3 text-[0.9375rem] text-info-ink">
             Lines carried across from the accepted quote. Change anything that changed on
             the day.
@@ -168,7 +181,7 @@ export function InvoiceBuilder({
             label="Invoice date"
             type="date"
             required
-            defaultValue={todayInLondon()}
+            defaultValue={initialIssueDate ?? todayInLondon()}
             error={errors.issue_date}
           />
 
@@ -176,7 +189,7 @@ export function InvoiceBuilder({
             name="due_date"
             label="Payment due by"
             type="date"
-            defaultValue={addDaysToToday(settings.payment_terms_days)}
+            defaultValue={initialDueDate ?? addDaysToToday(settings.payment_terms_days)}
             hint={`Your usual terms are ${settings.payment_terms_days} days.`}
             error={errors.due_date}
           />
@@ -213,6 +226,7 @@ export function InvoiceBuilder({
             label="A note on the invoice"
             hint="Appears under the lines. Handy for what you left on site, or what still needs doing."
             rows={3}
+            defaultValue={initialNotes ?? ""}
             error={errors.notes}
           />
 
@@ -247,7 +261,7 @@ export function InvoiceBuilder({
         >
           {lineCount === 0
             ? "Add a line first"
-            : `Save invoice for ${formatPence(totalPence)}`}
+            : `${editing ? "Save changes" : "Save invoice"} for ${formatPence(totalPence)}`}
         </Button>
       </div>
     </form>

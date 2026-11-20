@@ -7,7 +7,6 @@ import { PrintButton } from "@/components/print-button";
 import { QuoteLinkResponse } from "@/components/quote-link-response";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, isPast } from "@/lib/dates";
-import { business } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = { title: "Quote", robots: { index: false, follow: false } };
@@ -104,7 +103,9 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ id
                   ? "You have accepted this quote — there is nothing else to do. We will be in touch to agree a date."
                   : quote.status === "declined"
                     ? "This quote was declined. If that was not what you meant, give us a ring and we will sort it out."
-                    : "This quote has passed the date it was held until. Ring us and we will price it again — it may not have changed."}
+                    : quote.status === "withdrawn"
+                      ? "We have withdrawn this quote, so it can no longer be accepted. If you were expecting a new one, it will be on its way — or give us a ring."
+                      : "This quote has passed the date it was held until. Ring us and we will price it again — it may not have changed."}
               </p>
 
               <a
@@ -202,7 +203,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ id
           </article>
 
           <div className="no-print mt-6 flex justify-center">
-            <PrintButton label="Print or save as PDF" />
+            <PrintButton pdfHref={`/quotes/view/${quote.id}/pdf`} />
           </div>
         </div>
       </div>

@@ -25,7 +25,7 @@
  */
 
 // Bumped when the cached asset set changes. Old caches are swept on activate.
-const VERSION = "v2";
+const VERSION = "v3";
 const ASSET_CACHE = `carr-denzy-assets-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 

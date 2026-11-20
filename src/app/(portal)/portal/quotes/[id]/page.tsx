@@ -47,6 +47,10 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
     .order("sort_order", { ascending: true });
 
   const open = quote.status === "sent" && !isPast(quote.valid_until);
+  // Still "sent" in the table until the owner next opens a list and the sweep
+  // runs, but past its date: show it as run out, not as a blank page with no
+  // buttons and no explanation.
+  const lapsed = quote.status === "expired" || (quote.status === "sent" && isPast(quote.valid_until));
   const phone = settings?.phone ?? business.phone;
 
   // A viewer on this account can read the quote but cannot answer it —
@@ -157,7 +161,17 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
             </Card>
           ) : null}
 
-          {quote.status === "expired" ? (
+          {quote.status === "withdrawn" ? (
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">We withdrew this quote</h2>
+              <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
+                It can no longer be accepted. If you were expecting a new one, it will be with
+                you shortly — or ring us on {phone}.
+              </p>
+            </Card>
+          ) : null}
+
+          {lapsed ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">This one has run out</h2>
               <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">

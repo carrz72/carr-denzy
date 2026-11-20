@@ -10,7 +10,6 @@ import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
-import { business } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = { title: "Quote preview", robots: { index: false } };
@@ -213,7 +212,7 @@ export default async function QuotePreviewPage({
       </article>
 
       <div className="no-print mt-6">
-        <PrintButton label="Print or save as PDF" />
+        <PrintButton pdfHref={`/app/quotes/${quote.id}/pdf`} />
       </div>
     </div>
   );

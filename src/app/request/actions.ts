@@ -7,6 +7,12 @@ import { pushToStaff } from "@/lib/push";
 import { enquirySchema, fieldErrors } from "@/lib/validation";
 import { getMyClient } from "@/lib/auth";
 import { getService } from "@/lib/site";
+import { getBusiness } from "@/lib/business";
+
+/** The business phone for error messages, from settings so it never goes stale. */
+async function ourPhone(): Promise<string> {
+  return (await getBusiness()).phone;
+}
 
 /**
  * Enquiry submission.
@@ -45,7 +51,7 @@ export async function submitEnquiry(formData: FormData): Promise<EnquiryResult> 
     return {
       ok: false,
       formError:
-        "We have had several requests from this connection in the last hour. Please call 07934 633583 and we will help you straight away.",
+        `We have had several requests from this connection in the last hour. Please call ${await ourPhone()} and we will help you straight away.`,
     };
   }
 
@@ -128,7 +134,7 @@ export async function submitEnquiry(formData: FormData): Promise<EnquiryResult> 
       return {
         ok: false,
         formError:
-          "Something went wrong at our end and your request was not saved. Nothing you typed has been lost — try again, or call 07934 633583.",
+          `Something went wrong at our end and your request was not saved. Nothing you typed has been lost — try again, or call ${await ourPhone()}.`,
       };
     }
 
@@ -227,7 +233,7 @@ export async function submitEnquiry(formData: FormData): Promise<EnquiryResult> 
     return {
       ok: false,
       formError:
-        "We could not reach our system just then. Nothing you typed has been lost — try again in a moment, or call 07934 633583.",
+        `We could not reach our system just then. Nothing you typed has been lost — try again in a moment, or call ${await ourPhone()}.`,
     };
   }
 }

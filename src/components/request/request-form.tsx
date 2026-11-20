@@ -511,9 +511,9 @@ export function RequestForm({
               value={serviceSlug}
               onChange={(event) => setServiceSlug(event.target.value)}
               className={cn(
-                "mt-2 w-full rounded-md border border-line bg-surface-raised px-3.5 py-3",
+                "mt-2 w-full rounded-md border border-line-input bg-surface-raised px-3.5 py-3",
                 "shadow-subtle transition-[border-color] duration-200",
-                "hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25",
+                "hover:border-ink-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25",
               )}
             >
               <option value="">I am not sure</option>

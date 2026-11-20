@@ -9,7 +9,6 @@ import { PushToggle } from "@/components/owner/push-toggle";
 import { ClientMembers } from "@/components/client-members";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient, requireUser } from "@/lib/auth";
-import { business } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = { title: "Your details", robots: { index: false } };

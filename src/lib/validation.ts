@@ -61,7 +61,15 @@ export const enquirySchema = z
     city: trimmed(100).optional(),
     postcode: z.union([ukPostcode, z.literal("")]).optional(),
     preferred_dates: trimmed(400).optional(),
-    photo_paths: z.array(trimmed(400)).max(6, "Up to 6 photos, please").optional(),
+    // Only paths `storageKey("enquiry", …)` could have produced. The server
+    // action writes these with the admin client, so without this a crafted
+    // submission could attach any object path to its enquiry.
+    photo_paths: z
+      .array(
+        trimmed(400).regex(/^enquiry\/[a-z0-9][a-z0-9.-]*$/, "That photo did not upload properly"),
+      )
+      .max(6, "Up to 6 photos, please")
+      .optional(),
     // Honeypot. A real person never sees this field, so anything in it is a bot.
     company_website: z.string().max(0).optional(),
   })
@@ -93,9 +101,9 @@ export const clientSchema = z
  * What a signed-in customer may change about themselves.
  *
  * Deliberately not `clientSchema`: that one carries `notes`, which are the
- * owner's private notes *about* the customer. The RLS policy lets a client
- * update their own row, so the column list here is the thing standing between
- * that and a customer editing the owner's notes on them.
+ * owner's private notes *about* the customer. Those live in
+ * `client_private_notes` now, out of reach of the customer's own row, so this
+ * schema is no longer the only thing protecting them, but it stays narrow.
  */
 export const myDetailsSchema = z
   .object({

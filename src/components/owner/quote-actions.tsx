@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckIcon, PaperPlaneTiltIcon, WarningIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowUUpLeftIcon,
+  CheckIcon,
+  PaperPlaneTiltIcon,
+  TrashIcon,
+  WarningIcon,
+} from "@phosphor-icons/react/dist/ssr";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/field";
-import { sendQuote } from "@/app/(app)/app/actions";
+import { deleteDraftQuote, sendQuote, withdrawQuote } from "@/app/(app)/app/actions";
 
 /**
  * Sending a quote is the moment it stops being editable and starts being an
@@ -105,5 +112,105 @@ export function SendQuoteButton({
 
       <FormError message={error} />
     </div>
+  );
+}
+
+/** A small two-step destructive control: a quiet link, then a spelt-out confirm. */
+function ConfirmLink({
+  label,
+  icon,
+  explanation,
+  confirmLabel,
+  run,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  explanation: string;
+  confirmLabel: string;
+  run: () => Promise<{ ok: boolean; formError?: string }>;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function go() {
+    setError(null);
+    startTransition(async () => {
+      const result = await run();
+      if (!result.ok) {
+        setError(result.formError ?? "That did not work. Try again.");
+        setConfirming(false);
+      }
+    });
+  }
+
+  if (confirming) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-[0.9375rem] leading-relaxed text-ink-muted">{explanation}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="destructive" loading={isPending} onClick={go} icon={icon}>
+            {confirmLabel}
+          </Button>
+          <Button variant="quiet" onClick={() => setConfirming(false)}>
+            Not yet
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-medium text-ink-subtle hover:text-critical"
+      >
+        {icon}
+        {label}
+      </button>
+      <FormError message={error} />
+    </div>
+  );
+}
+
+export function DeleteDraftQuoteButton({ quoteId, jobId }: { quoteId: string; jobId: string }) {
+  const router = useRouter();
+
+  return (
+    <ConfirmLink
+      label="Delete this draft"
+      icon={<TrashIcon size={16} weight="bold" aria-hidden="true" />}
+      explanation="This deletes the draft. It has never been sent, so the customer has not seen it."
+      confirmLabel="Yes, delete it"
+      run={async () => {
+        const formData = new FormData();
+        formData.set("quote_id", quoteId);
+        const result = await deleteDraftQuote(formData);
+        if (result.ok) router.push(`/app/jobs/${jobId}`);
+        return result;
+      }}
+    />
+  );
+}
+
+export function WithdrawQuoteButton({ quoteId, reference }: { quoteId: string; reference: string }) {
+  const router = useRouter();
+
+  return (
+    <ConfirmLink
+      label="Withdraw this quote"
+      icon={<ArrowUUpLeftIcon size={16} weight="bold" aria-hidden="true" />}
+      explanation={`${reference} stays on file marked Withdrawn, and the customer can no longer accept it. Their link will say so. If the price was wrong, withdraw it and send a new one.`}
+      confirmLabel="Yes, withdraw it"
+      run={async () => {
+        const formData = new FormData();
+        formData.set("quote_id", quoteId);
+        const result = await withdrawQuote(formData);
+        if (result.ok) router.refresh();
+        return result;
+      }}
+    />
   );
 }

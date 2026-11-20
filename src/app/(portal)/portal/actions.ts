@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth";
 import {
   fieldErrors,
@@ -11,6 +10,12 @@ import {
   quoteResponseSchema,
 } from "@/lib/validation";
 import { notifyOwnerOfQuoteResponse } from "@/lib/notify-owner";
+import { getBusiness } from "@/lib/business";
+
+/** The business phone for error messages, from settings so it never goes stale. */
+async function ourPhone(): Promise<string> {
+  return (await getBusiness()).phone;
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -51,7 +56,7 @@ export async function acceptQuote(formData: FormData): Promise<ActionResult> {
       formError:
         error.message.includes("no longer open")
           ? "This quote is no longer open for a response. Give us a ring and we will sort it out."
-          : "We could not record that just now. Try again, or ring us on 07934 633583.",
+          : `We could not record that just now. Try again, or ring us on ${await ourPhone()}.`,
     };
   }
 
@@ -89,7 +94,7 @@ export async function declineQuote(formData: FormData): Promise<ActionResult> {
       formError:
         error.message.includes("no longer open")
           ? "This quote is no longer open for a response."
-          : "We could not record that just now. Try again, or ring us on 07934 633583.",
+          : `We could not record that just now. Try again, or ring us on ${await ourPhone()}.`,
     };
   }
 
@@ -139,7 +144,7 @@ export async function updateMyDetails(formData: FormData): Promise<ActionResult>
     console.error("[portal] details update failed", error.message);
     return {
       ok: false,
-      formError: "We could not save that just now. Try again, or ring us on 07934 633583.",
+      formError: `We could not save that just now. Try again, or ring us on ${await ourPhone()}.`,
     };
   }
 
@@ -175,7 +180,7 @@ export async function postMessage(formData: FormData): Promise<ActionResult> {
     console.error("[portal] message failed", error.message);
     return {
       ok: false,
-      formError: "Your message did not send. Try again, or ring us on 07934 633583.",
+      formError: `Your message did not send. Try again, or ring us on ${await ourPhone()}.`,
     };
   }
 

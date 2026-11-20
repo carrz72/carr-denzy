@@ -23,6 +23,7 @@ import { getSessionUser } from "@/lib/auth";
 import { formatDateTime, formatDuration } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { cn } from "@/lib/cn";
+import { signedJobPhotoUrls } from "@/lib/storage";
 
 export const metadata: Metadata = { title: "Job", robots: { index: false } };
 
@@ -58,6 +59,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     { data: notes },
     { data: messages },
     { data: visits },
+    { data: photos },
   ] = await Promise.all([
       supabase
         .from("quotes")
@@ -86,7 +88,16 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
         .select("id, starts_at, duration_minutes, note")
         .eq("job_id", id)
         .order("starts_at", { ascending: true }),
+      supabase
+        .from("job_photos")
+        .select("id, storage_path, caption, visible_to_client, created_at")
+        .eq("job_id", id)
+        .order("created_at", { ascending: true }),
     ]);
+
+  // Includes the photos the customer sent with their enquiry, which stay in
+  // the enquiry bucket after conversion.
+  const photoUrls = await signedJobPhotoUrls((photos ?? []).map((photo) => photo.storage_path));
 
   const address = job.property
     ? [job.property.address_line1, job.property.city, job.property.postcode]
@@ -154,6 +165,40 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
               ) : null}
             </dl>
           </Card>
+
+          {photoUrls.some(Boolean) ? (
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">Photos</h2>
+              <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {(photos ?? []).map((photo, index) => {
+                  const url = photoUrls[index];
+                  if (!url) return null;
+
+                  return (
+                    <li key={photo.id}>
+                      <a href={url} target="_blank" rel="noopener" className="block">
+                        <figure>
+                          <div className="overflow-hidden rounded-lg border border-line bg-surface-sunken">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not worth optimising */}
+                            <img
+                              src={url}
+                              alt={photo.caption ?? `Photograph from ${formatDateTime(photo.created_at)}`}
+                              loading="lazy"
+                              className="aspect-4/3 w-full object-cover"
+                            />
+                          </div>
+                          <figcaption className="mt-1.5 text-xs leading-snug text-ink-muted">
+                            {photo.caption ?? formatDateTime(photo.created_at)}
+                            {photo.visible_to_client ? "" : " · hidden from the customer"}
+                          </figcaption>
+                        </figure>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          ) : null}
 
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Your notes</h2>

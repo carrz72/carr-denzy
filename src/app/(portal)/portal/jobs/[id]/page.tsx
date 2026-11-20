@@ -20,8 +20,9 @@ import { markMessagesRead } from "@/lib/unread";
 import { getSessionUser } from "@/lib/auth";
 import { formatDateTime, formatDuration, formatWorkingDayRange } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
-import { signedPhotoUrls } from "@/lib/storage";
+import { signedJobPhotoUrls } from "@/lib/storage";
 import { cn } from "@/lib/cn";
+import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = { title: "Your job", robots: { index: false } };
 
@@ -90,7 +91,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
         .order("created_at", { ascending: true }),
     ]);
 
-  const photoUrls = await signedPhotoUrls("job-photos", (photos ?? []).map((p) => p.storage_path));
+  const photoUrls = await signedJobPhotoUrls((photos ?? []).map((p) => p.storage_path));
 
   const openQuote = (quotes ?? []).find((quote) => quote.status === "sent");
 
@@ -131,7 +132,7 @@ export default async function PortalJobPage({ params }: { params: Promise<{ id: 
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Progress</h2>
             <div className="mt-5">
-              <JobTimeline status={job.status} events={events ?? []} />
+              <JobTimeline status={job.status} events={events ?? []} phone={(await getBusiness()).phone} />
             </div>
           </Card>
 

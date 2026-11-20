@@ -58,12 +58,12 @@ export function SiteFooter({ contact }: { contact: BusinessContact }) {
 
           <nav aria-label="Services">
             <h2 className="text-label uppercase text-ink-subtle">What we do</h2>
-            <ul className="mt-4 flex flex-col gap-1">
+            <ul className="mt-4 flex flex-col">
               {services.slice(0, 6).map((service) => (
                 <li key={service.slug}>
                   <Link
                     href={`/services/${service.slug}`}
-                    className="flex min-h-9 items-center text-[0.9375rem] text-ink-muted hover:text-accent hover:underline hover:underline-offset-4"
+                    className="flex min-h-11 items-center text-[0.9375rem] text-ink-muted hover:text-accent hover:underline hover:underline-offset-4"
                   >
                     {service.name}
                   </Link>
@@ -74,7 +74,7 @@ export function SiteFooter({ contact }: { contact: BusinessContact }) {
 
           <nav aria-label="Company and account">
             <h2 className="text-label uppercase text-ink-subtle">Company</h2>
-            <ul className="mt-4 flex flex-col gap-1">
+            <ul className="mt-4 flex flex-col">
               {[
                 { href: "/about", label: "About us" },
                 { href: "/work", label: "Our work" },
@@ -91,7 +91,7 @@ export function SiteFooter({ contact }: { contact: BusinessContact }) {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="flex min-h-9 items-center text-[0.9375rem] text-ink-muted hover:text-accent hover:underline hover:underline-offset-4"
+                    className="flex min-h-11 items-center text-[0.9375rem] text-ink-muted hover:text-accent hover:underline hover:underline-offset-4"
                   >
                     {link.label}
                   </Link>
@@ -110,7 +110,7 @@ export function SiteFooter({ contact }: { contact: BusinessContact }) {
             <li>
               <Link
                 href="/privacy"
-                className="flex min-h-9 items-center text-sm text-ink-subtle hover:text-ink hover:underline hover:underline-offset-4"
+                className="flex min-h-11 items-center text-sm text-ink-subtle hover:text-ink hover:underline hover:underline-offset-4"
               >
                 Privacy
               </Link>
@@ -118,7 +118,7 @@ export function SiteFooter({ contact }: { contact: BusinessContact }) {
             <li>
               <Link
                 href="/terms"
-                className="flex min-h-9 items-center text-sm text-ink-subtle hover:text-ink hover:underline hover:underline-offset-4"
+                className="flex min-h-11 items-center text-sm text-ink-subtle hover:text-ink hover:underline hover:underline-offset-4"
               >
                 Terms
               </Link>

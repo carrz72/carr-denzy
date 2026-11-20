@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { EyeIcon } from "@phosphor-icons/react/dist/ssr";
+import { EyeIcon, PencilSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
 import { Card, DetailRow } from "@/components/ui/surface";
 import { InvoiceStatusBadge } from "@/components/ui/badge";
@@ -13,8 +13,11 @@ import {
   TotalsPanel,
 } from "@/components/money-document";
 import { PrintButton } from "@/components/print-button";
+import { businessForInvoice } from "@/lib/invoice-snapshot";
 import {
   DeleteDraftInvoiceButton,
+  RemovePaymentButton,
+  VoidInvoiceButton,
   RecordPaymentForm,
   ResendInvoiceButton,
   SendInvoiceButton,
@@ -75,30 +78,12 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
   const outstanding = invoice.total_pence - invoice.paid_pence;
   const isDraft = invoice.status === "draft";
   const settled = invoice.status === "paid" || invoice.status === "void";
-  const late = invoice.status === "overdue" || (invoice.status === "sent" && isPast(invoice.due_date));
+  const late = invoice.status === "overdue" || ((invoice.status === "sent" || invoice.status === "part_paid") && isPast(invoice.due_date));
 
-  // The invoice carries a snapshot of the business taken at issue time; live
-  // settings are only a fallback for a draft raised before any were saved.
-  const business =
-    invoice.business_snapshot ??
-    ({
-      trading_name: settings.trading_name,
-      legal_name: settings.legal_name,
-      address_line1: settings.address_line1,
-      address_line2: settings.address_line2,
-      city: settings.city,
-      postcode: settings.postcode,
-      phone: settings.phone,
-      email: settings.email,
-      vat_registered: settings.vat_registered,
-      vat_number: settings.vat_number,
-      cis_enabled: settings.cis_enabled,
-      utr: settings.utr,
-      bank_account_name: settings.bank_account_name,
-      bank_sort_code: settings.bank_sort_code,
-      bank_account_number: settings.bank_account_number,
-      invoice_footer_note: settings.invoice_footer_note,
-    } as Record<string, unknown>);
+  // A draft shows live settings, so a change in Settings shows up straight
+  // away; a sent invoice shows what it was issued with (payment details on an
+  // unpaid one are kept current by updateSettings).
+  const business = businessForInvoice(invoice, settings);
 
   const clientSnapshot = (invoice.client_snapshot ?? {}) as Record<string, unknown>;
   const snapshotAddress = clientSnapshot.address as Record<string, string | null> | null;
@@ -237,6 +222,10 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
                     <span className="font-mono font-semibold tabular-nums text-ink">
                       {formatPence(payment.amount_pence)}
                     </span>
+                    <RemovePaymentButton
+                      paymentId={payment.id}
+                      amountLabel={formatPence(payment.amount_pence)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -252,14 +241,26 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
                 Check the figures. Nothing has left your account.
               </p>
 
-              {/* Above the send button deliberately: reading it back as the
-                  customer will is the step worth taking before it is fixed. */}
+              {/* Edit, then read it back as the customer will, then send —
+                  the order you would use them in, each harder to undo. */}
+              <Link
+                href={`/app/invoices/${invoice.id}/edit`}
+                className={buttonClasses({
+                  variant: "secondary",
+                  fullWidth: true,
+                  className: "mt-5",
+                })}
+              >
+                <PencilSimpleIcon size={18} aria-hidden="true" />
+                Change the lines, dates or note
+              </Link>
+
               <Link
                 href={`/app/invoices/${invoice.id}/preview`}
                 className={buttonClasses({
                   variant: "secondary",
                   fullWidth: true,
-                  className: "mt-5",
+                  className: "mt-2.5",
                 })}
               >
                 <EyeIcon size={18} aria-hidden="true" />
@@ -332,7 +333,7 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
                           unbreakable word and will leave the row without it. */}
                       <span className="wrap-anywhere">{invoice.client.email}</span>{" "}
                       <Link
-                        href={`/app/clients/${invoice.client.id}`}
+                        href={`/app/clients/${invoice.client.id}/edit`}
                         className="text-accent hover:underline hover:underline-offset-4"
                       >
                         Change
@@ -340,7 +341,7 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
                     </>
                   ) : (
                     <Link
-                      href={`/app/clients/${invoice.client.id}`}
+                      href={`/app/clients/${invoice.client.id}/edit`}
                       className="text-accent hover:underline hover:underline-offset-4"
                     >
                       Add one
@@ -379,8 +380,17 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
                 Customer&apos;s copy
               </Link>
 
-              <PrintButton label="Download or print" />
+              <PrintButton pdfHref={`/app/invoices/${invoice.id}/pdf`} />
             </div>
+
+            {/* Sent but nothing paid: the one state where cancelling is clean.
+                Drafts are deleted instead; once money is in, it stays. */}
+            {(invoice.status === "sent" || invoice.status === "overdue") &&
+            invoice.paid_pence === 0 ? (
+              <div className="mt-5 border-t border-line pt-4">
+                <VoidInvoiceButton invoiceId={invoice.id} reference={invoice.reference} />
+              </div>
+            ) : null}
           </Card>
         </div>
       </div>

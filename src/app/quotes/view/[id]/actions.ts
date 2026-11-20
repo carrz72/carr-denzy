@@ -6,6 +6,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { notifyOwnerOfQuoteResponse } from "@/lib/notify-owner";
 import { fieldErrors } from "@/lib/validation";
+import { getBusiness } from "@/lib/business";
+
+/** The business phone for error messages, from settings so it never goes stale. */
+async function ourPhone(): Promise<string> {
+  return (await getBusiness()).phone;
+}
 
 /**
  * Accepting or declining a quote from the emailed link, with no account.
@@ -60,7 +66,7 @@ async function prepare(formData: FormData): Promise<Prepared> {
       failure: {
         ok: false,
         formError:
-          "That has been tried several times from this connection. Please ring 07934 633583 and we will sort it out on the phone.",
+          `That has been tried several times from this connection. Please ring ${await ourPhone()} and we will sort it out on the phone.`,
       },
     };
   }
@@ -95,8 +101,8 @@ export async function acceptQuoteViaLink(formData: FormData): Promise<LinkRespon
     return {
       ok: false,
       formError: error.message.includes("no longer open")
-        ? "This quote has already been answered. If that was not you, please ring 07934 633583."
-        : "We could not record that just now. Try again, or ring 07934 633583.",
+        ? `This quote has already been answered. If that was not you, please ring ${await ourPhone()}.`
+        : `We could not record that just now. Try again, or ring ${await ourPhone()}.`,
     };
   }
 
@@ -128,7 +134,7 @@ export async function declineQuoteViaLink(formData: FormData): Promise<LinkRespo
       ok: false,
       formError: error.message.includes("no longer open")
         ? "This quote has already been answered."
-        : "We could not record that just now. Try again, or ring 07934 633583.",
+        : `We could not record that just now. Try again, or ring ${await ourPhone()}.`,
     };
   }
 

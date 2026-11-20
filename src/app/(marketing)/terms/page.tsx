@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { business } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
@@ -20,9 +19,7 @@ export default async function TermsPage() {
     <article className="section-y">
       <div className="container-page">
         <div className="container-prose">
-          <p className="text-label uppercase text-accent">Legal</p>
-
-          <h1 className="mt-3 font-display text-title text-ink">Terms of service</h1>
+          <h1 className="font-display text-title text-ink">Terms of service</h1>
 
           <p className="mt-4 text-sm text-ink-subtle">Last updated: 10 August 2026</p>
 

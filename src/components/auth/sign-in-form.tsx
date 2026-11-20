@@ -22,7 +22,16 @@ const errorMessages: Record<string, string> = {
  * would be forgotten every single time, and a forgotten-password flow is more
  * code and more attack surface than the thing it replaces.
  */
-export function SignInForm({ next, initialError }: { next?: string; initialError?: string }) {
+export function SignInForm({
+  next,
+  initialError,
+  phone,
+}: {
+  next?: string;
+  initialError?: string;
+  /** The business phone, from Settings, for the "ring us" fallback. */
+  phone: string;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -61,7 +70,7 @@ export function SignInForm({ next, initialError }: { next?: string; initialError
 
       if (error) {
         setFormError(
-          "We could not send that just now. Try again in a moment, or ring us on 07934 633583.",
+          `We could not send that just now. Try again in a moment, or ring us on ${phone}.`,
         );
         return;
       }
@@ -72,7 +81,7 @@ export function SignInForm({ next, initialError }: { next?: string; initialError
       setSent(true);
     } catch {
       setFormError(
-        "We could not reach our system just then. Try again in a moment, or ring us on 07934 633583.",
+        `We could not reach our system just then. Try again in a moment, or ring us on ${phone}.`,
       );
     } finally {
       setBusy(false);

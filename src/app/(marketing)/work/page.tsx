@@ -49,9 +49,7 @@ export default async function WorkPage() {
     <>
       <section className="border-b border-line bg-surface-sunken">
         <div className="container-page py-16 md:py-20">
-          <p className="text-label uppercase text-accent">Our work</p>
-
-          <h1 className="mt-3 max-w-3xl font-display text-title text-ink">
+          <h1 className="max-w-3xl font-display text-title text-ink">
             Finished jobs, photographed on the day.
           </h1>
 

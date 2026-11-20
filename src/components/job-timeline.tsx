@@ -42,9 +42,12 @@ const stageBlurbs: Partial<Record<JobStatus, string>> = {
 export function JobTimeline({
   status,
   events,
+  phone,
 }: {
   status: JobStatus;
   events: Pick<JobEvent, "to_status" | "created_at">[];
+  /** The business phone, from Settings. */
+  phone: string;
 }) {
   // A cancelled or declined job is not a stalled happy path — say what happened.
   if (status === "cancelled" || status === "declined") {
@@ -59,7 +62,7 @@ export function JobTimeline({
           <p className="mt-1 text-sm text-ink-muted">{formatDateTime(event.created_at)}</p>
         ) : null}
         <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-muted">
-          If that was not what you meant to happen, give us a ring on 07934 633583 and we
+          If that was not what you meant to happen, give us a ring on {phone} and we
           will pick it back up.
         </p>
       </div>

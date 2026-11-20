@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { addMember } from "@/lib/members";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { emailSchema } from "@/lib/validation";
 import type { ClientMemberRole } from "@/types/database";
 
@@ -43,6 +44,19 @@ export async function addClientMember(formData: FormData): Promise<MemberActionR
   }
 
   const role: ClientMemberRole = rawRole === "manager" ? "manager" : "viewer";
+
+  // Every add sends an email from the business's address, so an unlimited
+  // form is a free spam relay. Customers get a handful an hour, which is far
+  // more than a real household or office needs; the owner is not limited.
+  if (user.role !== "owner") {
+    const { allowed } = await checkRateLimit("member-invite", 10, 60);
+    if (!allowed) {
+      return {
+        ok: false,
+        formError: "That is a lot of invitations in one go. Try again in an hour, or ring us.",
+      };
+    }
+  }
 
   const supabase = await createClient();
 

@@ -225,8 +225,7 @@ export default async function HomePage() {
         <div className="container-page">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
-              <p className="text-label uppercase text-accent">What we do</p>
-              <h2 className="mt-3 font-display text-title text-ink">
+              <h2 className="font-display text-title text-ink">
                 One firm for the pipe, the boiler and the wall you had to open to reach them.
               </h2>
             </div>
@@ -377,9 +376,7 @@ export default async function HomePage() {
             </div>
 
             <div>
-              <p className="text-label uppercase text-accent">Why us</p>
-
-              <h2 className="mt-3 font-display text-title text-ink">
+              <h2 className="font-display text-title text-ink">
                 You are told what it needs, not what is easiest to sell you.
               </h2>
 
@@ -422,8 +419,7 @@ export default async function HomePage() {
       <section className="section-y">
         <div className="container-page">
           <div className="max-w-2xl">
-            <p className="text-label uppercase text-accent">How it works</p>
-            <h2 className="mt-3 font-display text-title text-ink">
+            <h2 className="font-display text-title text-ink">
               Four steps, and you can see all of them from your phone.
             </h2>
           </div>
@@ -459,8 +455,7 @@ export default async function HomePage() {
         <div className="container-page section-y">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
-              <p className="text-label uppercase text-accent">Recent work</p>
-              <h2 className="mt-3 font-display text-title text-ink">Jobs we have finished.</h2>
+              <h2 className="font-display text-title text-ink">Jobs we have finished.</h2>
             </div>
 
             <Link

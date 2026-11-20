@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 
 /**
- * Middleware does three jobs, in this order:
+ * The proxy (formerly middleware) does three jobs, in this order:
  *
  *   1. Refreshes the Supabase session cookie so a signed-in user is not thrown
  *      out mid-task.
@@ -76,7 +76,7 @@ function buildCsp(supabaseOrigin: string, isDev: boolean) {
   return directives.join("; ").replace(/\s{2,}/g, " ").trim();
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
 
   let supabaseOrigin = "";

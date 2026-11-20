@@ -38,9 +38,7 @@ export default function AboutPage() {
     <>
       <section className="border-b border-line bg-surface-sunken">
         <div className="container-page py-16 md:py-20">
-          <p className="text-label uppercase text-accent">About us</p>
-
-          <h1 className="mt-3 max-w-3xl font-display text-title text-ink">
+          <h1 className="max-w-3xl font-display text-title text-ink">
             {years} years of other people&apos;s emergencies.
           </h1>
 

@@ -7,7 +7,11 @@ import { Card, DetailRow } from "@/components/ui/surface";
 import { QuoteStatusBadge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { DocumentLines, TotalsPanel } from "@/components/money-document";
-import { SendQuoteButton } from "@/components/owner/quote-actions";
+import {
+  DeleteDraftQuoteButton,
+  SendQuoteButton,
+  WithdrawQuoteButton,
+} from "@/components/owner/quote-actions";
 import { ShareLink } from "@/components/owner/share-link";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
@@ -39,11 +43,23 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
 
   if (!quote || !settings) notFound();
 
-  const { data: items } = await supabase
-    .from("quote_items")
-    .select("id, description, kind, quantity_milli, unit_price_pence, vat_rate_bp")
-    .eq("quote_id", id)
-    .order("sort_order", { ascending: true });
+  const [{ data: items }, { data: invoice }] = await Promise.all([
+    supabase
+      .from("quote_items")
+      .select("id, description, kind, quantity_milli, unit_price_pence, vat_rate_bp")
+      .eq("quote_id", id)
+      .order("sort_order", { ascending: true }),
+    // The live invoice raised from this quote, if any. Cancelled ones do not
+    // count, so a replacement can still be raised after cancelling.
+    supabase
+      .from("invoices")
+      .select("id, reference")
+      .eq("quote_id", id)
+      .is("deleted_at", null)
+      .neq("status", "void")
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const expired = quote.status === "sent" && isPast(quote.valid_until);
 
@@ -142,6 +158,10 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                   totalLabel={formatPence(quote.total_pence)}
                 />
               </div>
+
+              <div className="mt-5 border-t border-line pt-4">
+                <DeleteDraftQuoteButton quoteId={quote.id} jobId={quote.job_id} />
+              </div>
             </Card>
           ) : null}
 
@@ -162,6 +182,25 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                     : "This customer has no email address on file, so nothing was sent automatically. Text them this link — they can accept it without signing in."
                 }
               />
+
+              <div className="mt-5 border-t border-line pt-4">
+                <WithdrawQuoteButton quoteId={quote.id} reference={quote.reference} />
+              </div>
+            </Card>
+          ) : null}
+
+          {quote.status === "withdrawn" ? (
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">Withdrawn</h2>
+              <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
+                You took this quote back, so the customer can no longer accept it.
+              </p>
+              <Link
+                href={`/app/jobs/${quote.job_id}/quote`}
+                className={buttonClasses({ variant: "secondary", fullWidth: true, className: "mt-5" })}
+              >
+                Write a new quote
+              </Link>
             </Card>
           ) : null}
 
@@ -172,16 +211,28 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                 {quote.responded_at
                   ? `The customer accepted this on ${formatDateTime(quote.responded_at)}.`
                   : "The customer has accepted this quote."}{" "}
-                Raising an invoice will carry these lines across so you do not retype them.
+                {invoice
+                  ? `It has been invoiced as ${invoice.reference}.`
+                  : "Raising an invoice will carry these lines across so you do not retype them."}
               </p>
 
-              <Link
-                href={`/app/jobs/${quote.job_id}/invoice?from=${quote.id}`}
-                className={buttonClasses({ fullWidth: true, className: "mt-5" })}
-              >
-                <ReceiptIcon size={19} aria-hidden="true" />
-                Invoice this quote
-              </Link>
+              {invoice ? (
+                <Link
+                  href={`/app/invoices/${invoice.id}`}
+                  className={buttonClasses({ variant: "secondary", fullWidth: true, className: "mt-5" })}
+                >
+                  <ReceiptIcon size={19} aria-hidden="true" />
+                  View {invoice.reference}
+                </Link>
+              ) : (
+                <Link
+                  href={`/app/jobs/${quote.job_id}/invoice?from=${quote.id}`}
+                  className={buttonClasses({ fullWidth: true, className: "mt-5" })}
+                >
+                  <ReceiptIcon size={19} aria-hidden="true" />
+                  Invoice this quote
+                </Link>
+              )}
             </Card>
           ) : null}
 

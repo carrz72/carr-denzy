@@ -5,9 +5,9 @@
   "description": "Carr Denzy Plumbing & Gas — marketing site, client portal and job management app",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "eslint . && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "dev:login": "node scripts/dev-login.mjs",
     "db:push": "supabase db push",
@@ -21,7 +21,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "idb": "^8.0.3",
-    "next": "^15.5.4",
+    "next": "^16.4.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "resend": "^6.1.0",
@@ -35,6 +35,8 @@
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@types/web-push": "^3.6.4",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.6",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2"
   }

@@ -71,7 +71,8 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
 
   const outstanding = invoice.total_pence - invoice.paid_pence;
   const paid = invoice.status === "paid";
-  const late = invoice.status === "overdue" || (invoice.status === "sent" && isPast(invoice.due_date));
+  const voided = invoice.status === "void";
+  const late = invoice.status === "overdue" || ((invoice.status === "sent" || invoice.status === "part_paid") && isPast(invoice.due_date));
 
   const footerNote =
     typeof snapshot?.invoice_footer_note === "string" ? snapshot.invoice_footer_note : null;
@@ -161,7 +162,7 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
             </p>
           ) : null}
 
-          {!paid ? (
+          {!paid && !voided ? (
             <BankDetails
               className="mt-6 print-avoid-break"
               snapshot={snapshot}
@@ -177,7 +178,14 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
         </Card>
 
         <div className="no-print flex min-w-0 flex-col gap-6">
-          {paid ? (
+          {voided ? (
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">Cancelled</h2>
+              <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
+                This invoice has been cancelled, so there is nothing to pay on it. If you were not expecting that, ring us on {phone}.
+              </p>
+            </Card>
+          ) : paid ? (
             <Card className="border-positive/25 bg-positive-soft">
               <h2 className="flex items-center gap-2 text-label uppercase text-positive-ink">
                 <CheckCircleIcon size={17} weight="fill" aria-hidden="true" />

@@ -29,7 +29,7 @@ export type JobStatus =
   | "invoiced"
   | "paid"
   | "cancelled";
-export type QuoteStatus = "draft" | "sent" | "accepted" | "declined" | "expired";
+export type QuoteStatus = "draft" | "sent" | "accepted" | "declined" | "expired" | "withdrawn";
 export type InvoiceStatus = "draft" | "sent" | "part_paid" | "paid" | "overdue" | "void";
 export type PaymentMethod = "bank_transfer" | "cash" | "cheque" | "card" | "other";
 export type LineKind = "labour" | "materials" | "other";
@@ -85,6 +85,17 @@ export type Service = {
   created_at: string;
 }
 
+/**
+ * The owner's private notes about a customer. Deliberately its own table, not a
+ * column on `clients`: a customer can read and update their own clients row.
+ */
+export type ClientPrivateNotes = {
+  client_id: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Client = {
   id: string;
   profile_id: string | null;
@@ -92,7 +103,6 @@ export type Client = {
   email: string | null;
   phone: string | null;
   company_name: string | null;
-  notes: string | null;
   /** Customer-controlled. All default true — these concern work they asked for. */
   notify_booking: boolean;
   notify_messages: boolean;
@@ -438,6 +448,20 @@ export type Database = {
         Client,
         "full_name",
         [Rel<"clients_profile_id_fkey", "profile_id", "profiles">]
+      >;
+
+      client_private_notes: Table<
+        ClientPrivateNotes,
+        "client_id" | "notes",
+        [
+          {
+            foreignKeyName: "client_private_notes_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: true;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ]
       >;
 
       properties: Table<

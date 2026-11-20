@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import {
+  ArrowCounterClockwiseIcon,
   ArrowsClockwiseIcon,
   CheckIcon,
   CurrencyGbpIcon,
   PaperPlaneTiltIcon,
+  ProhibitIcon,
   TrashIcon,
   WarningIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -14,7 +16,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
 import { FormError, SelectField, TextAreaField, TextField } from "@/components/ui/field";
-import { deleteDraftInvoice, recordPayment, resendInvoice, sendInvoice } from "@/app/(app)/app/actions";
+import {
+  deleteDraftInvoice,
+  deletePayment,
+  recordPayment,
+  resendInvoice,
+  sendInvoice,
+  voidInvoice,
+} from "@/app/(app)/app/actions";
 import { formatPence, formatPenceBare, parsePence } from "@/lib/money";
 import { todayInLondon } from "@/lib/dates";
 import type { PaymentMethod } from "@/types/database";
@@ -469,5 +478,158 @@ export function RecordPaymentForm({
         </Button>
       </form>
     </Card>
+  );
+}
+
+/**
+ * Cancelling a sent invoice that should not have gone out. Two taps, with the
+ * consequence spelt out, because unlike deleting a draft the customer has
+ * already seen this one.
+ */
+export function VoidInvoiceButton({
+  invoiceId,
+  reference,
+}: {
+  invoiceId: string;
+  reference: string;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function cancelInvoice() {
+    setError(null);
+
+    const formData = new FormData();
+    formData.set("invoice_id", invoiceId);
+
+    startTransition(async () => {
+      const result = await voidInvoice(formData);
+
+      if (!result.ok) {
+        setError(result.formError ?? "Could not cancel that invoice.");
+        setConfirming(false);
+        return;
+      }
+
+      setConfirming(false);
+      router.refresh();
+    });
+  }
+
+  if (confirming) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-[0.9375rem] leading-relaxed text-ink-muted">
+          {reference} stays on file marked Cancelled, and its link tells the customer there
+          is nothing to pay. Reminders stop. This cannot be undone, so if the figures were
+          only wrong, cancel it and raise a corrected one.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="destructive"
+            loading={isPending}
+            onClick={cancelInvoice}
+            icon={<ProhibitIcon size={18} weight="bold" />}
+          >
+            Yes, cancel it
+          </Button>
+          <Button variant="quiet" onClick={() => setConfirming(false)}>
+            Keep it
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-medium text-ink-subtle hover:text-critical"
+      >
+        <ProhibitIcon size={16} weight="bold" aria-hidden="true" />
+        Cancel this invoice
+      </button>
+      <FormError message={error} />
+    </div>
+  );
+}
+
+/**
+ * Removing a payment entered by mistake. Small and out of the way on the
+ * payment row, with a confirm step naming the amount, because this changes
+ * what the customer owes.
+ */
+export function RemovePaymentButton({
+  paymentId,
+  amountLabel,
+}: {
+  paymentId: string;
+  amountLabel: string;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function remove() {
+    setError(null);
+
+    const formData = new FormData();
+    formData.set("payment_id", paymentId);
+
+    startTransition(async () => {
+      const result = await deletePayment(formData);
+
+      if (!result.ok) {
+        setError(result.formError ?? "Could not remove that payment.");
+        setConfirming(false);
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
+  if (confirming) {
+    return (
+      <div className="flex w-full flex-col gap-2.5 border-t border-line pt-3">
+        <p className="text-sm leading-relaxed text-ink-muted">
+          Remove this {amountLabel} payment? The amount owed goes back up by {amountLabel}.
+          Only do this if it was entered by mistake.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            loading={isPending}
+            onClick={remove}
+            icon={<ArrowCounterClockwiseIcon size={16} weight="bold" />}
+          >
+            Yes, remove it
+          </Button>
+          <Button variant="quiet" size="sm" onClick={() => setConfirming(false)}>
+            Keep it
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-medium text-ink-subtle hover:text-critical"
+      >
+        <ArrowCounterClockwiseIcon size={15} weight="bold" aria-hidden="true" />
+        Entered by mistake? Remove
+      </button>
+      <FormError message={error} />
+    </div>
   );
 }

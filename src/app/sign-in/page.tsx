@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeftIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { SignInForm } from "@/components/auth/sign-in-form";
-import { business } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
@@ -60,7 +59,7 @@ export default async function SignInPage({
             </p>
 
             <div className="mt-8 rounded-2xl border border-line bg-surface-raised p-6 shadow-raised sm:p-8">
-              <SignInForm next={next} initialError={params.error} />
+              <SignInForm next={next} initialError={params.error} phone={contact.phone} />
             </div>
 
             <p className="mt-8 text-center text-sm leading-relaxed text-ink-subtle">

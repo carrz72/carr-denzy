@@ -25,9 +25,7 @@ export default async function PrivacyPage() {
     <article className="section-y">
       <div className="container-page">
         <div className="container-prose">
-          <p className="text-label uppercase text-accent">Legal</p>
-
-          <h1 className="mt-3 font-display text-title text-ink">Privacy policy</h1>
+          <h1 className="font-display text-title text-ink">Privacy policy</h1>
 
           <p className="mt-4 text-sm text-ink-subtle">Last updated: 10 August 2026</p>
 

@@ -12,6 +12,7 @@ import {
   TotalsPanel,
 } from "@/components/money-document";
 import { PrintButton } from "@/components/print-button";
+import { businessForInvoice } from "@/lib/invoice-snapshot";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
@@ -64,29 +65,10 @@ export default async function InvoicePreviewPage({
     .eq("invoice_id", id)
     .order("sort_order", { ascending: true });
 
-  // A draft has no snapshot yet — it is taken when the invoice is issued — so
-  // live settings stand in. That is exactly what the customer would get if it
+  // A draft always shows live settings, since its details are only frozen
+  // when it is sent. That is exactly what the customer would get if it
   // were sent right now, which is what a preview is for.
-  const business =
-    invoice.business_snapshot ??
-    ({
-      trading_name: settings.trading_name,
-      legal_name: settings.legal_name,
-      address_line1: settings.address_line1,
-      address_line2: settings.address_line2,
-      city: settings.city,
-      postcode: settings.postcode,
-      phone: settings.phone,
-      email: settings.email,
-      vat_registered: settings.vat_registered,
-      vat_number: settings.vat_number,
-      cis_enabled: settings.cis_enabled,
-      utr: settings.utr,
-      bank_account_name: settings.bank_account_name,
-      bank_sort_code: settings.bank_sort_code,
-      bank_account_number: settings.bank_account_number,
-      invoice_footer_note: settings.invoice_footer_note,
-    } as Record<string, unknown>);
+  const business = businessForInvoice(invoice, settings);
 
   const clientSnapshot = (invoice.client_snapshot ?? {}) as Record<string, unknown>;
   const snapshotAddress = clientSnapshot.address as Record<string, string | null> | null;
@@ -128,7 +110,7 @@ export default async function InvoicePreviewPage({
           </Link>
 
           <div className="min-w-52">
-            <PrintButton label="Download or print" />
+            <PrintButton pdfHref={`/app/invoices/${invoice.id}/pdf`} />
           </div>
         </div>
       </div>

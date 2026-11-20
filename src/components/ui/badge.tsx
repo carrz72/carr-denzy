@@ -97,6 +97,7 @@ export const quoteStatusLabels: Record<QuoteStatus, string> = {
   accepted: "Accepted",
   declined: "Declined",
   expired: "Expired",
+  withdrawn: "Withdrawn",
 };
 
 const quoteStatusTones: Record<QuoteStatus, Tone> = {
@@ -105,6 +106,7 @@ const quoteStatusTones: Record<QuoteStatus, Tone> = {
   accepted: "positive",
   declined: "neutral",
   expired: "neutral",
+  withdrawn: "neutral",
 };
 
 export function QuoteStatusBadge({

@@ -70,6 +70,16 @@ export async function GET(request: NextRequest) {
 
   const result = { invoicesChased: 0, quotesChased: 0, failed: 0, errors: [] as string[] };
 
+  // The date sweep used to run only when the owner opened a list, so a quiet
+  // week left lapsed quotes "awaiting reply" and late invoices "sent" for any
+  // customer looking. Run it here first, every scheduled day, before deciding
+  // who to chase.
+  const { error: sweepError } = await admin.rpc("mark_overdue_invoices");
+  if (sweepError) {
+    console.error("[cron] overdue sweep failed", sweepError.message);
+    result.errors.push(`sweep: ${sweepError.message}`);
+  }
+
   // A query that fails returns `data: null`, which loops zero times and looks
   // exactly like "nothing needed chasing". That is the worst possible way for
   // this to break: silent, and indistinguishable from working. Both queries
@@ -81,7 +91,8 @@ export async function GET(request: NextRequest) {
     .select(
       "id, reference, due_date, total_pence, paid_pence, last_reminder_at, client:clients(full_name, email)",
     )
-    .in("status", ["sent", "overdue"])
+    // Part-paid counts: the balance is just as late as an unpaid invoice.
+    .in("status", ["sent", "part_paid", "overdue"])
     .is("deleted_at", null)
     .lt("due_date", today)
     .or(`last_reminder_at.is.null,last_reminder_at.lt.${cooldownStart}`)

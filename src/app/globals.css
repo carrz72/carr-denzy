@@ -30,11 +30,19 @@
   /* --- Lines ------------------------------------------------------------ */
   --color-line: #e6ded2;
   --color-line-strong: #cfc3b2;
+  /* Form-control edges. 3.5:1 on white and 3.3:1 on the base, clearing the
+     3:1 WCAG 1.4.11 asks of a boundary that tells you where to type. The
+     decorative lines above stay soft; only inputs need to be found. */
+  --color-line-input: #958775;
 
   /* --- Text ------------------------------------------------------------- */
   --color-ink: #1a1714;
   --color-ink-muted: #6b6055;
-  --color-ink-subtle: #948676;
+  /* Was #948676, which read 3.3:1 on the base and 3.0:1 on sunken panels —
+     below the 4.5:1 body text needs, and it is used for small labels and
+     placeholders. Now 5.1:1 on the base and at least 4.6:1 on every tinted
+     surface, while staying a step lighter than ink-muted. */
+  --color-ink-subtle: #74685b;
   --color-ink-inverse: #faf7f2;
 
   /* --- Accent (single, desaturated brick) ------------------------------- */

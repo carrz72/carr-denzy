@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { ArrowRightIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/service-icon";
-import { business, services } from "@/lib/site";
+import { services } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
@@ -22,9 +22,7 @@ export default async function ServicesPage() {
     <>
       <section className="border-b border-line bg-surface-sunken">
         <div className="container-page py-16 md:py-20">
-          <p className="text-label uppercase text-accent">What we do</p>
-
-          <h1 className="mt-3 max-w-3xl font-display text-title text-ink">
+          <h1 className="max-w-3xl font-display text-title text-ink">
             Eight things, and the overlap between them is the point.
           </h1>
 

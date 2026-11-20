@@ -121,10 +121,10 @@ export function MessageThread({
           maxLength={5000}
           placeholder="Anything we should know?"
           className={cn(
-            "w-full resize-y rounded-md border border-line bg-surface-raised px-3.5 py-3",
+            "w-full resize-y rounded-md border border-line-input bg-surface-raised px-3.5 py-3",
             "shadow-subtle transition-[border-color] duration-200",
             "placeholder:text-ink-subtle",
-            "hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25",
+            "hover:border-ink-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25",
           )}
         />
 

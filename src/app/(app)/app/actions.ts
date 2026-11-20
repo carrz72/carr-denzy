@@ -28,10 +28,15 @@ import {
   sendPortalInvite,
   sendQuoteToClient,
 } from "@/lib/email";
-import { renderInvoicePdf, renderQuotePdf } from "@/lib/invoice-pdf";
+import { buildInvoicePdf, buildQuotePdf } from "@/lib/document-pdf";
+import {
+  businessSnapshot,
+  LIVE_PAYMENT_FIELDS,
+  UNPAID_ISSUED_STATUSES,
+} from "@/lib/invoice-snapshot";
 import { notifyClientBooked, notifyClientCompleted } from "@/lib/notify-client";
 import { formatPence } from "@/lib/money";
-import { addDaysToToday, formatDate, workingDaysFrom } from "@/lib/dates";
+import { addDaysToToday, formatDate, isPast, workingDaysFrom } from "@/lib/dates";
 
 export interface ActionResult {
   ok: boolean;
@@ -828,7 +833,7 @@ export async function deleteJob(formData: FormData): Promise<ActionResult> {
     return {
       ok: false,
       formError:
-        "This job has an invoice on it, so it cannot be deleted. Cancel the job, and void or delete the invoice from the Money screen.",
+        "This job has an invoice on it, so it cannot be deleted. Cancel the job instead, and cancel or delete the invoice from its own page.",
     };
   }
 
@@ -1249,6 +1254,101 @@ export async function updateQuote(formData: FormData): Promise<ActionResult> {
   return { ok: true, id: quoteId };
 }
 
+/**
+ * Deletes a draft quote. Never sent, so nobody has seen it, and it goes the
+ * same way as a draft invoice: soft-deleted, out of every list.
+ */
+export async function deleteDraftQuote(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const quoteId = String(formData.get("quote_id") ?? "");
+  if (!quoteId) return { ok: false, formError: "Missing quote." };
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("quotes")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", quoteId)
+    .eq("status", "draft")
+    .is("deleted_at", null)
+    .select("id, job_id")
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) console.error("[quote] delete failed", error);
+    return {
+      ok: false,
+      formError: "Only a draft can be deleted. A sent quote can be withdrawn instead.",
+    };
+  }
+
+  revalidatePath(`/app/jobs/${data.job_id}`);
+  revalidatePath("/app/quotes");
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: data.job_id };
+}
+
+/**
+ * Withdraws a sent quote that has not been answered: the price was wrong, or
+ * the customer wants a different option. It stays on file as Withdrawn and can
+ * no longer be accepted anywhere, since acceptance only takes a quote that is
+ * still "sent". If it was the job's only open quote, the job goes back to
+ * New, ready for the replacement.
+ */
+export async function withdrawQuote(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const quoteId = String(formData.get("quote_id") ?? "");
+  if (!quoteId) return { ok: false, formError: "Missing quote." };
+
+  const supabase = await createClient();
+
+  const { data: quote, error } = await supabase
+    .from("quotes")
+    .update({ status: "withdrawn" })
+    .eq("id", quoteId)
+    .eq("status", "sent")
+    .is("deleted_at", null)
+    .select("id, job_id")
+    .maybeSingle();
+
+  if (error || !quote) {
+    if (error) console.error("[quote] withdraw failed", error);
+    return {
+      ok: false,
+      formError: error?.message.includes("withdrawn")
+        ? "The database has not been updated for this yet. Apply the latest migration, then try again."
+        : "Only a quote still waiting on an answer can be withdrawn. It may have just been accepted or declined, so reload the page.",
+    };
+  }
+
+  const { data: stillOpen } = await supabase
+    .from("quotes")
+    .select("id")
+    .eq("job_id", quote.job_id)
+    .eq("status", "sent")
+    .is("deleted_at", null)
+    .limit(1);
+
+  if (!stillOpen?.length) {
+    await supabase
+      .from("jobs")
+      .update({ status: "new" })
+      .eq("id", quote.job_id)
+      .eq("status", "quoted");
+  }
+
+  revalidatePath(`/app/quotes/${quoteId}`);
+  revalidatePath(`/app/jobs/${quote.job_id}`);
+  revalidatePath("/app/quotes");
+  revalidatePath(`/quotes/view/${quoteId}`);
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: quoteId };
+}
+
 /** Sends a draft quote to the customer. */
 export async function sendQuote(formData: FormData): Promise<ActionResult> {
   await requireOwner();
@@ -1257,6 +1357,22 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
   if (!quoteId) return { ok: false, formError: "Missing quote." };
 
   const supabase = await createClient();
+
+  // A draft whose "open until" date has already gone would arrive expired:
+  // the customer could read it but not accept it. Catch it before it leaves.
+  const { data: pending } = await supabase
+    .from("quotes")
+    .select("valid_until")
+    .eq("id", quoteId)
+    .maybeSingle();
+
+  if (pending && isPast(pending.valid_until)) {
+    return {
+      ok: false,
+      formError:
+        "This quote's 'open until' date has already passed, so the customer could not accept it. Change the date, then send it.",
+    };
+  }
 
   const { data: quote, error } = await supabase
     .from("quotes")
@@ -1282,7 +1398,7 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
     // Best-effort. A PDF that fails to render must not stop the quote being
     // sent — the link in the email is the thing that actually wins the job,
     // and the attachment is a convenience for people who forward it on.
-    const pdf = await buildQuotePdf(quoteId).catch((pdfError) => {
+    const pdf = await buildQuotePdf(supabase, quoteId).catch((pdfError) => {
       console.error("[quote] pdf render failed", pdfError);
       return undefined;
     });
@@ -1320,63 +1436,6 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
   return { ok: true, warning };
 }
 
-/**
- * Renders a quote as a PDF, using the same document as invoices.
- *
- * Reads the business details live from `settings` rather than from a snapshot,
- * because unlike an invoice a quote is not a permanent financial record — it is
- * an offer, and if the phone number changed between quoting and the customer
- * opening the PDF, the newer one is the more useful of the two.
- */
-async function buildQuotePdf(quoteId: string): Promise<Buffer | undefined> {
-  const supabase = await createClient();
-
-  const [{ data: quote }, { data: business }] = await Promise.all([
-    supabase
-      .from("quotes")
-      .select(
-        `reference, sent_at, valid_until, subtotal_pence, tax_pence, total_pence, intro_note,
-         client:clients(full_name, company_name),
-         job:jobs(property:properties(address_line1, address_line2, city, postcode)),
-         items:quote_items(description, kind, quantity_milli, unit_price_pence, vat_rate_bp, sort_order)`,
-      )
-      .eq("id", quoteId)
-      .maybeSingle(),
-    supabase.from("settings").select("*").maybeSingle(),
-  ]);
-
-  if (!quote) return undefined;
-
-  const address = quote.job?.property;
-
-  return renderQuotePdf({
-    reference: quote.reference,
-    issueDate: quote.sent_at,
-    dueDate: quote.valid_until,
-    business: business as Record<string, unknown> | null,
-    customerName: quote.client?.full_name ?? "your customer",
-    customerCompany: quote.client?.company_name ?? null,
-    customerAddress: address
-      ? [address.address_line1, address.address_line2, address.city, address.postcode]
-          .filter(Boolean)
-          .join(", ")
-      : null,
-    items: [...(quote.items ?? [])].sort((a, b) => a.sort_order - b.sort_order),
-    subtotalPence: quote.subtotal_pence,
-    vatPence: quote.tax_pence,
-    cisDeductionPence: 0,
-    cisDeductionRateBp: business?.cis_deduction_rate_bp ?? 0,
-    totalPence: quote.total_pence,
-    vatRegistered: business?.vat_registered ?? false,
-    // CIS is deducted when an invoice is paid, never on a quote — the customer
-    // is being shown the price of the work, not a subcontractor settlement.
-    cisEnabled: false,
-    reverseCharge: false,
-    notes: quote.intro_note,
-    footerNote: null,
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Invoices
 // ---------------------------------------------------------------------------
@@ -1410,6 +1469,27 @@ export async function createInvoice(formData: FormData): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
 
   const supabase = await createClient();
+
+  // One quote, one invoice. A second "Invoice this quote" tap (or the same
+  // page opened twice) would otherwise bill the customer for the work again.
+  // A cancelled invoice does not count, so a corrected one can be raised.
+  if (parsed.data.quote_id) {
+    const { data: already } = await supabase
+      .from("invoices")
+      .select("reference")
+      .eq("quote_id", parsed.data.quote_id)
+      .is("deleted_at", null)
+      .neq("status", "void")
+      .limit(1)
+      .maybeSingle();
+
+    if (already) {
+      return {
+        ok: false,
+        formError: `This quote has already been invoiced as ${already.reference}. Open that one instead, or cancel it first if it needs replacing.`,
+      };
+    }
+  }
 
   // A standalone invoice may be the first record of this customer — work done
   // before the app existed, or a one-off that never became a job.
@@ -1464,26 +1544,7 @@ export async function createInvoice(formData: FormData): Promise<ActionResult> {
         parsed.data.due_date || addDaysToToday(settings?.payment_terms_days ?? 14),
       notes: parsed.data.notes || null,
       reverse_charge: parsed.data.reverse_charge,
-      business_snapshot: settings
-        ? {
-            trading_name: settings.trading_name,
-            legal_name: settings.legal_name,
-            address_line1: settings.address_line1,
-            address_line2: settings.address_line2,
-            city: settings.city,
-            postcode: settings.postcode,
-            phone: settings.phone,
-            email: settings.email,
-            vat_registered: settings.vat_registered,
-            vat_number: settings.vat_number,
-            cis_enabled: settings.cis_enabled,
-            utr: settings.utr,
-            bank_account_name: settings.bank_account_name,
-            bank_sort_code: settings.bank_sort_code,
-            bank_account_number: settings.bank_account_number,
-            invoice_footer_note: settings.invoice_footer_note,
-          }
-        : null,
+      business_snapshot: settings ? businessSnapshot(settings) : null,
       client_snapshot: {
         full_name: client.full_name,
         company_name: client.company_name,
@@ -1526,92 +1587,118 @@ export async function createInvoice(formData: FormData): Promise<ActionResult> {
 }
 
 /**
- * Builds the PDF copy attached to an invoice email. Reads back everything
- * needed for `money-document.tsx`'s figures — the same source the portal and
- * print pages use — so the attachment can never disagree with what the
- * customer sees on the invoice page. Returns null rather than throwing: a
- * missing attachment is not worth losing the whole send over.
+ * Changes a draft invoice before it goes out: its lines, dates, note and
+ * reverse-charge flag. The customer, job and quote stay as raised — moving an
+ * invoice to a different customer is a different invoice.
+ *
+ * Drafts only, checked here and again by the database trigger that refuses
+ * line changes on anything issued.
  */
-async function buildInvoicePdf(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  invoiceId: string,
-): Promise<Buffer | null> {
-  const [{ data: invoice, error: invoiceError }, { data: settings, error: settingsError }] =
-    await Promise.all([
-      supabase
-        .from("invoices")
-        .select(
-          `reference, issue_date, due_date, business_snapshot, client_snapshot,
-           subtotal_pence, vat_pence, cis_deduction_pence, total_pence, paid_pence,
-           reverse_charge, notes, status, client:clients(full_name)`,
-        )
-        .eq("id", invoiceId)
-        .maybeSingle(),
-      supabase
-        .from("settings")
-        .select("vat_registered, cis_enabled, cis_deduction_rate_bp")
-        .maybeSingle(),
-    ]);
+export async function updateInvoice(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
 
-  if (!invoice || !settings) {
-    console.error("[invoice] pdf skipped: missing data", {
-      invoiceError: invoiceError?.message,
-      settingsError: settingsError?.message,
-      hasInvoice: !!invoice,
-      hasSettings: !!settings,
-    });
-    return null;
-  }
+  const invoiceId = String(formData.get("invoice_id") ?? "");
+  if (!invoiceId) return { ok: false, formError: "Missing invoice." };
 
-  const { data: items } = await supabase
-    .from("invoice_items")
-    .select("description, kind, quantity_milli, unit_price_pence, vat_rate_bp")
-    .eq("invoice_id", invoiceId)
-    .order("sort_order", { ascending: true });
-
-  const business = (invoice.business_snapshot ?? {}) as Record<string, unknown>;
-  const clientSnapshot = (invoice.client_snapshot ?? {}) as Record<string, unknown>;
-  const snapshotAddress = clientSnapshot.address as Record<string, string | null> | null;
-  const footerNote =
-    typeof business.invoice_footer_note === "string" ? business.invoice_footer_note : null;
-
+  let items: unknown;
   try {
-    return await renderInvoicePdf({
-      reference: invoice.reference,
-      issueDate: invoice.issue_date,
-      dueDate: invoice.due_date,
-      business,
-      customerName:
-        (clientSnapshot.full_name as string | null) ?? invoice.client?.full_name ?? "your customer",
-      customerCompany: (clientSnapshot.company_name as string | null) ?? null,
-      customerAddress: snapshotAddress
-        ? [
-            snapshotAddress.address_line1,
-            snapshotAddress.address_line2,
-            snapshotAddress.city,
-            snapshotAddress.postcode,
-          ]
-            .filter(Boolean)
-            .join(", ")
-        : null,
-      items: items ?? [],
-      subtotalPence: invoice.subtotal_pence,
-      vatPence: invoice.vat_pence,
-      cisDeductionPence: invoice.cis_deduction_pence,
-      cisDeductionRateBp: settings.cis_deduction_rate_bp,
-      totalPence: invoice.total_pence,
-      paidPence: invoice.paid_pence,
-      vatRegistered: settings.vat_registered,
-      cisEnabled: settings.cis_enabled,
-      reverseCharge: invoice.reverse_charge,
-      notes: invoice.notes,
-      footerNote,
-      settled: invoice.status === "paid" || invoice.status === "void",
-    });
-  } catch (pdfError) {
-    console.error("[invoice] pdf generation failed", pdfError);
-    return null;
+    items = JSON.parse(String(formData.get("items") ?? "[]"));
+  } catch {
+    return { ok: false, formError: "Could not read the invoice lines. Try again." };
   }
+
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("invoices")
+    .select("id, status, job_id, client_id, quote_id")
+    .eq("id", invoiceId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, formError: "That invoice no longer exists." };
+
+  if (existing.status !== "draft") {
+    return {
+      ok: false,
+      formError: "This invoice has already been sent, so its figures are fixed.",
+    };
+  }
+
+  const parsed = invoiceSchema.safeParse({
+    job_id: existing.job_id ?? "",
+    client_id: existing.client_id ?? "",
+    quote_id: existing.quote_id ?? "",
+    issue_date: formData.get("issue_date") ?? "",
+    due_date: formData.get("due_date") ?? "",
+    notes: formData.get("notes") ?? "",
+    reverse_charge: formData.get("reverse_charge") === "on",
+    items,
+  });
+
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+
+  const { data: settings } = await supabase
+    .from("settings")
+    .select("payment_terms_days")
+    .maybeSingle();
+
+  // Status re-checked in the write itself, so a send that lands between the
+  // read above and this update cannot be overwritten.
+  const { data: updated, error } = await supabase
+    .from("invoices")
+    .update({
+      issue_date: parsed.data.issue_date,
+      due_date: parsed.data.due_date || addDaysToToday(settings?.payment_terms_days ?? 14),
+      notes: parsed.data.notes || null,
+      reverse_charge: parsed.data.reverse_charge,
+    })
+    .eq("id", invoiceId)
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
+
+  if (error || !updated) {
+    console.error("[invoice] update failed", error);
+    return { ok: false, formError: "Could not save that. Try again." };
+  }
+
+  // Replaced wholesale, as quotes are. The totals trigger recalculates from
+  // whatever ends up in the table.
+  const { error: clearError } = await supabase
+    .from("invoice_items")
+    .delete()
+    .eq("invoice_id", invoiceId);
+
+  if (clearError) {
+    console.error("[invoice] could not clear lines", clearError);
+    return { ok: false, formError: "Could not save the lines. Try again." };
+  }
+
+  const { error: itemsError } = await supabase.from("invoice_items").insert(
+    parsed.data.items.map((item, index) => ({
+      invoice_id: invoiceId,
+      description: item.description,
+      kind: item.kind,
+      quantity_milli: item.quantity_milli,
+      unit_price_pence: item.unit_price_pence,
+      vat_rate_bp: item.vat_rate_bp,
+      sort_order: index,
+    })),
+  );
+
+  if (itemsError) {
+    console.error("[invoice] items failed", itemsError);
+    return {
+      ok: false,
+      formError: "The invoice saved but its lines did not. Open it and try again.",
+    };
+  }
+
+  revalidatePath(`/app/invoices/${invoiceId}`);
+  revalidatePath("/app/invoices");
+
+  return { ok: true, id: invoiceId };
 }
 
 export async function sendInvoice(formData: FormData): Promise<ActionResult> {
@@ -1622,9 +1709,39 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createClient();
 
+  // The details are frozen now, at sending, not when the draft was started:
+  // anything changed in Settings while it sat as a draft must be on the copy
+  // the customer receives.
+  const [{ data: settings }, { data: draft }] = await Promise.all([
+    supabase.from("settings").select("*").maybeSingle(),
+    supabase
+      .from("invoices")
+      .select("client_snapshot, client:clients(full_name, company_name, email, phone)")
+      .eq("id", invoiceId)
+      .maybeSingle(),
+  ]);
+
+  // The customer too: a name or phone corrected on their record while this sat
+  // as a draft belongs on the invoice they get. The address stays as captured
+  // from the job, which is where the work was done.
+  const clientSnapshot = draft?.client
+    ? {
+        ...((draft.client_snapshot ?? {}) as Record<string, unknown>),
+        full_name: draft.client.full_name,
+        company_name: draft.client.company_name,
+        email: draft.client.email,
+        phone: draft.client.phone,
+      }
+    : undefined;
+
   const { data: invoice, error } = await supabase
     .from("invoices")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .update({
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      ...(settings ? { business_snapshot: businessSnapshot(settings) } : {}),
+      ...(clientSnapshot ? { client_snapshot: clientSnapshot } : {}),
+    })
     .eq("id", invoiceId)
     .eq("status", "draft")
     .select("id, reference, total_pence, due_date, job_id, client_id, client:clients(full_name, email)")
@@ -1769,6 +1886,72 @@ export async function deleteDraftInvoice(formData: FormData): Promise<ActionResu
  * parent job's status are all recalculated by trigger, so a part payment
  * cannot leave the three disagreeing (spec FR-54, FR-55, AC-8, AC-9).
  */
+/**
+ * Cancels a sent invoice that should never have gone out: wrong customer,
+ * wrong job, raised twice. It stays on file marked Cancelled — an issued
+ * invoice number is never reused or deleted — but stops asking for money:
+ * no bank details, no reminders, no "still to pay".
+ *
+ * Only while nothing has been paid on it. Once money has come in, cancelling
+ * would leave a payment attached to an invoice that says nothing is owed.
+ */
+export async function voidInvoice(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const invoiceId = String(formData.get("invoice_id") ?? "");
+  if (!invoiceId) return { ok: false, formError: "Missing invoice." };
+
+  const supabase = await createClient();
+
+  const { data: invoice, error } = await supabase
+    .from("invoices")
+    .update({ status: "void" })
+    .eq("id", invoiceId)
+    .in("status", ["sent", "overdue"])
+    .eq("paid_pence", 0)
+    .is("deleted_at", null)
+    .select("id, reference, job_id")
+    .maybeSingle();
+
+  if (error || !invoice) {
+    if (error) console.error("[invoice] void failed", error);
+    return {
+      ok: false,
+      formError:
+        "Only a sent invoice with nothing paid on it can be cancelled. A draft can simply be deleted.",
+    };
+  }
+
+  // The job said "invoice sent". With this one cancelled and no other live
+  // invoice on it, it is back to done-but-not-billed, ready for a new one.
+  if (invoice.job_id) {
+    const { data: others } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("job_id", invoice.job_id)
+      .is("deleted_at", null)
+      .not("status", "in", "(draft,void)")
+      .limit(1);
+
+    if (!others?.length) {
+      await supabase
+        .from("jobs")
+        .update({ status: "completed" })
+        .eq("id", invoice.job_id)
+        .eq("status", "invoiced");
+    }
+
+    revalidatePath(`/app/jobs/${invoice.job_id}`);
+  }
+
+  revalidatePath(`/app/invoices/${invoiceId}`);
+  revalidatePath("/app/invoices");
+  revalidatePath(`/invoices/view/${invoiceId}`);
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: invoiceId };
+}
+
 export async function recordPayment(formData: FormData): Promise<ActionResult> {
   const user = await requireOwner();
 
@@ -1784,6 +1967,23 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
 
   const supabase = await createClient();
+
+  // Money only lands on an invoice the customer has actually been sent. A
+  // payment on a draft or a cancelled one would be invisible in every total.
+  const { data: target } = await supabase
+    .from("invoices")
+    .select("status")
+    .eq("id", parsed.data.invoice_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!target) return { ok: false, formError: "That invoice no longer exists." };
+  if (target.status === "draft") {
+    return { ok: false, formError: "Send the invoice before recording a payment against it." };
+  }
+  if (target.status === "void") {
+    return { ok: false, formError: "This invoice was cancelled, so it cannot take a payment." };
+  }
 
   const { error } = await supabase.from("payments").insert({
     invoice_id: parsed.data.invoice_id,
@@ -1856,9 +2056,120 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Takes back a payment entered by mistake: wrong amount, wrong invoice, or
+ * money that never actually arrived. The totals trigger recalculates what is
+ * owed and the invoice's status (paid back to part paid or sent), and the
+ * removal is written to the audit log with what was removed, so a payment
+ * never disappears without trace.
+ */
+export async function deletePayment(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const paymentId = String(formData.get("payment_id") ?? "");
+  if (!paymentId) return { ok: false, formError: "Missing payment." };
+
+  const supabase = await createClient();
+
+  const { data: payment, error } = await supabase
+    .from("payments")
+    .delete()
+    .eq("id", paymentId)
+    .select("invoice_id, amount_pence, method, paid_on, reference")
+    .maybeSingle();
+
+  if (error || !payment) {
+    if (error) console.error("[payment] delete failed", error);
+    return { ok: false, formError: "Could not remove that payment. Try again." };
+  }
+
+  const { error: auditError } = await supabase.rpc("record_audit_entry", {
+    p_action: "payment.removed",
+    p_entity: "invoice",
+    p_entity_id: payment.invoice_id,
+    p_detail: {
+      amount_pence: payment.amount_pence,
+      method: payment.method,
+      paid_on: payment.paid_on,
+      reference: payment.reference,
+    },
+  });
+  if (auditError) console.error("[payment] audit entry failed", auditError.message);
+
+  // The trigger puts an unpaid invoice back to "sent"; if it is past its due
+  // date it should read overdue straight away, not on the next list visit.
+  await supabase.rpc("mark_overdue_invoices");
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("status, job_id")
+    .eq("id", payment.invoice_id)
+    .maybeSingle();
+
+  // A job marked paid because of this payment is not paid any more.
+  if (invoice?.job_id && invoice.status !== "paid") {
+    await supabase
+      .from("jobs")
+      .update({ status: "invoiced" })
+      .eq("id", invoice.job_id)
+      .eq("status", "paid");
+    revalidatePath(`/app/jobs/${invoice.job_id}`);
+  }
+
+  revalidatePath(`/app/invoices/${payment.invoice_id}`);
+  revalidatePath("/app/invoices");
+  revalidatePath("/app", "layout");
+
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
+
+/**
+ * Carries new payment and contact details onto invoices still waiting to be
+ * paid. Without this, changing bank account in Settings left every unpaid
+ * invoice telling the customer to pay the old one. Names, addresses and tax
+ * numbers stay as issued; paid and void invoices are left alone entirely.
+ */
+async function refreshUnpaidInvoicePaymentDetails(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<void> {
+  const [{ data: settings }, { data: invoices, error }] = await Promise.all([
+    supabase.from("settings").select("*").maybeSingle(),
+    supabase
+      .from("invoices")
+      .select("id, business_snapshot")
+      .in("status", [...UNPAID_ISSUED_STATUSES])
+      .is("deleted_at", null),
+  ]);
+
+  if (error || !settings || !invoices) {
+    if (error) console.error("[settings] unpaid invoice lookup failed", error);
+    return;
+  }
+
+  const live = businessSnapshot(settings);
+
+  for (const invoice of invoices) {
+    const snapshot = { ...((invoice.business_snapshot ?? live) as Record<string, unknown>) };
+    let changed = false;
+    for (const field of LIVE_PAYMENT_FIELDS) {
+      if (snapshot[field] !== live[field]) {
+        snapshot[field] = live[field];
+        changed = true;
+      }
+    }
+    if (!changed) continue;
+
+    const { error: updateError } = await supabase
+      .from("invoices")
+      .update({ business_snapshot: snapshot })
+      .eq("id", invoice.id);
+    if (updateError) console.error("[settings] invoice refresh failed", invoice.id, updateError);
+  }
+}
 
 export async function updateSettings(formData: FormData): Promise<ActionResult> {
   await requireOwner();
@@ -1915,8 +2226,11 @@ export async function updateSettings(formData: FormData): Promise<ActionResult> 
     };
   }
 
+  await refreshUnpaidInvoicePaymentDetails(supabase);
+
   revalidatePath("/app/settings");
   revalidatePath("/app", "layout");
+  revalidatePath("/invoices/view/[id]", "page");
 
   // The public site reads the phone number and email from this same row, so a
   // change here has to reach the marketing pages too. Without this the owner

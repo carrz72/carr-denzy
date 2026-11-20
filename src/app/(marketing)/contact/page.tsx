@@ -37,9 +37,7 @@ export default async function ContactPage() {
       <div className="container-page">
         <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-20">
           <div>
-            <p className="text-label uppercase text-accent">Contact</p>
-
-            <h1 className="mt-3 font-display text-title text-ink">
+            <h1 className="font-display text-title text-ink">
               Ring us, or send the details.
             </h1>
 

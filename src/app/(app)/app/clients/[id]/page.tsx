@@ -5,6 +5,7 @@ import {
   EnvelopeSimpleIcon,
   FileTextIcon,
   MapPinIcon,
+  PencilSimpleIcon,
   PhoneIcon,
   ReceiptIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -15,6 +16,7 @@ import { Card, DetailRow } from "@/components/ui/surface";
 import { InvoiceStatusBadge, JobStatusBadge, QuoteStatusBadge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/auth";
+import { buttonClasses } from "@/components/ui/button";
 import { formatDate, formatRelative } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { cn } from "@/lib/cn";
@@ -24,12 +26,12 @@ export const metadata: Metadata = { title: "Customer", robots: { index: false } 
 export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  await requireStaff();
+  const viewer = await requireStaff();
   const supabase = await createClient();
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, full_name, company_name, email, phone, notes, created_at, profile_id")
+    .select("id, full_name, company_name, email, phone, created_at, profile_id")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -42,6 +44,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     { data: quotes },
     { data: invoices },
     { data: members },
+    { data: privateNotes },
   ] = await Promise.all([
       supabase
         .from("properties")
@@ -71,6 +74,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         .select("*")
         .eq("client_id", id)
         .order("created_at", { ascending: true }),
+      // Kept off the clients row, which the customer can read and edit.
+      supabase
+        .from("client_private_notes")
+        .select("notes")
+        .eq("client_id", id)
+        .maybeSingle(),
     ]);
 
   const outstanding = (invoices ?? [])
@@ -87,6 +96,17 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         title={client.full_name}
         description={client.company_name ?? undefined}
         back={{ href: "/app/clients", label: "All customers" }}
+        action={
+          viewer.role === "owner" ? (
+            <Link
+              href={`/app/clients/${client.id}/edit`}
+              className={buttonClasses({ variant: "secondary", size: "sm" })}
+            >
+              <PencilSimpleIcon size={16} aria-hidden="true" />
+              Edit
+            </Link>
+          ) : undefined
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:gap-8">
@@ -283,10 +303,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             )}
           </Card>
 
-          {client.notes ? (
+          {privateNotes?.notes ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Your notes</h2>
-              <p className="mt-3 whitespace-pre-wrap leading-relaxed text-ink">{client.notes}</p>
+              <p className="mt-3 whitespace-pre-wrap leading-relaxed text-ink">
+                {privateNotes.notes}
+              </p>
             </Card>
           ) : null}
         </div>

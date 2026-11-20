@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 /**
  * Content-Security-Policy is NOT set here — it is set per-request in
- * `src/middleware.ts` so it can carry a nonce that Next.js picks up for its
+ * `src/proxy.ts` (Next.js 16's name for middleware) so it can carry a nonce that Next.js picks up for its
  * own inline hydration scripts. Everything else is static and belongs here.
  */
 const securityHeaders = [
@@ -59,8 +59,8 @@ const nextConfig: NextConfig = {
   },
 
   // Fail the build rather than ship a type error into a business's invoicing.
+  // (Next.js 16 no longer lints during build; `npm run build` runs ESLint first.)
   typescript: { ignoreBuildErrors: false },
-  eslint: { ignoreDuringBuilds: false },
 
   async headers() {
     return [

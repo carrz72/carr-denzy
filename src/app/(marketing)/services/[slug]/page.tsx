@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/service-icon";
-import { business, getService, services } from "@/lib/site";
+import { getService, services } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 

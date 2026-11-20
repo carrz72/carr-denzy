@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRightIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
-import { business, services } from "@/lib/site";
+import { services } from "@/lib/site";
 import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 

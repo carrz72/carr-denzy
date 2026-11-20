@@ -103,7 +103,7 @@ type InvoiceRowData = {
 
 function InvoiceRow({ invoice }: { invoice: InvoiceRowData }) {
   const outstanding = invoice.total_pence - invoice.paid_pence;
-  const late = invoice.status === "overdue" || (invoice.status === "sent" && isPast(invoice.due_date));
+  const late = invoice.status === "overdue" || ((invoice.status === "sent" || invoice.status === "part_paid") && isPast(invoice.due_date));
 
   return (
     <li>

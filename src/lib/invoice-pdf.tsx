@@ -52,6 +52,8 @@ export interface InvoicePdfData {
   notes: string | null;
   footerNote: string | null;
   settled: boolean;
+  /** A cancelled invoice: kept on file, but plainly not a request for money. */
+  voided?: boolean;
 }
 
 const kindLabels: Record<LineKind, string> = {
@@ -137,7 +139,7 @@ function InvoiceDocument(data: InvoicePdfData) {
   const showBreakdown = data.vatRegistered || data.cisEnabled;
   const outstanding = data.totalPence - data.paidPence;
 
-  const docLabel = isQuote ? "Quote" : "Invoice";
+  const docLabel = isQuote ? "Quote" : data.voided ? "Cancelled invoice" : "Invoice";
 
   const businessLines = [
     text(data.business, "address_line1"),
@@ -288,6 +290,12 @@ function InvoiceDocument(data: InvoicePdfData) {
           ) : null}
         </View>
 
+        {!isQuote && data.voided ? (
+          <View style={styles.section}>
+            <Text style={styles.muted}>This invoice has been cancelled. Nothing is owed on it.</Text>
+          </View>
+        ) : null}
+
         {data.notes ? (
           <View style={styles.section}>
             <Text style={styles.muted}>{data.notes}</Text>
@@ -355,7 +363,7 @@ export async function renderInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
  * "still to pay" line.
  */
 export async function renderQuotePdf(
-  data: Omit<InvoicePdfData, "documentKind" | "paidPence" | "settled">,
+  data: Omit<InvoicePdfData, "documentKind" | "paidPence" | "settled" | "voided">,
 ): Promise<Buffer> {
   return renderToBuffer(
     <InvoiceDocument {...data} documentKind="quote" paidPence={0} settled={false} />,
