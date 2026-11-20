@@ -56,7 +56,7 @@ export function JobTimeline({
     return (
       <div className="rounded-lg border border-line bg-surface-sunken p-5">
         <p className="font-medium text-ink">
-          {status === "cancelled" ? "This job was cancelled" : "This quote was declined"}
+          {status === "cancelled" ? "This job was cancelled" : "This job is not going ahead"}
         </p>
         {event ? (
           <p className="mt-1 text-sm text-ink-muted">{formatDateTime(event.created_at)}</p>

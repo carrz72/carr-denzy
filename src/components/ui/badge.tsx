@@ -61,7 +61,7 @@ export const jobStatusLabels: Record<JobStatus, string> = {
   new: "New request",
   quoted: "Quote sent",
   accepted: "Quote accepted",
-  declined: "Quote declined",
+  declined: "Not going ahead",
   scheduled: "Booked in",
   in_progress: "Work under way",
   completed: "Work finished",

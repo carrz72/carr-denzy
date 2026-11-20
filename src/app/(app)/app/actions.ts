@@ -30,6 +30,7 @@ import {
   sendQuoteToClient,
 } from "@/lib/email";
 import { buildInvoicePdf, buildQuotePdf } from "@/lib/document-pdf";
+import { NOT_GOING_AHEAD_REASONS } from "@/lib/job-outcomes";
 import {
   businessSnapshot,
   LIVE_PAYMENT_FIELDS,
@@ -622,6 +623,116 @@ export async function updateJobDetails(formData: FormData): Promise<ActionResult
     console.error("[job] update failed", error);
     return { ok: false, formError: "Could not save those details. Try again." };
   }
+
+  revalidatePath(`/app/jobs/${jobId}`);
+  revalidatePath("/app/jobs");
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: jobId };
+}
+
+/**
+ * Closes a job the customer is not going ahead with: they said no on the
+ * phone or WhatsApp, went elsewhere, or simply stopped replying. Only from
+ * "New request" or "Quote sent", the two stages where the job is waiting on
+ * them.
+ *
+ * Any quote still open is marked declined with the same reason, so it stops
+ * being chased and cannot be accepted later by mistake. The reason (and any
+ * note) is kept privately on the job. The customer is not emailed: in almost
+ * every case they are the one who said so.
+ */
+export async function closeJobNotGoingAhead(formData: FormData): Promise<ActionResult> {
+  const user = await requireOwner();
+
+  const jobId = String(formData.get("job_id") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  const note = String(formData.get("note") ?? "").trim().slice(0, 1000);
+
+  if (!jobId) return { ok: false, formError: "Missing job." };
+  if (!(NOT_GOING_AHEAD_REASONS as readonly string[]).includes(reason)) {
+    return { ok: false, errors: { reason: "Pick a reason." } };
+  }
+
+  const supabase = await createClient();
+
+  const { data: job, error } = await supabase
+    .from("jobs")
+    .update({ status: "declined", closed_reason: reason })
+    .eq("id", jobId)
+    .in("status", ["new", "quoted"])
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !job) {
+    if (error) console.error("[job] close failed", error.message);
+    return {
+      ok: false,
+      formError: "Only a job still waiting on the customer can be closed this way. Reload the page.",
+    };
+  }
+
+  const { error: quoteError } = await supabase
+    .from("quotes")
+    .update({ status: "declined", responded_at: new Date().toISOString(), decline_reason: reason })
+    .eq("job_id", jobId)
+    .eq("status", "sent")
+    .is("deleted_at", null);
+  if (quoteError) console.error("[job] open quotes not closed", quoteError.message);
+
+  await supabase.from("job_notes").insert({
+    job_id: jobId,
+    author_id: user.id,
+    body: `Not going ahead: ${reason.toLowerCase()}.${note ? ` ${note}` : ""}`,
+    visible_to_client: false,
+  });
+
+  revalidatePath(`/app/jobs/${jobId}`);
+  revalidatePath("/app/jobs");
+  revalidatePath("/app/quotes");
+  revalidatePath("/app", "layout");
+
+  return { ok: true, id: jobId };
+}
+
+/**
+ * The customer came back. Puts a closed job back to "New request" so it can
+ * be quoted afresh; the old quotes stay on file as they were.
+ */
+export async function reopenJob(formData: FormData): Promise<ActionResult> {
+  const user = await requireOwner();
+
+  const jobId = String(formData.get("job_id") ?? "");
+  if (!jobId) return { ok: false, formError: "Missing job." };
+
+  const supabase = await createClient();
+
+  const { data: job, error } = await supabase
+    .from("jobs")
+    .update({ status: "new", closed_reason: null })
+    .eq("id", jobId)
+    .eq("status", "declined")
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !job) {
+    if (error) console.error("[job] reopen failed", error.message);
+    return {
+      ok: false,
+      formError: error?.message.includes("can't go from")
+        ? "The database has not been updated for reopening yet. Apply the latest migration, then try again."
+        : "Only a job marked not going ahead can be reopened. Reload the page.",
+    };
+  }
+
+  await supabase.from("job_notes").insert({
+    job_id: jobId,
+    author_id: user.id,
+    body: "Reopened: the customer came back.",
+    visible_to_client: false,
+  });
 
   revalidatePath(`/app/jobs/${jobId}`);
   revalidatePath("/app/jobs");

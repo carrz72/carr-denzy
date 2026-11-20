@@ -25,6 +25,7 @@ import { formatDateTime, formatDuration } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { cn } from "@/lib/cn";
 import { signedJobPhotoUrls } from "@/lib/storage";
+import { NotGoingAhead } from "@/components/owner/not-going-ahead";
 import { addressName } from "@/lib/names";
 
 export const metadata: Metadata = { title: "Job", robots: { index: false } };
@@ -44,7 +45,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     .from("jobs")
     .select(
       `id, reference, title, description, status, urgency, scheduled_start,
-       duration_minutes, expected_days, expected_days_max, completed_at, private_notes, created_at,
+       duration_minutes, expected_days, expected_days_max, completed_at, private_notes, closed_reason, created_at,
        client:clients(id, full_name, email, phone, company_name),
        property:properties(address_line1, address_line2, city, postcode, access_notes),
        service:services(name)`,
@@ -258,6 +259,10 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             status={job.status}
             clientName={job.client?.full_name ?? null}
           />
+
+          {user?.role === "owner" ? (
+            <NotGoingAhead jobId={job.id} status={job.status} closedReason={job.closed_reason} />
+          ) : null}
 
           {job.client ? (
             <Card>

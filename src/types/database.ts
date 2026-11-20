@@ -169,6 +169,8 @@ export type Job = {
   expected_days_max: number | null;
   completed_at: string | null;
   private_notes: string | null;
+  /** Why it did not go ahead (said no, went quiet...). Owner only. Set with status declined. */
+  closed_reason: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

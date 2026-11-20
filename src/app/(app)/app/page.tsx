@@ -36,6 +36,8 @@ import {
 } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import { addressName } from "@/lib/names";
+import { GONE_QUIET_DAYS } from "@/lib/job-outcomes";
+import { GoneQuietCloseButton } from "@/components/owner/not-going-ahead";
 
 export const metadata: Metadata = { title: "Today", robots: { index: false } };
 
@@ -123,7 +125,12 @@ export default async function OwnerDashboard() {
    * they are a to-do list, and each one is a job that will be forgotten unless
    * somebody looks at the right page on the right day.
    */
-  const [{ data: slipped }, { data: needsBooking }, { data: comingUp }] = await Promise.all([
+  // New requests nobody has touched in a month: almost always a customer who
+  // went quiet. Listed so they can be closed in one tap, not closed for you;
+  // an unquoted job may just be one that was forgotten.
+  const goneQuietBefore = new Date(Date.now() - GONE_QUIET_DAYS * 86_400_000).toISOString();
+
+  const [{ data: slipped }, { data: needsBooking }, { data: comingUp }, { data: goneQuiet }] = await Promise.all([
     // Booked for a day that has been and gone, and never moved on. The single
     // most common way a paper diary loses a job.
     supabase
@@ -155,7 +162,18 @@ export default async function OwnerDashboard() {
       .gte("scheduled_start", dayEnd)
       .lte("scheduled_start", `${addDays(today, 7)}T23:59:59`)
       .not("status", "in", "(cancelled,declined)"),
+
+    supabase
+      .from("jobs")
+      .select("id, title, updated_at, client:clients(full_name)")
+      .is("deleted_at", null)
+      .eq("status", "new")
+      .lt("updated_at", goneQuietBefore)
+      .order("updated_at", { ascending: true })
+      .limit(8),
   ]);
+
+  const goneQuietJobs = goneQuiet ?? [];
 
   const slippedJobs = slipped ?? [];
   const unbookedJobs = needsBooking ?? [];
@@ -486,6 +504,35 @@ export default async function OwnerDashboard() {
               </ul>
             )}
           </Card>
+
+          {goneQuietJobs.length > 0 ? (
+            <Card>
+              <div className="mb-1.5 flex items-center justify-between gap-4">
+                <h2 className="font-display text-subheading text-ink">Gone quiet</h2>
+              </div>
+              <p className="mb-4 text-sm leading-relaxed text-ink-muted">
+                New requests with nothing done for over {GONE_QUIET_DAYS} days. Close the ones
+                that are not happening, or open one to pick it back up.
+              </p>
+
+              <ul className="flex flex-col gap-2">
+                {goneQuietJobs.map((job) => (
+                  <li
+                    key={job.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface p-3.5"
+                  >
+                    <Link href={`/app/jobs/${job.id}`} className="min-w-0 flex-1 hover:underline hover:underline-offset-4">
+                      <span className="block truncate font-medium text-ink">{job.title}</span>
+                      <span className="mt-0.5 block text-xs text-ink-subtle">
+                        {job.client?.full_name ?? "Customer"} · last touched {formatRelative(job.updated_at)}
+                      </span>
+                    </Link>
+                    <GoneQuietCloseButton jobId={job.id} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
         </div>
       </div>
     </>
