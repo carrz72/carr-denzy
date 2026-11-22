@@ -21,7 +21,8 @@ import { MessageThread } from "@/components/message-thread";
 import { createClient } from "@/lib/supabase/server";
 import { markMessagesRead } from "@/lib/unread";
 import { getSessionUser } from "@/lib/auth";
-import { formatDateTime, formatDuration } from "@/lib/dates";
+import { formatDateTime, formatDuration, todayInLondon } from "@/lib/dates";
+import { ReminderSwitch, RemindMe } from "@/components/owner/reminders";
 import { formatPence } from "@/lib/money";
 import { cn } from "@/lib/cn";
 import { signedJobPhotoUrls } from "@/lib/storage";
@@ -46,7 +47,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     .select(
       `id, reference, title, description, status, urgency, scheduled_start,
        duration_minutes, expected_days, expected_days_max, completed_at, private_notes, closed_reason, created_at,
-       client:clients(id, full_name, email, phone, company_name),
+       client:clients(id, full_name, email, phone, company_name, auto_reminders, notify_booking),
        property:properties(address_line1, address_line2, city, postcode, access_notes),
        service:services(name)`,
     )
@@ -63,6 +64,8 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     { data: messages },
     { data: visits },
     { data: photos },
+    { data: chase },
+    { data: settings },
   ] = await Promise.all([
       supabase
         .from("quotes")
@@ -96,7 +99,23 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
         .select("id, storage_path, caption, visible_to_client, created_at")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
+      supabase.from("chase_controls").select("stopped").eq("entity", "job").eq("entity_id", id).maybeSingle(),
+      supabase.from("settings").select("remind_visits").maybeSingle(),
     ]);
+
+  const today = todayInLondon();
+  const jobOpen = !["completed", "invoiced", "paid", "cancelled", "declined"].includes(job.status);
+
+  // What the day-before email will do for this job, in one line.
+  const visitReminderHint = !settings?.remind_visits
+    ? "Day-before emails are switched off in Settings."
+    : job.client?.auto_reminders === false
+      ? "Automatic reminders are off for this customer."
+      : job.client?.notify_booking === false
+        ? "The customer turned off booking emails in their account."
+        : !job.client?.email
+          ? "This customer has no email address, so nothing is sent."
+          : "The day before each visit: the time, the address and your number in case it no longer suits. Not for a visit booked the day before, or for each day of a long job.";
 
   // Includes the photos the customer sent with their enquiry, which stay in
   // the enquiry bucket after conversion.
@@ -329,6 +348,22 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             expectedDays={job.expected_days}
             expectedDaysMax={job.expected_days_max}
             durationMinutes={job.duration_minutes}
+          />
+
+          {jobOpen ? (
+            <ReminderSwitch
+              entity="job"
+              entityId={job.id}
+              stopped={Boolean(chase?.stopped)}
+              label="Email them the day before"
+              hint={visitReminderHint}
+            />
+          ) : null}
+
+          <RemindMe
+            links={{ job_id: job.id, client_id: job.client?.id }}
+            defaultTitle={`Ring ${job.client?.full_name ?? "the customer"} back about ${job.title}`}
+            today={today}
           />
 
           <Card>

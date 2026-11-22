@@ -17,7 +17,8 @@ import { InvoiceStatusBadge, JobStatusBadge, QuoteStatusBadge } from "@/componen
 import { createClient } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/auth";
 import { buttonClasses } from "@/components/ui/button";
-import { formatDate, formatRelative } from "@/lib/dates";
+import { formatDate, formatRelative, todayInLondon } from "@/lib/dates";
+import { ClientRemindersSwitch, RemindMe } from "@/components/owner/reminders";
 import { formatPence } from "@/lib/money";
 import { cn } from "@/lib/cn";
 
@@ -31,7 +32,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, full_name, company_name, email, phone, created_at, profile_id")
+    .select("id, full_name, company_name, email, phone, created_at, profile_id, auto_reminders")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -247,6 +248,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             audience="owner"
             canManage
           />
+
+          <RemindMe
+            links={{ client_id: client.id }}
+            defaultTitle={`Ring ${client.full_name} back`}
+            today={todayInLondon()}
+          />
+
+          <ClientRemindersSwitch clientId={client.id} on={client.auto_reminders !== false} />
 
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Addresses</h2>

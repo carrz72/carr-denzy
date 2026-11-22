@@ -70,6 +70,16 @@ export type Settings = {
   notification_emails: string[];
   /** The owner's own logo in the `branding` bucket. Null means the standard logo file. */
   logo_path: string | null;
+  /** Automatic emails, each switchable for the whole business. */
+  remind_invoices: boolean;
+  /** Days between payment reminders on the same invoice. */
+  invoice_reminder_every_days: number;
+  remind_quotes: boolean;
+  remind_visits: boolean;
+  /** Nudges for the owner, on their to-do list and phone. */
+  nudge_unbilled: boolean;
+  nudge_quotes: boolean;
+  nudge_promises: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -115,6 +125,8 @@ export type Client = {
   notify_booking: boolean;
   notify_messages: boolean;
   notify_completion: boolean;
+  /** Owner-controlled: false stops every automatic reminder to this customer. */
+  auto_reminders: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -191,8 +203,44 @@ export type JobVisit = {
   duration_minutes: number;
   /** "First fix", "plasterer in". Shown to the customer. */
   note: string | null;
+  /** When the "see you tomorrow" email went. Null until then. */
+  reminder_sent_at: string | null;
   created_at: string;
 }
+
+export type ChaseEntity = "invoice" | "quote" | "job";
+
+/** the owner's say over the automatic reminders on one invoice, quote or job. Staff only. */
+export type ChaseControl = {
+  entity: ChaseEntity;
+  entity_id: string;
+  /** "They said they will pay by" — no reminders up to and including this date. */
+  paused_until: string | null;
+  stopped: boolean;
+  note: string | null;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export type OwnerReminderKind = "manual" | "unbilled_job" | "quote_lapsed" | "promise_due";
+
+/** One line on the owner's to-do list. Staff only. */
+export type OwnerReminder = {
+  id: string;
+  title: string;
+  due_at: string;
+  kind: OwnerReminderKind;
+  auto_key: string | null;
+  job_id: string | null;
+  client_id: string | null;
+  enquiry_id: string | null;
+  invoice_id: string | null;
+  quote_id: string | null;
+  done_at: string | null;
+  pushed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+};
 
 export type JobEvent = {
   id: string;
@@ -611,6 +659,19 @@ export type Database = {
         [Rel<"push_subscriptions_profile_id_fkey", "profile_id", "profiles">]
       >;
       audit_log: Table<AuditLogEntry, "action">;
+      chase_controls: Table<ChaseControl, "entity" | "entity_id">;
+      owner_reminders: Table<
+        OwnerReminder,
+        "title" | "due_at",
+        [
+          Rel<"owner_reminders_job_id_fkey", "job_id", "jobs">,
+          Rel<"owner_reminders_client_id_fkey", "client_id", "clients">,
+          Rel<"owner_reminders_enquiry_id_fkey", "enquiry_id", "enquiries">,
+          Rel<"owner_reminders_invoice_id_fkey", "invoice_id", "invoices">,
+          Rel<"owner_reminders_quote_id_fkey", "quote_id", "quotes">,
+        ]
+      >;
+      job_keys: Table<{ name: string; key: string }, "name">;
     };
     Views: Record<string, never>;
     Functions: {

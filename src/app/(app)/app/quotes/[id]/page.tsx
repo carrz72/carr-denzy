@@ -16,7 +16,8 @@ import {
 import { ShareLink } from "@/components/owner/share-link";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
-import { formatDate, formatDateTime, isPast } from "@/lib/dates";
+import { addDays, formatDate, formatDateTime, isPast, todayInLondon } from "@/lib/dates";
+import { ReminderSwitch, RemindMe } from "@/components/owner/reminders";
 import { formatPence } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Quote", robots: { index: false } };
@@ -32,8 +33,8 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
       .from("quotes")
       .select(
         `id, reference, status, intro_note, terms, subtotal_pence, tax_pence, total_pence,
-         valid_until, sent_at, responded_at, decline_reason, created_at, job_id,
-         client:clients(id, full_name, email, phone, company_name),
+         valid_until, sent_at, responded_at, decline_reason, created_at, job_id, last_reminder_at,
+         client:clients(id, full_name, email, phone, company_name, auto_reminders),
          job:jobs(id, reference, title)`,
       )
       .eq("id", id)
@@ -44,7 +45,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
 
   if (!quote || !settings) notFound();
 
-  const [{ data: items }, { data: invoice }] = await Promise.all([
+  const [{ data: items }, { data: invoice }, { data: chase }] = await Promise.all([
     supabase
       .from("quote_items")
       .select("id, description, kind, quantity_milli, unit_price_pence, vat_rate_bp")
@@ -60,7 +61,28 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
       .neq("status", "void")
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("chase_controls")
+      .select("stopped")
+      .eq("entity", "quote")
+      .eq("entity_id", id)
+      .maybeSingle(),
   ]);
+
+  const today = todayInLondon();
+
+  // What the quote reminder will do, in one line. Mirrors /api/cron/reminders.
+  const reminderHint = (() => {
+    if (quote.last_reminder_at) return `A reminder went on ${formatDate(quote.last_reminder_at)}.`;
+    if (!settings.remind_quotes) return "Quote reminders are switched off in Settings.";
+    if (quote.client?.auto_reminders === false) return "Automatic reminders are off for this customer.";
+    if (!quote.client?.email) return "This customer has no email address, so nothing is sent.";
+    if (!quote.valid_until) return "This quote has no end date, so no reminder is sent.";
+    const on = addDays(quote.valid_until, -3);
+    return on <= today
+      ? "One email goes tomorrow morning to say it is about to run out."
+      : `One email goes on ${formatDate(on)}, three days before it runs out.`;
+  })();
 
   const expired = quote.status === "sent" && isPast(quote.valid_until);
 
@@ -290,6 +312,24 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
                 Worth a phone call before you write it off.
               </p>
             </Card>
+          ) : null}
+
+          {quote.status === "sent" && !expired ? (
+            <ReminderSwitch
+              entity="quote"
+              entityId={quote.id}
+              stopped={Boolean(chase?.stopped)}
+              label="Remind them before it runs out"
+              hint={reminderHint}
+            />
+          ) : null}
+
+          {quote.status === "sent" ? (
+            <RemindMe
+              links={{ quote_id: quote.id, client_id: quote.client?.id, job_id: quote.job_id }}
+              defaultTitle={`Ring ${quote.client?.full_name ?? "the customer"} about quote ${quote.reference}`}
+              today={today}
+            />
           ) : null}
 
           <Card>

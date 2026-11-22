@@ -38,6 +38,7 @@ import { cn } from "@/lib/cn";
 import { addressName } from "@/lib/names";
 import { GONE_QUIET_DAYS } from "@/lib/job-outcomes";
 import { GoneQuietCloseButton } from "@/components/owner/not-going-ahead";
+import { TodoList, type TodoItem } from "@/components/owner/reminders";
 
 export const metadata: Metadata = { title: "Today", robots: { index: false } };
 
@@ -172,6 +173,50 @@ export default async function OwnerDashboard() {
       .order("updated_at", { ascending: true })
       .limit(8),
   ]);
+
+  // the owner's own list: reminders he set and nudges the morning run added.
+  // Everything open that is due by the end of tomorrow, oldest first.
+  const { data: reminderRows } = await supabase
+    .from("owner_reminders")
+    .select("id, title, due_at, kind, job_id, client_id, enquiry_id, invoice_id, quote_id")
+    .is("done_at", null)
+    .lt("due_at", londonDayBoundsIso(addDays(today, 1)).end)
+    .order("due_at", { ascending: true })
+    .limit(30);
+
+  const { count: laterCount } = await supabase
+    .from("owner_reminders")
+    .select("id", { count: "exact", head: true })
+    .is("done_at", null)
+    .gte("due_at", londonDayBoundsIso(addDays(today, 1)).end);
+
+  const nowMs = Date.now();
+  const todoItems: TodoItem[] = (reminderRows ?? []).map((row) => {
+    const due = new Date(row.due_at).getTime() <= nowMs;
+    const dueDay = londonDateOf(row.due_at);
+    return {
+      id: row.id,
+      title: row.title,
+      href: row.invoice_id
+        ? `/app/invoices/${row.invoice_id}`
+        : row.quote_id
+          ? `/app/quotes/${row.quote_id}`
+          : row.job_id
+            ? `/app/jobs/${row.job_id}`
+            : row.enquiry_id
+              ? `/app/enquiries/${row.enquiry_id}`
+              : row.client_id
+                ? `/app/clients/${row.client_id}`
+                : null,
+      whenLabel: due
+        ? "Due now"
+        : dueDay === today
+          ? `Today at ${formatTime(row.due_at)}`
+          : `Tomorrow at ${formatTime(row.due_at)}`,
+      due,
+      automatic: row.kind !== "manual",
+    };
+  });
 
   const goneQuietJobs = goneQuiet ?? [];
 
@@ -416,6 +461,8 @@ export default async function OwnerDashboard() {
 
         {/* --- Waiting on you ------------------------------------------ */}
         <div className="flex flex-col gap-6">
+          <TodoList items={todoItems} today={today} laterCount={laterCount ?? 0} />
+
           <Card>
             <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="font-display text-subheading text-ink">New enquiries</h2>

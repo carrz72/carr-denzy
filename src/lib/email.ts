@@ -5,7 +5,7 @@ import { Resend } from "resend";
 import { getBusiness } from "@/lib/business";
 import { business } from "@/lib/site";
 import { formatPence } from "@/lib/money";
-import { formatWorkingDayRange } from "@/lib/dates";
+import { formatDate, formatWorkingDayRange } from "@/lib/dates";
 import { addressName } from "@/lib/names";
 
 /**
@@ -681,13 +681,17 @@ export async function sendInvoiceReminder(
   outstandingPence: number,
   daysOverdue: number,
   invoiceId: string,
+  /** Only used when the owner chases before the due date ("due on 14 November"). */
+  dueDate: string | null = null,
 ): Promise<SendResult> {
   const link = `${siteUrl()}/invoices/view/${invoiceId}`;
   const phone = await businessPhone();
   const amount = formatPence(outstandingPence);
 
   const timing =
-    daysOverdue <= 0
+    daysOverdue < 0
+      ? `which is due on ${dueDate ? formatDate(dueDate) : "its due date"}`
+      : daysOverdue === 0
       ? "which is due today"
       : daysOverdue === 1
         ? "which was due yesterday"
@@ -875,6 +879,60 @@ export async function sendBookingConfirmation(
     .join("\n");
 
   return send(to, multiDay ? `Starting ${whenLabel} — ${jobTitle}` : `Booked in — ${whenLabel}`, html, text);
+}
+
+/**
+ * "See you tomorrow": the day before a visit.
+ *
+ * The booking email may have gone weeks ago. This one is short on purpose:
+ * when, roughly what time, where, and how to say it no longer suits, so a
+ * wasted trip to an empty house becomes a phone call the day before.
+ */
+export async function sendVisitReminder(
+  to: string,
+  clientName: string,
+  jobTitle: string,
+  dayLabel: string,
+  arrivalWindow: string,
+  address: string | null,
+  jobId: string,
+): Promise<SendResult> {
+  const link = `${siteUrl()}/portal/jobs/${jobId}`;
+  const phone = await businessPhone();
+  const tel = phone.replace(/[^\d+]/g, "");
+
+  const html = await layout(
+    "See you tomorrow",
+    `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Just a reminder that we are coming tomorrow for <strong>${esc(jobTitle)}</strong>.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#faf8f5;border:1px solid #ebe5dc;border-radius:6px;">
+       <tr><td style="padding:18px 20px;">
+         <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8a7f73;">When</p>
+         <p style="margin:0 0 14px;font-size:17px;font-weight:700;">${esc(dayLabel)}, ${esc(arrivalWindow)}</p>
+         ${address ? `<p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8a7f73;">Where</p><p style="margin:0;font-size:15px;">${esc(address)}</p>` : ""}
+       </td></tr>
+     </table>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Please make sure someone is in, and that we can get to the stopcock, boiler or whatever we will be working on.</p>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;"><strong>Can no longer make it?</strong> Ring or text us on <a href="tel:${esc(tel)}" style="color:#be4a33;font-weight:700;text-decoration:none;">${esc(phone)}</a> and we will find another day.</p>
+     ${button(link, "See the job")}`,
+  );
+
+  const text = [
+    `Hello ${clientName},`,
+    "",
+    `Just a reminder that we are coming tomorrow for ${jobTitle}.`,
+    "",
+    `When: ${dayLabel}, ${arrivalWindow}`,
+    address ? `Where: ${address}` : "",
+    "",
+    `Can no longer make it? Ring or text us on ${phone} and we will find another day.`,
+    "",
+    link,
+  ]
+    .filter((line, index, all) => line !== "" || all[index - 1] !== "")
+    .join("\n");
+
+  return send(to, `See you tomorrow — ${jobTitle}`, html, text);
 }
 
 export async function sendJobMessageToClient(

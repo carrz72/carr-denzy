@@ -27,6 +27,9 @@ import { requireOwner } from "@/lib/auth";
 import { formatDate, formatDateTime, isPast } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import type { PaymentMethod } from "@/types/database";
+import { InvoiceReminders, RemindMe } from "@/components/owner/reminders";
+import { invoiceChaseSummary } from "@/lib/reminders";
+import { todayInLondon } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Invoice", robots: { index: false } };
 
@@ -50,8 +53,8 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
       .select(
         `id, reference, status, issue_date, due_date, business_snapshot, client_snapshot,
          subtotal_pence, vat_pence, cis_deduction_pence, total_pence, paid_pence,
-         reverse_charge, notes, sent_at, paid_at, created_at, job_id, quote_id,
-         client:clients(id, full_name, email, phone, company_name),
+         reverse_charge, notes, sent_at, paid_at, created_at, job_id, quote_id, last_reminder_at,
+         client:clients(id, full_name, email, phone, company_name, auto_reminders),
          job:jobs(id, reference, title)`,
       )
       .eq("id", id)
@@ -62,7 +65,7 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
 
   if (!invoice || !settings) notFound();
 
-  const [{ data: items }, { data: payments }] = await Promise.all([
+  const [{ data: items }, { data: payments }, { data: chase }] = await Promise.all([
     supabase
       .from("invoice_items")
       .select("id, description, kind, quantity_milli, unit_price_pence, vat_rate_bp")
@@ -73,7 +76,27 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
       .select("id, amount_pence, method, paid_on, reference, note")
       .eq("invoice_id", id)
       .order("paid_on", { ascending: false }),
+    supabase
+      .from("chase_controls")
+      .select("paused_until, stopped, note")
+      .eq("entity", "invoice")
+      .eq("entity_id", id)
+      .maybeSingle(),
   ]);
+
+  const today = todayInLondon();
+  const canChase = ["sent", "part_paid", "overdue"].includes(invoice.status) && outstandingOf(invoice) > 0;
+  const chaseSummary = invoiceChaseSummary({
+    status: invoice.status,
+    dueDate: invoice.due_date,
+    outstandingPence: outstandingOf(invoice),
+    lastReminderAt: invoice.last_reminder_at,
+    hasEmail: Boolean(invoice.client?.email),
+    clientOn: invoice.client?.auto_reminders !== false,
+    settingOn: settings.remind_invoices,
+    everyDays: settings.invoice_reminder_every_days,
+    control: chase ?? null,
+  });
 
   const outstanding = invoice.total_pence - invoice.paid_pence;
   const isDraft = invoice.status === "draft";
@@ -304,6 +327,29 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
             <RecordPaymentForm invoiceId={invoice.id} outstandingPence={outstanding} />
           ) : null}
 
+          {canChase ? (
+            <InvoiceReminders
+              invoiceId={invoice.id}
+              line={chaseSummary.line}
+              state={chaseSummary.state}
+              lastSentLabel={invoice.last_reminder_at ? formatDateTime(invoice.last_reminder_at) : null}
+              note={chase?.note ?? null}
+              paused={Boolean(chase?.paused_until && chase.paused_until >= today)}
+              stopped={Boolean(chase?.stopped)}
+              canChase={canChase}
+              clientEmail={invoice.client?.email ?? null}
+              today={today}
+            />
+          ) : null}
+
+          {!isDraft && invoice.status !== "void" ? (
+            <RemindMe
+              links={{ invoice_id: invoice.id, client_id: invoice.client?.id, job_id: invoice.job_id ?? undefined }}
+              defaultTitle={`Chase ${invoice.client?.full_name ?? "the customer"} about ${invoice.reference}`}
+              today={today}
+            />
+          ) : null}
+
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Details</h2>
 
@@ -396,4 +442,8 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
       </div>
     </>
   );
+}
+
+function outstandingOf(invoice: { total_pence: number; paid_pence: number }): number {
+  return invoice.total_pence - invoice.paid_pence;
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowRightIcon, BellIcon, TagIcon, WrenchIcon } from "@phosphor-icons/react/dist/ssr";
+import { AlarmIcon, ArrowRightIcon, BellIcon, TagIcon, WrenchIcon } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
 import { SettingsForm } from "@/components/owner/settings-form";
 import { LogoSettings } from "@/components/owner/logo-settings";
@@ -122,6 +122,38 @@ export default async function SettingsPage() {
             <span className="mt-0.5 block text-sm leading-snug text-ink-muted">
               Get a buzz on your phone when a job request comes in, and choose who else
               gets the email.
+            </span>
+          </span>
+
+          <ArrowRightIcon
+            size={18}
+            weight="bold"
+            aria-hidden="true"
+            className="shrink-0 text-ink-subtle transition-transform duration-300 group-hover:translate-x-1 group-hover:text-accent"
+          />
+        </Link>
+
+        <Link
+          href="/app/settings/reminders"
+          className={cn(
+            "group mt-3 flex items-center gap-4 rounded-lg border border-line bg-surface-raised p-5",
+            "shadow-subtle transition-[border-color,box-shadow,transform] duration-200",
+            "[transition-timing-function:var(--ease-standard)]",
+            "hover:-translate-y-0.5 hover:border-line-strong hover:shadow-float",
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className="flex size-11 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent"
+          >
+            <AlarmIcon size={22} weight="duotone" />
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium text-ink">Reminders</span>
+            <span className="mt-0.5 block text-sm leading-snug text-ink-muted">
+              Payment, quote and day-before emails to customers, and the nudges you get about
+              unbilled jobs and promised payments.
             </span>
           </span>
 

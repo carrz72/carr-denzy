@@ -13,7 +13,8 @@ import { Card, DetailRow } from "@/components/ui/surface";
 import { Badge, UrgencyBadge } from "@/components/ui/badge";
 import { EnquiryActions } from "@/components/owner/enquiry-actions";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, todayInLondon } from "@/lib/dates";
+import { RemindMe } from "@/components/owner/reminders";
 import { signedPhotoUrls } from "@/lib/storage";
 
 export const metadata: Metadata = { title: "Enquiry", robots: { index: false } };
@@ -211,6 +212,14 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
               ) : null}
             </dl>
           </Card>
+
+          {enquiry.status === "new" || enquiry.status === "read" ? (
+            <RemindMe
+              links={{ enquiry_id: enquiry.id }}
+              defaultTitle={`Get back to ${enquiry.full_name}`}
+              today={todayInLondon()}
+            />
+          ) : null}
 
           <EnquiryActions
             enquiryId={enquiry.id}
