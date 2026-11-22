@@ -31,85 +31,68 @@
 -->
 <!doctype html>
 <html lang="en">
-  <body style="margin:0;padding:24px 12px;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;">
-    <!-- Preview text: what shows in the inbox list next to the subject. Hidden in the body. -->
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-      Your Carrdenzy sign-in code is {{ .Token }}. It works once and lasts an hour.
-    </div>
-
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e6dfd5;">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+  </head>
+  <body style="margin:0;padding:0;background:#f3f1ed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;-webkit-font-smoothing:antialiased;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">Your Carrdenzy sign-in code is {{ .Token }}. It works once and lasts an hour.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f1ed;">
       <tr>
-        <td style="padding:22px 32px 20px;">
-          <a href="{{ .SiteURL }}" style="text-decoration:none;color:#1a1714;">
-            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-              <td style="padding-right:12px;vertical-align:middle;"><img src="https://www.carrdenzy.com/images/logo/logo-mark.png" width="27" height="40" alt="" style="display:block;width:27px;height:40px;border:0;outline:none;" /></td>
-              <td style="vertical-align:middle;font-size:17px;font-weight:800;letter-spacing:-0.01em;color:#1a1714;">Carrdenzy Heating &amp; Gas</td>
-            </tr></table>
-          </a>
-        </td>
-      </tr>
-      <tr>
-        <td height="4" style="background:#be4a33;height:4px;font-size:0;line-height:0;">&nbsp;</td>
-      </tr>
-
-      <tr>
-        <td style="padding:32px;">
-          <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;font-weight:800;letter-spacing:-0.01em;color:#1a1714;">
-            Your sign-in code
-          </h1>
-
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1a1714;">
-            Type this code into the sign-in page and you are in. There is no password to
-            remember.
-          </p>
-
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
+        <td align="center" style="padding:32px 12px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #e7e1d8;border-radius:8px;overflow:hidden;">
             <tr>
-              <td style="padding:18px 20px;text-align:center;">
-                <p style="margin:0 0 8px;font-size:13px;color:#6b6055;">
-                  Enter it on the sign-in page
+              <td height="3" style="background:#be4a33;height:3px;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:24px 36px 22px;border-bottom:1px solid #efeae3;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                  <td style="vertical-align:middle;">
+                    <a href="{{ .SiteURL }}" style="text-decoration:none;color:#1a1714;">
+                      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                        <td style="padding-right:12px;vertical-align:middle;"><img src="https://www.carrdenzy.com/images/logo/logo-mark.png" width="22" height="33" alt="" style="display:block;width:22px;height:33px;border:0;outline:none;" /></td>
+                        <td style="vertical-align:middle;">
+                          <div style="font-size:16px;line-height:1.2;font-weight:700;letter-spacing:-0.005em;color:#1a1714;">Carrdenzy</div>
+                          <div style="font-size:10px;line-height:1.4;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#8a7f73;">Heating &amp; Gas</div>
+                        </td>
+                      </tr></table>
+                    </a>
+                  </td>
+                  <td align="right" style="vertical-align:middle;font-size:11px;line-height:1.4;letter-spacing:0.04em;color:#8a7f73;">Gas Safe registered</td>
+                </tr></table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:36px 36px 40px;font-size:15px;line-height:1.65;color:#3a342e;">
+                <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;font-weight:700;letter-spacing:-0.01em;color:#1a1714;">Your sign-in code</h1>
+                <p style="margin:0 0 16px;">Enter this code on the sign-in page to get into your account. There is no password to remember.</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background:#faf8f5;border:1px solid #ebe5dc;border-radius:6px;">
+                  <tr>
+                    <td style="padding:20px;text-align:center;">
+                      <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8a7f73;">Your code</p>
+                      <p style="margin:0;font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace;font-size:30px;font-weight:700;letter-spacing:0.18em;color:#1a1714;">{{ .Token }}</p>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 8px;color:#776c60;font-size:14px;">Or sign in with one tap:</p>
+                <p style="margin:4px 0 28px;">
+                  <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email" style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:6px;font-weight:600;font-size:15px;line-height:1;letter-spacing:0.01em;">Sign me in</a>
                 </p>
-                <p style="margin:0;font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace;font-size:30px;font-weight:700;letter-spacing:0.16em;color:#be4a33;">
-                  {{ .Token }}
-                </p>
+                <p style="margin:0;color:#776c60;font-size:14px;">The code and the button work once and expire after an hour. If you did not ask to sign in, you can ignore this email; nobody can get into your account without it.</p>
               </td>
             </tr>
           </table>
-
-          <p style="margin:0 0 4px;font-size:14px;line-height:1.6;color:#6b6055;">
-            Or tap the button instead:
-          </p>
-          <p style="margin:24px 0;">
-            <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email"
-               style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:15px 28px;border-radius:10px;font-weight:700;font-size:16px;">
-              Sign me in
-            </a>
-          </p>
-
-          <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#6b6055;">
-            The code and the button work once and expire in an hour.
-          </p>
-
-          <!--
-            The code is shown as well as the link. Some email apps — Outlook on
-            a work laptop especially — rewrite or pre-open links, which silently
-            consumes a one-time link and leaves the person staring at "that link
-            has expired". Typing the code is the escape hatch when that happens.
-          -->
-          
-
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#6b6055;">
-            If you did not ask to sign in, you can ignore this email — nobody can get
-            into your account without this message.
-          </p>
-        </td>
-      </tr>
-
-      <tr>
-        <td style="padding:22px 32px;background:#f9f7f4;border-top:1px solid #ece6dd;font-size:13px;line-height:1.7;color:#6b6055;">
-          <strong style="color:#1a1714;font-size:14px;">Carrdenzy Heating &amp; Gas</strong><br />
-          Gas Safe registered &middot; Monday to Saturday, 8am to 8pm &middot; Nottingham and surrounding areas<br />
-          <a href="tel:+447938463358" style="color:#be4a33;font-weight:700;text-decoration:none;">07938 463358</a> &middot; <a href="https://www.carrdenzy.com" style="color:#be4a33;text-decoration:none;">Visit the website</a>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+            <tr>
+              <td align="center" style="padding:24px 24px 0;font-size:12px;line-height:1.75;color:#8a7f73;">
+                <strong style="color:#5c5248;font-weight:600;">Carrdenzy Heating &amp; Gas</strong><br />
+                Gas Safe registered &middot; Nottingham and surrounding areas &middot; Monday to Saturday, 8am to 8pm<br />
+                <a href="tel:+447938463358" style="color:#5c5248;text-decoration:none;font-weight:600;">07938 463358</a> &nbsp;&middot;&nbsp; <a href="{{ .SiteURL }}" style="color:#5c5248;text-decoration:underline;">carrdenzy.com</a>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>

@@ -133,10 +133,11 @@ function esc(value: string): string {
 
 /**
  * The shell every email shares, and the Supabase sign-in emails copy
- * (supabase/email-templates): the logo mark and name on white, a brick-red
- * stripe, the message, then a footer with the hours, phone number and site.
- * Tables and inline styles only, because that is what email apps render. The
- * logo is a hosted image, so it must be an absolute URL.
+ * (supabase/email-templates): a thin brick-red rule, the logo and name with
+ * "Gas Safe registered" opposite, the message on white with generous space,
+ * and a quiet footer under the card. Tables and inline styles only, because
+ * that is what email apps render. The logo is a hosted image, so it must be
+ * an absolute URL.
  */
 async function layout(heading: string, bodyHtml: string): Promise<string> {
   const site = siteUrl();
@@ -144,32 +145,54 @@ async function layout(heading: string, bodyHtml: string): Promise<string> {
   const tel = `tel:${phone.replace(/[^\d+]/g, "").replace(/^0/, "+44")}`;
   return `<!doctype html>
 <html lang="en">
-  <body style="margin:0;padding:24px 12px;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e6dfd5;">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+  </head>
+  <body style="margin:0;padding:0;background:#f3f1ed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;-webkit-font-smoothing:antialiased;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f1ed;">
       <tr>
-        <td style="padding:22px 32px 20px;">
-          <a href="${site}" style="text-decoration:none;color:#1a1714;">
-            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-              <td style="padding-right:12px;vertical-align:middle;"><img src="${site}/images/logo/logo-mark.png" width="27" height="40" alt="" style="display:block;width:27px;height:40px;border:0;outline:none;" /></td>
-              <td style="vertical-align:middle;font-size:17px;font-weight:800;letter-spacing:-0.01em;color:#1a1714;">Carrdenzy Heating &amp; Gas</td>
-            </tr></table>
-          </a>
-        </td>
-      </tr>
-      <tr>
-        <td height="4" style="background:#be4a33;height:4px;font-size:0;line-height:0;">&nbsp;</td>
-      </tr>
-      <tr>
-        <td style="padding:32px;">
-          <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;font-weight:800;letter-spacing:-0.01em;">${esc(heading)}</h1>
+        <td align="center" style="padding:32px 12px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #e7e1d8;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td height="3" style="background:#be4a33;height:3px;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:24px 36px 22px;border-bottom:1px solid #efeae3;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                  <td style="vertical-align:middle;">
+                    <a href="${site}" style="text-decoration:none;color:#1a1714;">
+                      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                        <td style="padding-right:12px;vertical-align:middle;"><img src="${site}/images/logo/logo-mark.png" width="22" height="33" alt="" style="display:block;width:22px;height:33px;border:0;outline:none;" /></td>
+                        <td style="vertical-align:middle;">
+                          <div style="font-size:16px;line-height:1.2;font-weight:700;letter-spacing:-0.005em;color:#1a1714;">Carrdenzy</div>
+                          <div style="font-size:10px;line-height:1.4;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#8a7f73;">Heating &amp; Gas</div>
+                        </td>
+                      </tr></table>
+                    </a>
+                  </td>
+                  <td align="right" style="vertical-align:middle;font-size:11px;line-height:1.4;letter-spacing:0.04em;color:#8a7f73;">Gas Safe registered</td>
+                </tr></table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:36px 36px 40px;font-size:15px;line-height:1.65;color:#3a342e;">
+                <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;font-weight:700;letter-spacing:-0.01em;color:#1a1714;">${esc(heading)}</h1>
           ${bodyHtml}
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:22px 32px;background:#f9f7f4;border-top:1px solid #ece6dd;font-size:13px;line-height:1.7;color:#6b6055;">
-          <strong style="color:#1a1714;font-size:14px;">Carrdenzy Heating &amp; Gas</strong><br />
-          Gas Safe registered &middot; Monday to Saturday, 8am to 8pm &middot; Nottingham and surrounding areas<br />
-          <a href="${tel}" style="color:#be4a33;font-weight:700;text-decoration:none;">${esc(phone)}</a> &middot; <a href="${site}" style="color:#be4a33;text-decoration:none;">Visit the website</a>
+              </td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+            <tr>
+              <td align="center" style="padding:24px 24px 0;font-size:12px;line-height:1.75;color:#8a7f73;">
+                <strong style="color:#5c5248;font-weight:600;">Carrdenzy Heating &amp; Gas</strong><br />
+                Gas Safe registered &middot; Nottingham and surrounding areas &middot; Monday to Saturday, 8am to 8pm<br />
+                <a href="${tel}" style="color:#5c5248;text-decoration:none;font-weight:600;">${esc(phone)}</a> &nbsp;&middot;&nbsp; <a href="${site}" style="color:#5c5248;text-decoration:underline;">carrdenzy.com</a>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
@@ -178,8 +201,8 @@ async function layout(heading: string, bodyHtml: string): Promise<string> {
 }
 
 function button(href: string, label: string): string {
-  return `<p style="margin:26px 0;">
-    <a href="${href}" style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:15px 28px;border-radius:10px;font-weight:700;font-size:16px;">${esc(label)}</a>
+  return `<p style="margin:28px 0;">
+    <a href="${href}" style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:6px;font-weight:600;font-size:15px;line-height:1;letter-spacing:0.01em;">${esc(label)}</a>
   </p>`;
 }
 
@@ -259,7 +282,7 @@ export async function sendOwnerEnquiryNotification(data: EnquiryEmailData): Prom
   const html = await layout(
     `New enquiry ${data.reference}`,
     `<p style="margin:0 0 8px;font-size:15px;"><strong>${esc(data.fullName)}</strong></p>
-     <p style="margin:0 0 16px;font-size:14px;color:#6b6055;">${esc(urgencyWords[data.urgency])}</p>
+     <p style="margin:0 0 16px;font-size:14px;color:#776c60;">${esc(urgencyWords[data.urgency])}</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;white-space:pre-wrap;">${esc(data.description)}</p>
      ${contactLines.map((line) => `<p style="margin:0 0 4px;font-size:14px;">${esc(line)}</p>`).join("")}
      ${button(link, "Open this enquiry")}`,
@@ -348,7 +371,7 @@ export async function sendEnquiryDeclined(
   const phone = await businessPhone();
 
   const reasonHtml = reason
-    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;padding:14px 16px;background:#f9f7f4;border-radius:8px;">${esc(reason)}</p>`
+    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;padding:14px 16px;background:#faf8f5;border:1px solid #ebe5dc;border-radius:6px;">${esc(reason)}</p>`
     : "";
 
   const html = await layout(
@@ -405,7 +428,7 @@ export async function sendPortalInvite(
        booked, any prices we have sent you, and your invoices.
      </p>
      ${button(signInLink, "Open my jobs")}
-     <p style="margin:0;font-size:14px;line-height:1.6;color:#6b6055;">
+     <p style="margin:0;font-size:14px;line-height:1.6;color:#776c60;">
        There is no password to remember. This link signs you in, and afterwards you can
        always get back in from the website. The link works once and lasts an hour — if it
        has expired, use <a href="${siteUrl()}/sign-in" style="color:#be4a33;">Sign in</a>
@@ -454,8 +477,8 @@ export async function sendQuoteToClient(
      ${validLine ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${esc(validLine)}</p>` : ""}
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Tap below to see what it covers. You can accept or decline it right there — there is nothing to sign up for.</p>
      ${button(link, "View and accept your quote")}
-     ${pdf ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#6b6055;">A copy is attached as a PDF if you would rather keep one or pass it on.</p>` : ""}
-     <p style="margin:0;font-size:14px;line-height:1.6;color:#6b6055;">This is a quote, not a bill. Nothing is payable until the work is done.</p>`,
+     ${pdf ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#776c60;">A copy is attached as a PDF if you would rather keep one or pass it on.</p>` : ""}
+     <p style="margin:0;font-size:14px;line-height:1.6;color:#776c60;">This is a quote, not a bill. Nothing is payable until the work is done.</p>`,
   );
 
   const text = [
@@ -817,12 +840,12 @@ export async function sendBookingConfirmation(
     multiDay ? "Your job is booked in" : "You are booked in",
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${multiDay ? "We are booked in to start" : "We have you booked in for"} <strong>${esc(jobTitle)}</strong>.</p>
-     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#faf8f5;border:1px solid #ebe5dc;border-radius:6px;">
        <tr><td style="padding:18px 20px;">
-         <p style="margin:0 0 4px;font-size:13px;color:#6b6055;">${multiDay ? "Starting" : "When"}</p>
+         <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8a7f73;">${multiDay ? "Starting" : "When"}</p>
          <p style="margin:0 0 14px;font-size:17px;font-weight:700;">${esc(whenLabel)}</p>
-         ${arrivalWindow ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6055;">Arriving</p><p style="margin:0 0 14px;font-size:15px;">${esc(arrivalWindow)}</p>` : ""}
-         ${address ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6055;">Where</p><p style="margin:0;font-size:15px;">${esc(address)}</p>` : ""}
+         ${arrivalWindow ? `<p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8a7f73;">Arriving</p><p style="margin:0 0 14px;font-size:15px;">${esc(arrivalWindow)}</p>` : ""}
+         ${address ? `<p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8a7f73;">Where</p><p style="margin:0;font-size:15px;">${esc(address)}</p>` : ""}
        </td></tr>
      </table>
      ${spanLine}
@@ -866,8 +889,8 @@ export async function sendJobMessageToClient(
   const html = await layout(
     "A message about your job",
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Hello ${esc(clientName)},</p>
-     <p style="margin:0 0 8px;font-size:14px;color:#6b6055;">About ${esc(jobTitle)}:</p>
-     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
+     <p style="margin:0 0 8px;font-size:14px;color:#776c60;">About ${esc(jobTitle)}:</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#faf8f5;border:1px solid #ebe5dc;border-radius:6px;">
        <tr><td style="padding:18px 20px;">
          <p style="margin:0;font-size:15px;line-height:1.6;white-space:pre-wrap;">${esc(messageBody)}</p>
        </td></tr>
@@ -904,7 +927,7 @@ export async function sendJobCompleted(
   // finished" invites "finished what, exactly?" from anybody who was at work
   // while it happened — and that question arrives as a phone call.
   const summaryHtml = summary
-    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;padding:14px 16px;background:#f9f7f4;border-radius:8px;white-space:pre-wrap;">${esc(summary)}</p>`
+    ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;padding:14px 16px;background:#faf8f5;border:1px solid #ebe5dc;border-radius:6px;white-space:pre-wrap;">${esc(summary)}</p>`
     : "";
 
   const html = await layout(
@@ -956,8 +979,8 @@ export async function sendOwnerMessageNotification(
 
   const html = await layout(
     `${clientName} replied`,
-    `<p style="margin:0 0 8px;font-size:14px;color:#6b6055;">${esc(jobReference)} — ${esc(jobTitle)}</p>
-     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f9f7f4;border-radius:8px;">
+    `<p style="margin:0 0 8px;font-size:14px;color:#776c60;">${esc(jobReference)} — ${esc(jobTitle)}</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#faf8f5;border:1px solid #ebe5dc;border-radius:6px;">
        <tr><td style="padding:18px 20px;">
          <p style="margin:0;font-size:15px;line-height:1.6;white-space:pre-wrap;">${esc(messageBody)}</p>
        </td></tr>
