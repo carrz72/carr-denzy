@@ -62,6 +62,7 @@ interface RunResult {
   nudgesAdded: number;
   nudgesClosed: number;
   skipped: number;
+  orphanPhotosRemoved: number;
   failed: number;
   errors: string[];
 }
@@ -121,6 +122,7 @@ export async function GET(request: NextRequest) {
     nudgesAdded: 0,
     nudgesClosed: 0,
     skipped: 0,
+    orphanPhotosRemoved: 0,
     failed: 0,
     errors: [],
   };
@@ -264,6 +266,15 @@ export async function GET(request: NextRequest) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[cron] nudges failed", message);
     result.errors.push(`nudges: ${message}`);
+  }
+
+  // --- Orphan enquiry photos ------------------------------------------------
+  try {
+    result.orphanPhotosRemoved = await removeOrphanEnquiryPhotos(admin, now);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[cron] orphan photo cleanup failed", message);
+    result.errors.push(`orphan photos: ${message}`);
   }
 
   console.info("[cron] reminders", result);
@@ -520,4 +531,57 @@ async function addOwnerNudges(
     await admin.from("owner_reminders").update({ done_at: now.toISOString() }).in("id", resolved);
     result.nudgesClosed = resolved.length;
   }
+}
+
+/**
+ * Deletes enquiry photos that nothing points at.
+ *
+ * The request form uploads each photo the moment it is picked, before the
+ * customer presses send. When they never send it (or the send fails), the
+ * files stay in the `enquiry-photos` bucket with no enquiry, invisible to
+ * everyone. Those are the only files this removes:
+ *
+ *   - only the `enquiry-photos` bucket, under `enquiry/`. Job photos, the
+ *     gallery and the logo live in other buckets and are never listed here;
+ *   - only files no `job_photos` row refers to. A sent enquiry links its photos
+ *     there, and converting it to a job keeps that same row, so every photo
+ *     anyone can see is referenced;
+ *   - only files more than a day old, so a photo uploaded seconds before the
+ *     customer presses send is never caught mid-flight.
+ */
+async function removeOrphanEnquiryPhotos(
+  admin: ReturnType<typeof createAdminClient>,
+  now: Date,
+): Promise<number> {
+  const cutoff = now.getTime() - 24 * 60 * 60 * 1000;
+
+  const { data: files, error } = await admin.storage
+    .from("enquiry-photos")
+    .list("enquiry", { limit: 1000, sortBy: { column: "created_at", order: "asc" } });
+  if (error) throw new Error(error.message);
+
+  const candidates = (files ?? [])
+    .filter((file) => file.id && file.created_at && new Date(file.created_at).getTime() < cutoff)
+    .map((file) => `enquiry/${file.name}`);
+  if (candidates.length === 0) return 0;
+
+  const referenced = new Set<string>();
+  for (let i = 0; i < candidates.length; i += 200) {
+    const batch = candidates.slice(i, i + 200);
+    const { data: rows, error: lookupError } = await admin
+      .from("job_photos")
+      .select("storage_path")
+      .in("storage_path", batch);
+    // A failed lookup must never be read as "nothing refers to these".
+    if (lookupError) throw new Error(lookupError.message);
+    for (const row of rows ?? []) referenced.add(row.storage_path);
+  }
+
+  const orphans = candidates.filter((path) => !referenced.has(path));
+  if (orphans.length === 0) return 0;
+
+  const { error: removeError } = await admin.storage.from("enquiry-photos").remove(orphans);
+  if (removeError) throw new Error(removeError.message);
+
+  return orphans.length;
 }
