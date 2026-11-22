@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { WhatsAppButton } from "@/components/marketing/whatsapp-button";
 import { ClosureNotice } from "@/components/marketing/closure-notice";
 import { getClosureNotice } from "@/lib/closures";
 import { getBusiness } from "@/lib/business";
@@ -33,6 +34,8 @@ export default async function MarketingLayout({ children }: { children: React.Re
       </main>
 
       <SiteFooter contact={contact} services={services} />
+
+      <WhatsAppButton href={contact.whatsappHref} />
 
       {/*
         The only dangerouslySetInnerHTML in the application. The object is

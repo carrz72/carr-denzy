@@ -8,6 +8,7 @@ import {
   PhoneIcon,
   StarIcon,
   WarningIcon,
+  WhatsappLogoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { business } from "@/lib/site";
@@ -69,6 +70,31 @@ export default async function ContactPage() {
                   </span>
                 </span>
               </a>
+
+              {contact.whatsappHref ? (
+                <a
+                  href={contact.whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "flex items-start gap-4 rounded-xl border border-line bg-surface-raised p-5",
+                    "shadow-subtle transition-[border-color,box-shadow,transform] duration-200",
+                    "[transition-timing-function:var(--ease-standard)]",
+                    "hover:-translate-y-0.5 hover:border-accent hover:shadow-float",
+                  )}
+                >
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#25D366] text-white">
+                    <WhatsappLogoIcon size={24} weight="fill" aria-hidden="true" />
+                  </span>
+
+                  <span>
+                    <span className="block text-sm text-ink-muted">WhatsApp us</span>
+                    <span className="mt-0.5 block font-medium text-ink">
+                      Send a message or photos
+                    </span>
+                  </span>
+                </a>
+              ) : null}
 
               <a
                 href={`mailto:${contact.email}`}

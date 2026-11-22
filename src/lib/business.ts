@@ -36,6 +36,12 @@ export interface BusinessContact {
   phone: string;
   /** `tel:` href, derived from the phone number. */
   phoneHref: string;
+  /**
+   * A wa.me chat link for the same number, or null when the number is not a
+   * mobile (a landline cannot have WhatsApp, and a dead chat link is worse
+   * than none).
+   */
+  whatsappHref: string | null;
   email: string;
 }
 
@@ -75,12 +81,34 @@ export function toTelHref(input: string): string {
   return `tel:${digits}`;
 }
 
+/**
+ * The text a WhatsApp chat opens with, ready for the customer to finish.
+ * Starting them off means the first message already says it came from the
+ * website, and they rarely send an empty "hi".
+ */
+const WHATSAPP_GREETING = "Hi, I found you on your website and I would like some help with ";
+
+/**
+ * Turns a phone number into a WhatsApp click-to-chat link. Only UK mobiles
+ * (07…, +447…) qualify; anything else returns null so no button is shown.
+ */
+export function toWhatsAppHref(input: string): string | null {
+  const digits = input.replace(/[^\d+]/g, "");
+  let international: string;
+  if (digits.startsWith("+")) international = digits.slice(1);
+  else if (digits.startsWith("0")) international = `44${digits.slice(1)}`;
+  else international = digits;
+  if (!/^447\d{9}$/.test(international)) return null;
+  return `https://wa.me/${international}?text=${encodeURIComponent(WHATSAPP_GREETING)}`;
+}
+
 export const getBusiness = cache(async (): Promise<BusinessContact> => {
   const base: BusinessContact = {
     name: fallback.name,
     shortName: fallback.shortName,
     phone: fallback.phone,
     phoneHref: fallback.phoneHref,
+    whatsappHref: toWhatsAppHref(fallback.phone),
     email: fallback.email,
   };
 
@@ -103,6 +131,7 @@ export const getBusiness = cache(async (): Promise<BusinessContact> => {
       shortName: base.shortName,
       phone: phone || base.phone,
       phoneHref: phone ? toTelHref(phone) : base.phoneHref,
+      whatsappHref: phone ? toWhatsAppHref(phone) : base.whatsappHref,
       email: email || base.email,
     };
   } catch (error) {
