@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowsHorizontalIcon } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/cn";
 
@@ -45,6 +45,15 @@ export function BeforeAfter({
   const [dragging, setDragging] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const labelId = useId();
+  const gesture = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
+
+  const endGesture = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    gesture.current = null;
+    setDragging(false);
+  }, []);
 
   const setFromClientX = useCallback((clientX: number) => {
     const frame = frameRef.current;
@@ -76,45 +85,54 @@ export function BeforeAfter({
           // It only applies to the element actually hit, which is why the range
           // input below must stay pointer-inert: otherwise IT is the hit target
           // and this declaration does nothing on touch.
-          "aspect-[4/3] cursor-ew-resize touch-pan-y select-none",
+          "aspect-[4/3] cursor-ew-resize touch-pan-y select-none [-webkit-touch-callout:none]",
         )}
         onPointerDown={(event) => {
           // Capture on the frame so a fast drag that leaves the element still
-          // tracks, instead of stopping dead at the edge.
-          //
-          // Wrapped because setPointerCapture throws NotFoundError if the
-          // pointer is no longer active — a real possibility when a touch ends
-          // in the same tick it began. An exception here would abort the
-          // handler before `setDragging(true)` and the drag would die with no
-          // error anyone would ever see. Capture is an enhancement; losing it
-          // costs tracking past the edge, not the drag itself.
+          // tracks, instead of stopping dead at the edge. Wrapped because
+          // setPointerCapture throws if the pointer is already gone.
           try {
             event.currentTarget.setPointerCapture(event.pointerId);
           } catch {
             // Carry on without capture.
           }
 
-          setDragging(true);
-          setFromClientX(event.clientX);
+          gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+
+          // A mouse or pen means "move the divider here". A finger might just
+          // be scrolling the page, so wait to see which way it goes before
+          // touching the picture.
+          if (event.pointerType !== "touch") {
+            setDragging(true);
+            setFromClientX(event.clientX);
+          }
         }}
         onPointerMove={(event) => {
-          if (!dragging) return;
+          const g = gesture.current;
+          if (!g || g.id !== event.pointerId) return;
+
+          if (!dragging) {
+            const dx = Math.abs(event.clientX - g.x);
+            const dy = Math.abs(event.clientY - g.y);
+            if (dx < 6 || dx < dy) return;
+            setDragging(true);
+          }
+          g.moved = true;
           setFromClientX(event.clientX);
         }}
         onPointerUp={(event) => {
-          // Releasing a capture that was never taken throws. That happens on a
-          // pointerup with no matching pointerdown — a touch that began outside
-          // the frame and ended inside it.
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
+          const g = gesture.current;
+          // A quick tap with a finger moves the divider there, smoothly.
+          if (g && g.id === event.pointerId && event.pointerType === "touch" && !g.moved) {
+            setFromClientX(event.clientX);
           }
-          setDragging(false);
+          endGesture(event);
         }}
-        onPointerCancel={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
-          setDragging(false);
+        onPointerCancel={endGesture}
+        onDragStart={(event) => event.preventDefault()}
+        onContextMenu={(event) => {
+          // A long press on a touch screen would otherwise open the image menu.
+          if (gesture.current) event.preventDefault();
         }}
         style={{ ["--wipe" as string]: `${position}%` }}
       >
@@ -125,12 +143,16 @@ export function BeforeAfter({
           fill
           sizes="(min-width: 1024px) 50vw, 100vw"
           priority={priority}
+          draggable={false}
           className="object-cover"
         />
 
         {/* Top layer: how it started, clipped to the left of the divider. */}
         <div
-          className="absolute inset-0"
+          className={cn(
+            "absolute inset-0",
+            !dragging && "transition-[clip-path] duration-300 [transition-timing-function:var(--ease-out-soft)] motion-reduce:transition-none",
+          )}
           style={{ clipPath: "inset(0 calc(100% - var(--wipe)) 0 0)" }}
         >
           <Image
@@ -139,6 +161,7 @@ export function BeforeAfter({
             fill
             sizes="(min-width: 1024px) 50vw, 100vw"
             priority={priority}
+            draggable={false}
             className="object-cover"
           />
         </div>
@@ -150,7 +173,10 @@ export function BeforeAfter({
             is really meant for the range input underneath the cursor. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-surface-raised shadow-[0_0_0_1px_rgba(0,0,0,0.15)]"
+          className={cn(
+            "pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-surface-raised shadow-[0_0_0_1px_rgba(0,0,0,0.15)]",
+            !dragging && "transition-[left] duration-300 [transition-timing-function:var(--ease-out-soft)] motion-reduce:transition-none",
+          )}
           style={{ left: "var(--wipe)" }}
         >
           <span

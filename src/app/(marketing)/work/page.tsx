@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/states";
 import { createPublicClient } from "@/lib/supabase/public";
 import { portfolioImageUrl, isPair } from "@/lib/portfolio";
 import { cn } from "@/lib/cn";
-import type { PortfolioItem } from "@/types/database";
+import type { PortfolioCategory, PortfolioItem } from "@/types/database";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/work" },
@@ -32,18 +32,28 @@ export default async function WorkPage() {
   // cookie-reading one would drop this page out of static rendering.
   const supabase = createPublicClient();
 
-  const { data, error } = await supabase
-    .from("portfolio_items")
-    .select("id, after_path, before_path, caption, location, sort_order, is_published, created_at, updated_at")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
+  const [{ data, error }, { data: categoryData }] = await Promise.all([
+    supabase
+      .from("portfolio_items")
+      .select("id, after_path, before_path, caption, location, category_id, sort_order, is_published, created_at, updated_at")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("portfolio_categories")
+      .select("id, name, sort_order, created_at")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+  ]);
 
   if (error) {
     console.error("[work] could not load portfolio", error.message);
   }
 
   const items: PortfolioItem[] = data ?? [];
+  const sections = groupByCategory(items, categoryData ?? []);
+  // A heading on its own above every photo adds nothing until there are two.
+  const showHeadings = sections.length > 1 || (sections.length === 1 && sections[0]?.id !== "other");
 
   return (
     <>
@@ -79,24 +89,68 @@ export default async function WorkPage() {
              * thing and it must not be sliced up or shuffled away from its own
              * caption. A grid keeps reading order and DOM order identical.
              */
-            <ul className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
-              {items.map((item, index) => (
-                <li
-                  key={item.id}
-                  className={cn(
-                    // A pair earns the full width — it is the one thing on this
-                    // page worth stopping for.
-                    isPair(item) && "md:col-span-2",
-                  )}
-                >
-                  {isPair(item) ? (
-                    <PairCard item={item} priority={index === 0} />
-                  ) : (
-                    <SingleCard item={item} priority={index === 0} />
-                  )}
-                </li>
-              ))}
-            </ul>
+            <>
+              {showHeadings && sections.length > 1 ? (
+                <nav aria-label="Jump to a type of work" className="mb-10 flex flex-wrap gap-2">
+                  {sections.map((section) => (
+                    <a
+                      key={section.id}
+                      href={`#${section.anchor}`}
+                      className={cn(
+                        "inline-flex min-h-11 items-center rounded-full border border-line bg-surface-raised px-4",
+                        "text-sm font-medium text-ink-muted transition-colors duration-200",
+                        "hover:border-ink-subtle hover:text-ink",
+                      )}
+                    >
+                      {section.name}
+                      <span className="ml-1.5 text-ink-subtle">{section.items.length}</span>
+                    </a>
+                  ))}
+                </nav>
+              ) : null}
+
+              <div className="flex flex-col gap-16">
+                {sections.map((section, sectionIndex) => (
+                  <section
+                    key={section.id}
+                    id={section.anchor}
+                    aria-labelledby={showHeadings ? `${section.anchor}-heading` : undefined}
+                    className="scroll-mt-24"
+                  >
+                    {showHeadings ? (
+                      <h2
+                        id={`${section.anchor}-heading`}
+                        className="mb-6 font-display text-heading text-ink"
+                      >
+                        {section.name}
+                      </h2>
+                    ) : null}
+
+                    <ul className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
+                      {section.items.map((item, index) => {
+                        const priority = sectionIndex === 0 && index === 0;
+                        return (
+                          <li
+                            key={item.id}
+                            className={cn(
+                              // A pair earns the full width — it is the one thing
+                              // on this page worth stopping for.
+                              isPair(item) && "md:col-span-2",
+                            )}
+                          >
+                            {isPair(item) ? (
+                              <PairCard item={item} priority={priority} />
+                            ) : (
+                              <SingleCard item={item} priority={priority} />
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </section>
@@ -118,6 +172,39 @@ export default async function WorkPage() {
       </section>
     </>
   );
+}
+
+type Section = { id: string; name: string; anchor: string; items: PortfolioItem[] };
+
+/**
+ * Photos under the owner's category headings, in the owner's order. Empty
+ * categories are left out; anything without a (surviving) category goes last
+ * under "Other work".
+ */
+function groupByCategory(items: PortfolioItem[], categories: PortfolioCategory[]): Section[] {
+  const used = new Set<string>();
+  const anchorFor = (name: string) => {
+    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "work";
+    let anchor = base;
+    for (let n = 2; used.has(anchor); n++) anchor = `${base}-${n}`;
+    used.add(anchor);
+    return anchor;
+  };
+
+  const known = new Set(categories.map((category) => category.id));
+  const sections: Section[] = categories
+    .map((category) => ({
+      id: category.id,
+      name: category.name,
+      anchor: "",
+      items: items.filter((item) => item.category_id === category.id),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  const other = items.filter((item) => !item.category_id || !known.has(item.category_id));
+  if (other.length > 0) sections.push({ id: "other", name: "Other work", anchor: "", items: other });
+
+  return sections.map((section) => ({ ...section, anchor: anchorFor(section.name) }));
 }
 
 function PairCard({

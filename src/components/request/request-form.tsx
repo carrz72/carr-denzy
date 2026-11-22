@@ -27,11 +27,10 @@ import {
   MAX_PHOTOS,
   formatBytes,
   preparePhoto,
-  storageKey,
   type PreparedPhoto,
 } from "@/lib/photos";
-import { submitEnquiry } from "@/app/request/actions";
-import { services } from "@/lib/site";
+import { prepareEnquiryUploads, submitEnquiry } from "@/app/request/actions";
+import type { ServiceDefinition } from "@/lib/site";
 import type { BusinessContact } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
@@ -53,12 +52,15 @@ type Step = 0 | 1 | 2;
 const stepTitles = ["What has happened?", "Where and when", "How to reach you"];
 
 export function RequestForm({
+  services,
   initialServiceSlug,
   initialProblem,
   contact,
   signedInAs = null,
   isSignedIn = Boolean(signedInAs),
 }: {
+  /** The live service list, so a service the owner adds shows up here too. */
+  services: ServiceDefinition[];
   initialServiceSlug?: string;
   initialProblem?: string;
   /** From Settings, so the owner can change the number without a redeploy. */
@@ -238,18 +240,20 @@ export function RequestForm({
 
       try {
         const supabase = createClient();
+        const prepared = await prepareEnquiryUploads(photos.map((photo) => photo.file.name));
+        const slots = prepared.ok ? prepared.slots : [];
 
         const results = await Promise.all(
-          photos.map(async (photo) => {
-            const key = storageKey("enquiry", photo.file.name);
+          photos.map(async (photo, index) => {
+            const slot = slots[index];
+            if (!slot) return null;
             const { error } = await supabase.storage
               .from("enquiry-photos")
-              .upload(key, photo.file, {
+              .uploadToSignedUrl(slot.path, slot.token, photo.file, {
                 contentType: photo.file.type,
-                upsert: false,
               });
 
-            return error ? null : key;
+            return error ? null : slot.path;
           }),
         );
 

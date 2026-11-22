@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { ArrowRightIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/service-icon";
-import { services } from "@/lib/site";
+import { getServices } from "@/lib/services";
 import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ServicesPage() {
-  const contact = await getBusiness();
+  const [contact, services] = await Promise.all([getBusiness(), getServices()]);
 
   return (
     <>

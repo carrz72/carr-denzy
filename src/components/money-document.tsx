@@ -323,6 +323,9 @@ export function BusinessBlock({
 
   return (
     <div className={cn("text-sm leading-relaxed text-ink-muted", className)}>
+      {/* The current logo, whatever it is: /brand/logo follows Settings. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/logo" alt="" className="mb-3 h-16 w-auto max-w-[12rem] object-contain object-left" />
       <p className="font-display text-subheading text-ink">
         {text("trading_name") ?? "Carrdenzy Heating & Gas"}
       </p>

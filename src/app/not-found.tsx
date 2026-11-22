@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRightIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
-import { services } from "@/lib/site";
+import { getServices } from "@/lib/services";
 import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
  * a proportion of the people who reach it have a leak running right now.
  */
 export default async function NotFound() {
-  const contact = await getBusiness();
+  const [contact, services] = await Promise.all([getBusiness(), getServices()]);
 
   return (
     <div className="flex min-h-dvh flex-col">

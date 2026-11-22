@@ -5,13 +5,14 @@ import type { Metadata } from "next";
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/service-icon";
-import { getService, services } from "@/lib/site";
+import { getServiceBySlug, getServices } from "@/lib/services";
 import { getBusiness } from "@/lib/business";
 import { cn } from "@/lib/cn";
 
-// Eight services, known at build time — every one is a static page.
-export function generateStaticParams() {
-  return services.map((service) => ({ slug: service.slug }));
+// The services known at build time are static pages; one the owner adds later
+// is rendered on first visit and cached the same way.
+export async function generateStaticParams() {
+  return (await getServices()).map((service) => ({ slug: service.slug }));
 }
 
 export async function generateMetadata({
@@ -20,7 +21,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const service = getService(slug);
+  const service = await getServiceBySlug(slug);
 
   if (!service) return { title: "Service not found" };
 
@@ -29,8 +30,12 @@ export async function generateMetadata({
     // "boiler repair Nottingham", so each needs its own canonical.
     alternates: { canonical: `/services/${service.slug}` },
     title: service.name,
-    description: service.blurb,
-    openGraph: { title: `${service.name} · Carrdenzy`, description: service.blurb },
+    description: service.metaDescription,
+    openGraph: {
+      title: `${service.name} in Nottingham · Carrdenzy`,
+      description: service.metaDescription,
+      images: [service.image],
+    },
   };
 }
 
@@ -39,10 +44,9 @@ export default async function ServiceDetailPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const contact = await getBusiness();
-
   const { slug } = await params;
-  const service = getService(slug);
+  const [contact, services] = await Promise.all([getBusiness(), getServices()]);
+  const service = services.find((item) => item.slug === slug);
 
   if (!service) notFound();
 
@@ -74,6 +78,13 @@ export default async function ServiceDetailPage({
               <p className="container-prose mt-4 text-lg leading-relaxed text-ink-muted">
                 {service.blurb}
               </p>
+
+              {service.fromPrice ? (
+                <p className="mt-5 inline-flex items-baseline gap-2 rounded-full border border-line bg-surface-raised px-4 py-2 text-ink">
+                  <span className="text-sm text-ink-muted">Guide price from</span>
+                  <span className="font-display text-subheading">{service.fromPrice}</span>
+                </p>
+              ) : null}
             </div>
 
             <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-line bg-surface-raised p-10 shadow-subtle">

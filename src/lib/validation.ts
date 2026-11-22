@@ -362,6 +362,12 @@ export const portfolioItemSchema = z.object({
   before_path: trimmed(400).optional(),
   caption: trimmed(200).min(3, "Say what the job was, for example 'Garage conversion'"),
   location: trimmed(80).optional(),
+  category_id: z.string().uuid().optional().or(z.literal("")),
+});
+
+/** A heading on the "Our work" page. */
+export const portfolioCategorySchema = z.object({
+  name: trimmed(40).min(2, "Give the category a name, for example 'Bathrooms'"),
 });
 
 /**

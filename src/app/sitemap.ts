@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
-import { services } from "@/lib/site";
+import { getServices } from "@/lib/services";
 
 /**
  * Only public marketing pages are listed. The portal and the owner app are
  * behind authentication and deliberately excluded — listing them would invite
  * crawlers to hammer routes that always redirect.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const services = await getServices();
   const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
   const lastModified = new Date();
 

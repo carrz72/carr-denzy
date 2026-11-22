@@ -1,6 +1,7 @@
 import "server-only";
 
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import type { LogoImage } from "@/lib/logo-server";
 import { formatDate } from "@/lib/dates";
 import { formatPence, formatQuantity, formatRateBp, lineAmountPence } from "@/lib/money";
 import type { LineKind } from "@/types/database";
@@ -36,6 +37,8 @@ export interface InvoicePdfData {
   /** Invoices: payment due. Quotes: the date the price is held until. */
   dueDate: string | null;
   business: Record<string, unknown> | null;
+  /** Printed top-left. Missing just means no logo, never a failed PDF. */
+  logo?: LogoImage | null;
   customerName: string;
   customerCompany: string | null;
   customerAddress: string | null;
@@ -66,7 +69,12 @@ const styles = StyleSheet.create({
   page: { paddingVertical: 42, paddingHorizontal: 40, fontSize: 10, color: "#1a1a1a" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
   businessName: { fontSize: 15, fontWeight: 700, marginBottom: 4 },
-  muted: { color: "#555555", lineHeight: 1.5 },
+  logo: { height: 56, maxWidth: 160, objectFit: "contain", objectPosition: "left", marginBottom: 10 },
+  // fontSize is set here, not only inherited from the page: react-pdf works out
+  // a numeric lineHeight from the style's OWN fontSize, which otherwise defaults
+  // to 18, and 1.5 x 18 spread every grey line (and pushed invoices onto a
+  // second page).
+  muted: { color: "#555555", fontSize: 10, lineHeight: 1.45 },
   docTitle: { fontSize: 18, fontWeight: 700, textAlign: "right" },
   reference: { textAlign: "right", color: "#555555", marginTop: 2 },
   metaRow: {
@@ -161,6 +169,10 @@ function InvoiceDocument(data: InvoicePdfData) {
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View>
+            {data.logo ? (
+              // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf images have no alt
+              <Image style={styles.logo} src={{ data: data.logo.data, format: data.logo.format }} />
+            ) : null}
             <Text style={styles.businessName}>
               {text(data.business, "trading_name") ?? "Carrdenzy Heating & Gas"}
             </Text>

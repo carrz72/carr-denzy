@@ -6,8 +6,9 @@ import { sendEnquiryConfirmation, sendOwnerEnquiryNotification } from "@/lib/ema
 import { pushToStaff } from "@/lib/push";
 import { enquirySchema, fieldErrors } from "@/lib/validation";
 import { getMyClient } from "@/lib/auth";
-import { getService } from "@/lib/site";
+import { getServiceBySlug } from "@/lib/services";
 import { getBusiness } from "@/lib/business";
+import { storageKey } from "@/lib/storage-key";
 
 /** The business phone for error messages, from settings so it never goes stale. */
 async function ourPhone(): Promise<string> {
@@ -105,7 +106,7 @@ export async function submitEnquiry(formData: FormData): Promise<EnquiryResult> 
 
     const serviceLabel =
       input.service_label?.trim() ||
-      (input.service_slug ? getService(input.service_slug)?.name : undefined) ||
+      (input.service_slug ? (await getServiceBySlug(input.service_slug))?.name : undefined) ||
       null;
 
     const { data: enquiry, error } = await admin
@@ -236,4 +237,46 @@ export async function submitEnquiry(formData: FormData): Promise<EnquiryResult> 
         `We could not reach our system just then. Nothing you typed has been lost — try again in a moment, or call ${await ourPhone()}.`,
     };
   }
+}
+
+export interface EnquiryUploadSlot {
+  path: string;
+  token: string;
+}
+
+/**
+ * One-time upload slots for the photos on an enquiry.
+ *
+ * Photos go straight from the browser to storage (a six-photo payload is too
+ * big for a server action), but the browser may only upload to a slot this
+ * action has handed out. That puts the per-connection rate limit in front of
+ * the bucket: before this, anyone could upload to it directly, and the only
+ * brake was a cap shared by every visitor, which a spammer could use up and
+ * block real customers' photos for an hour.
+ */
+export async function prepareEnquiryUploads(
+  fileNames: string[],
+): Promise<{ ok: true; slots: EnquiryUploadSlot[] } | { ok: false; error: string }> {
+  const names = fileNames.slice(0, 6);
+  if (names.length === 0) return { ok: true, slots: [] };
+
+  const { allowed } = await checkRateLimit("enquiry-photos", 10, 60);
+  if (!allowed) {
+    return { ok: false, error: "Too many photo uploads from this connection. Send the request without them, or try again later." };
+  }
+
+  const admin = createAdminClient();
+  const slots: EnquiryUploadSlot[] = [];
+
+  for (const name of names) {
+    const path = storageKey("enquiry", String(name));
+    const { data, error } = await admin.storage.from("enquiry-photos").createSignedUploadUrl(path);
+    if (error || !data) {
+      console.error("[enquiry] could not create an upload slot", error?.message);
+      continue;
+    }
+    slots.push({ path: data.path, token: data.token });
+  }
+
+  return { ok: true, slots };
 }

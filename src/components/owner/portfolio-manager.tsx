@@ -9,26 +9,34 @@ import {
   EyeIcon,
   EyeSlashIcon,
   ImageSquareIcon,
+  ImagesIcon,
+  PencilSimpleIcon,
   PlusIcon,
+  XIcon,
   TrashIcon,
   UploadSimpleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
-import { FormError, TextField } from "@/components/ui/field";
+import { FormError, SelectField, TextField } from "@/components/ui/field";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { createClient } from "@/lib/supabase/client";
 import { preparePhoto, storageKey } from "@/lib/photos";
 import { portfolioImageUrl } from "@/lib/portfolio";
 import { cn } from "@/lib/cn";
 import {
+  createPortfolioCategory,
   createPortfolioItem,
+  createPortfolioItems,
+  deletePortfolioCategory,
   deletePortfolioItem,
+  movePortfolioCategory,
+  renamePortfolioCategory,
   movePortfolioItem,
   setPortfolioPublished,
   updatePortfolioItem,
 } from "@/app/(app)/app/portfolio/actions";
-import type { PortfolioItem } from "@/types/database";
+import type { PortfolioCategory, PortfolioItem } from "@/types/database";
 
 /**
  * The "Our work" gallery, as the owner manages it.
@@ -49,39 +57,97 @@ type Draft = {
   beforePath: string;
   caption: string;
   location: string;
+  categoryId: string;
 };
 
-const EMPTY: Draft = { afterPath: "", beforePath: "", caption: "", location: "" };
+const EMPTY: Draft = { afterPath: "", beforePath: "", caption: "", location: "", categoryId: "" };
 
-export function PortfolioManager({ items }: { items: PortfolioItem[] }) {
-  const [adding, setAdding] = useState(false);
+/** "all", "none" (no category), or a category id. */
+type Filter = string;
+
+export function PortfolioManager({
+  items,
+  categories,
+}: {
+  items: PortfolioItem[];
+  categories: PortfolioCategory[];
+}) {
+  const [adding, setAdding] = useState<null | "job" | "several">(null);
+  const [filter, setFilter] = useState<Filter>("all");
+
+  const known = new Set(categories.map((category) => category.id));
+  const groupOf = (item: PortfolioItem) =>
+    item.category_id && known.has(item.category_id) ? item.category_id : "none";
+
+  // The filter may point at a category that has just been deleted.
+  const activeFilter = filter === "all" || filter === "none" || known.has(filter) ? filter : "all";
+  const visible = activeFilter === "all" ? items : items.filter((item) => groupOf(item) === activeFilter);
+  const uncategorised = items.filter((item) => groupOf(item) === "none").length;
+
+  // Up/down moves a photo within its own category, so the ends are per group.
+  const groups = new Map<string, string[]>();
+  for (const item of items) {
+    const key = groupOf(item);
+    groups.set(key, [...(groups.get(key) ?? []), item.id]);
+  }
+
+  // New photos land in whichever category is being looked at.
+  const defaultCategory = activeFilter !== "all" && activeFilter !== "none" ? activeFilter : "";
 
   return (
     <div className="flex flex-col gap-6">
+      <CategoryManager categories={categories} items={items} />
+
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-label uppercase text-ink-subtle">Add a job</h2>
+            <h2 className="text-label uppercase text-ink-subtle">Add photos</h2>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
-              One entry is one job. Add a &ldquo;before&rdquo; photo and the website shows
-              the two together with a slider, instead of as two separate pictures.
+              Add several photos to a category in one go, or add a single job. Add a
+              &ldquo;before&rdquo; photo to a job and the website shows the two together
+              with a slider.
             </p>
           </div>
 
-          {!adding ? (
-            <Button
-              variant="secondary"
-              onClick={() => setAdding(true)}
-              icon={<PlusIcon size={18} weight="bold" />}
-            >
-              Add a job
-            </Button>
+          {adding === null ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setAdding("several")}
+                icon={<ImagesIcon size={18} />}
+              >
+                Add several photos
+              </Button>
+              <Button
+                variant="quiet"
+                onClick={() => setAdding("job")}
+                icon={<PlusIcon size={18} weight="bold" />}
+              >
+                Add a job
+              </Button>
+            </div>
           ) : null}
         </div>
 
-        {adding ? (
+        {adding === "job" ? (
           <div className="mt-5 border-t border-line pt-5">
-            <ItemForm onDone={() => setAdding(false)} onCancel={() => setAdding(false)} />
+            <ItemForm
+              categories={categories}
+              defaultCategory={defaultCategory}
+              onDone={() => setAdding(null)}
+              onCancel={() => setAdding(null)}
+            />
+          </div>
+        ) : null}
+
+        {adding === "several" ? (
+          <div className="mt-5 border-t border-line pt-5">
+            <SeveralForm
+              categories={categories}
+              defaultCategory={defaultCategory}
+              onDone={() => setAdding(null)}
+              onCancel={() => setAdding(null)}
+            />
           </div>
         ) : null}
       </Card>
@@ -93,18 +159,341 @@ export function PortfolioManager({ items }: { items: PortfolioItem[] }) {
           description="Photographs of finished work are the single most persuasive thing on the website. Add the first one and it appears on the home page and on Our work."
         />
       ) : (
-        <ul className="flex flex-col gap-4">
-          {items.map((item, index) => (
-            <ItemRow
-              key={item.id}
-              item={item}
+        <>
+          {categories.length > 0 ? (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Show photos in">
+              <FilterChip active={activeFilter === "all"} onClick={() => setFilter("all")}>
+                All ({items.length})
+              </FilterChip>
+              {categories.map((category) => (
+                <FilterChip
+                  key={category.id}
+                  active={activeFilter === category.id}
+                  onClick={() => setFilter(category.id)}
+                >
+                  {category.name} ({groups.get(category.id)?.length ?? 0})
+                </FilterChip>
+              ))}
+              {uncategorised > 0 ? (
+                <FilterChip active={activeFilter === "none"} onClick={() => setFilter("none")}>
+                  No category ({uncategorised})
+                </FilterChip>
+              ) : null}
+            </div>
+          ) : null}
+
+          {visible.length === 0 ? (
+            <EmptyState
+              icon={<ImageSquareIcon size={28} weight="duotone" />}
+              title="No photos in this category yet"
+              description="Use Add several photos above and they go straight into it."
+            />
+          ) : (
+            <ul className="flex flex-col gap-4">
+              {visible.map((item) => {
+                const group = groups.get(groupOf(item)) ?? [];
+                return (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    categories={categories}
+                    isFirst={group[0] === item.id}
+                    isLast={group[group.length - 1] === item.id}
+                  />
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "min-h-11 rounded-full border px-4 text-sm font-medium transition-colors duration-200",
+        active
+          ? "border-ink bg-ink text-ink-inverse"
+          : "border-line bg-surface-raised text-ink-muted hover:border-ink-subtle hover:text-ink",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Categories
+// ---------------------------------------------------------------------------
+
+function CategoryManager({
+  categories,
+  items,
+}: {
+  categories: PortfolioCategory[];
+  items: PortfolioItem[];
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function add() {
+    setError(null);
+    const data = new FormData();
+    data.set("name", name);
+    startTransition(async () => {
+      const result = await createPortfolioCategory(data);
+      if (!result.ok) {
+        setError(result.errors?.name ?? result.formError ?? "That did not work. Try again.");
+        return;
+      }
+      setName("");
+    });
+  }
+
+  return (
+    <Card>
+      <h2 className="text-label uppercase text-ink-subtle">Categories</h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
+        The headings photos are grouped under on the website, for example Bathrooms,
+        Boilers or Building work. The order here is the order customers see.
+      </p>
+
+      {categories.length > 0 ? (
+        <ul className="mt-4 flex flex-col divide-y divide-line border-y border-line">
+          {categories.map((category, index) => (
+            <CategoryRow
+              key={category.id}
+              category={category}
+              count={items.filter((item) => item.category_id === category.id).length}
               isFirst={index === 0}
-              isLast={index === items.length - 1}
+              isLast={index === categories.length - 1}
             />
           ))}
         </ul>
+      ) : null}
+
+      <form
+        className="mt-4 flex flex-wrap items-end gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          add();
+        }}
+      >
+        <TextField
+          name="new-category"
+          label="New category"
+          optionalLabel={false}
+          placeholder="Bathrooms"
+          value={name}
+          maxLength={40}
+          onChange={(event) => setName(event.target.value)}
+          containerClassName="min-w-0 flex-1"
+        />
+        <Button
+          type="submit"
+          variant="secondary"
+          loading={isPending}
+          disabled={name.trim().length < 2}
+          icon={<PlusIcon size={18} weight="bold" />}
+        >
+          Add category
+        </Button>
+      </form>
+
+      {error ? (
+        <div className="mt-3">
+          <FormError message={error} />
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function CategoryRow({
+  category,
+  count,
+  isFirst,
+  isLast,
+}: {
+  category: PortfolioCategory;
+  count: number;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [mode, setMode] = useState<"view" | "rename" | "delete">("view");
+  const [name, setName] = useState(category.name);
+  const [error, setError] = useState<string | null>(null);
+
+  function run(
+    action: (data: FormData) => Promise<{ ok: boolean; formError?: string; errors?: Record<string, string> }>,
+    data: FormData,
+    after?: () => void,
+  ) {
+    setError(null);
+    startTransition(async () => {
+      const result = await action(data);
+      if (!result.ok) {
+        setError(result.errors?.name ?? result.formError ?? "That did not work. Try again.");
+        return;
+      }
+      after?.();
+    });
+  }
+
+  const withId = (extra: Record<string, string> = {}) => {
+    const data = new FormData();
+    data.set("id", category.id);
+    for (const [key, value] of Object.entries(extra)) data.set(key, value);
+    return data;
+  };
+
+  return (
+    <li className="py-2">
+      {mode === "rename" ? (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            run(renamePortfolioCategory, withId({ name }), () => setMode("view"));
+          }}
+        >
+          <TextField
+            name={`category-${category.id}`}
+            label="Category name"
+            optionalLabel={false}
+            value={name}
+            maxLength={40}
+            onChange={(event) => setName(event.target.value)}
+            containerClassName="min-w-0 flex-1"
+            autoFocus
+          />
+          <Button type="submit" size="sm" loading={isPending} disabled={name.trim().length < 2}>
+            Save
+          </Button>
+          <Button
+            size="sm"
+            variant="quiet"
+            onClick={() => {
+              setName(category.name);
+              setMode("view");
+            }}
+          >
+            Cancel
+          </Button>
+        </form>
+      ) : (
+        <div className="flex items-center gap-2">
+          <p className="min-w-0 flex-1 truncate">
+            <span className="font-medium text-ink">{category.name}</span>{" "}
+            <span className="text-sm text-ink-subtle">
+              {count} {count === 1 ? "photo" : "photos"}
+            </span>
+          </p>
+          <IconButton label="Rename" disabled={isPending} onClick={() => setMode("rename")}>
+            <PencilSimpleIcon size={17} />
+          </IconButton>
+          <IconButton
+            label="Move earlier"
+            disabled={isFirst || isPending}
+            onClick={() => run(movePortfolioCategory, withId({ direction: "up" }))}
+          >
+            <ArrowUpIcon size={17} />
+          </IconButton>
+          <IconButton
+            label="Move later"
+            disabled={isLast || isPending}
+            onClick={() => run(movePortfolioCategory, withId({ direction: "down" }))}
+          >
+            <ArrowDownIcon size={17} />
+          </IconButton>
+          <IconButton
+            label="Remove category"
+            tone="critical"
+            disabled={isPending}
+            onClick={() => setMode("delete")}
+          >
+            <TrashIcon size={17} />
+          </IconButton>
+        </div>
       )}
-    </div>
+
+      {mode === "delete" ? (
+        <div className="mt-2 rounded-lg border border-critical/30 bg-critical-soft p-4">
+          <p className="text-[0.9375rem] font-medium text-critical">
+            Remove the &ldquo;{category.name}&rdquo; category?
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">
+            {count > 0
+              ? `Its ${count} ${count === 1 ? "photo stays" : "photos stay"} on the website under Other work.`
+              : "It has no photos in it."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              loading={isPending}
+              onClick={() => run(deletePortfolioCategory, withId())}
+            >
+              Yes, remove it
+            </Button>
+            <Button size="sm" variant="quiet" onClick={() => setMode("view")}>
+              Keep it
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="mt-2">
+          <FormError message={error} />
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+function CategorySelect({
+  categories,
+  value,
+  onChange,
+  name,
+}: {
+  categories: PortfolioCategory[];
+  value: string;
+  onChange: (value: string) => void;
+  name: string;
+}) {
+  return (
+    <SelectField
+      name={name}
+      label="Category"
+      hint={categories.length === 0 ? "Add categories at the top of this page." : undefined}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      <option value="">No category (shows under Other work)</option>
+      {categories.map((category) => (
+        <option key={category.id} value={category.id}>
+          {category.name}
+        </option>
+      ))}
+    </SelectField>
   );
 }
 
@@ -114,13 +503,16 @@ export function PortfolioManager({ items }: { items: PortfolioItem[] }) {
 
 function ItemRow({
   item,
+  categories,
   isFirst,
   isLast,
 }: {
   item: PortfolioItem;
+  categories: PortfolioCategory[];
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const categoryName = categories.find((category) => category.id === item.category_id)?.name;
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -167,6 +559,9 @@ function ItemRow({
             <p className="font-medium text-ink">{item.caption}</p>
 
             <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-ink-subtle">
+              <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-xs font-medium text-ink-muted">
+                {categoryName ?? "No category"}
+              </span>
               {item.location ? <span>{item.location}</span> : null}
               {item.before_path ? (
                 <span className="font-medium text-accent">Before &amp; after</span>
@@ -248,7 +643,12 @@ function ItemRow({
 
             {editing ? (
               <div className="mt-5 border-t border-line pt-5">
-                <ItemForm item={item} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />
+                <ItemForm
+                  item={item}
+                  categories={categories}
+                  onDone={() => setEditing(false)}
+                  onCancel={() => setEditing(false)}
+                />
               </div>
             ) : null}
           </div>
@@ -283,10 +683,14 @@ function Thumb({ src, label }: { src: string; label?: string }) {
 
 function ItemForm({
   item,
+  categories,
+  defaultCategory = "",
   onDone,
   onCancel,
 }: {
   item?: PortfolioItem;
+  categories: PortfolioCategory[];
+  defaultCategory?: string;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -298,8 +702,9 @@ function ItemForm({
           beforePath: item.before_path ?? "",
           caption: item.caption,
           location: item.location ?? "",
+          categoryId: item.category_id ?? "",
         }
-      : EMPTY,
+      : { ...EMPTY, categoryId: defaultCategory },
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -314,6 +719,7 @@ function ItemForm({
     data.set("before_path", draft.beforePath);
     data.set("caption", draft.caption);
     data.set("location", draft.location);
+    data.set("category_id", draft.categoryId);
 
     startTransition(async () => {
       const result = item
@@ -350,6 +756,13 @@ function ItemForm({
         />
       </div>
 
+      <CategorySelect
+        name={`category-${item?.id ?? "new"}`}
+        categories={categories}
+        value={draft.categoryId}
+        onChange={(categoryId) => setDraft((d) => ({ ...d, categoryId }))}
+      />
+
       <TextField
         name={`caption-${item?.id ?? "new"}`}
         label="What was the job"
@@ -380,6 +793,230 @@ function ItemForm({
           icon={<CheckIcon size={18} weight="bold" />}
         >
           {item ? "Save changes" : "Add to the gallery"}
+        </Button>
+
+        <Button variant="quiet" onClick={onCancel} disabled={isPending}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Downscale and upload one photo; returns its storage key or an error. */
+async function uploadPortfolioPhoto(
+  file: File,
+): Promise<{ ok: true; key: string } | { ok: false; error: string }> {
+  const prepared = await preparePhoto(file);
+  if (!prepared.ok) return { ok: false, error: prepared.error };
+
+  try {
+    const supabase = createClient();
+    const key = storageKey("portfolio", prepared.photo.file.name);
+
+    const { error } = await supabase.storage.from("portfolio").upload(key, prepared.photo.file, {
+      contentType: prepared.photo.file.type,
+      upsert: false,
+    });
+
+    if (error) {
+      console.error("[portfolio] upload failed", error.message);
+      return { ok: false, error: `${file.name} did not upload. Check your signal and try again.` };
+    }
+
+    return { ok: true, key };
+  } finally {
+    URL.revokeObjectURL(prepared.photo.previewUrl);
+  }
+}
+
+const MAX_BATCH = 30;
+
+/**
+ * Several photos into one category at once. Each photo becomes its own entry
+ * with the shared caption, so any one of them can be hidden or re-captioned
+ * later without touching the rest.
+ */
+function SeveralForm({
+  categories,
+  defaultCategory,
+  onDone,
+  onCancel,
+}: {
+  categories: PortfolioCategory[];
+  defaultCategory: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isPending, startTransition] = useTransition();
+  const [paths, setPaths] = useState<string[]>([]);
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [categoryId, setCategoryId] = useState(defaultCategory);
+  const [caption, setCaption] = useState("");
+  const [location, setLocation] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  async function handleFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+
+    const room = MAX_BATCH - paths.length;
+    const files = Array.from(list).slice(0, Math.max(0, room));
+    const problems: string[] = [];
+    if (list.length > room) problems.push(`Only ${MAX_BATCH} photos can go in at a time.`);
+
+    setUploadErrors([]);
+    setUploading({ done: 0, total: files.length });
+
+    // One at a time: a phone on 4G uploading ten photos in parallel tends to
+    // fail all ten rather than finish any.
+    for (const file of files) {
+      const result = await uploadPortfolioPhoto(file);
+      if (result.ok) setPaths((current) => [...current, result.key]);
+      else problems.push(result.error);
+      setUploading((current) => (current ? { ...current, done: current.done + 1 } : current));
+    }
+
+    setUploading(null);
+    setUploadErrors(problems);
+  }
+
+  function handleSubmit() {
+    setErrors({});
+    setFormError(null);
+
+    const data = new FormData();
+    for (const path of paths) data.append("paths", path);
+    data.set("caption", caption);
+    data.set("location", location);
+    data.set("category_id", categoryId);
+
+    startTransition(async () => {
+      const result = await createPortfolioItems(data);
+      if (!result.ok) {
+        setErrors(result.errors ?? {});
+        setFormError(result.formError ?? null);
+        return;
+      }
+      onDone();
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <CategorySelect
+        name="several-category"
+        categories={categories}
+        value={categoryId}
+        onChange={setCategoryId}
+      />
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium text-ink">Photos</span>
+        <p className="text-sm text-ink-muted">
+          Pick as many as you like, up to {MAX_BATCH} at a time. Each one shows as its own
+          picture on the website.
+        </p>
+
+        {paths.length > 0 || uploading ? (
+          <ul className="mt-1 grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {paths.map((path) => (
+              <li
+                key={path}
+                className="relative aspect-square overflow-hidden rounded-md border border-line bg-surface-sunken"
+              >
+                <Image src={portfolioImageUrl(path)} alt="" fill sizes="120px" className="object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setPaths((current) => current.filter((p) => p !== path))}
+                  className="absolute right-1 top-1 flex size-8 items-center justify-center rounded-full bg-surface-inverse/75 text-ink-inverse"
+                  title="Take this one out"
+                >
+                  <XIcon size={14} weight="bold" aria-hidden="true" />
+                  <span className="sr-only">Take this one out</span>
+                </button>
+              </li>
+            ))}
+            {uploading
+              ? Array.from({ length: uploading.total - uploading.done }, (_, index) => (
+                  <li key={`pending-${index}`} className="aspect-square">
+                    <Skeleton className="size-full" />
+                  </li>
+                ))
+              : null}
+          </ul>
+        ) : null}
+
+        <div className="mt-1">
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={uploading !== null}
+            loadingLabel={
+              uploading ? `Uploading ${uploading.done + 1} of ${uploading.total}…` : undefined
+            }
+            disabled={paths.length >= MAX_BATCH}
+            onClick={() => inputRef.current?.click()}
+            icon={<UploadSimpleIcon size={16} />}
+          >
+            {paths.length > 0 ? "Add more photos" : "Choose photos"}
+          </Button>
+        </div>
+
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          className="sr-only"
+          onChange={(event) => {
+            void handleFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+
+        {uploadErrors.length > 0 ? (
+          <ul role="alert" className="flex flex-col gap-1 text-sm font-medium text-critical">
+            {uploadErrors.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      <TextField
+        name="several-caption"
+        label="What was the job"
+        required
+        hint="Used as the caption on every photo in this batch. You can change any one later."
+        placeholder="Bathroom refit"
+        value={caption}
+        onChange={(event) => setCaption(event.target.value)}
+        error={errors.caption}
+      />
+
+      <TextField
+        name="several-location"
+        label="Where"
+        hint="Leave blank if you would rather not say. Only fill this in if it is accurate."
+        placeholder="West Bridgford"
+        value={location}
+        onChange={(event) => setLocation(event.target.value)}
+        error={errors.location}
+      />
+
+      <FormError message={formError} />
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          loading={isPending}
+          disabled={paths.length === 0 || uploading !== null || caption.trim().length < 3}
+          onClick={handleSubmit}
+          icon={<CheckIcon size={18} weight="bold" />}
+        >
+          {paths.length > 1 ? `Add ${paths.length} photos` : "Add to the gallery"}
         </Button>
 
         <Button variant="quiet" onClick={onCancel} disabled={isPending}>

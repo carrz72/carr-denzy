@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EnvelopeSimpleIcon, MapPinIcon, PhoneIcon, StarIcon } from "@phosphor-icons/react/dist/ssr";
-import { business, services } from "@/lib/site";
+import { business, services as builtInServices, type ServiceDefinition } from "@/lib/site";
 import type { BusinessContact } from "@/lib/business";
 
 /**
@@ -11,7 +11,14 @@ import type { BusinessContact } from "@/lib/business";
  * find the page they missed. Everything else is filler that makes those three
  * harder to spot.
  */
-export function SiteFooter({ contact }: { contact: BusinessContact }) {
+export function SiteFooter({
+  contact,
+  services = builtInServices,
+}: {
+  contact: BusinessContact;
+  /** The live list from Settings → Services. */
+  services?: ServiceDefinition[];
+}) {
   const year = new Date().getFullYear();
 
   return (

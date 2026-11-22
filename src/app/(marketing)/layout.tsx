@@ -4,6 +4,7 @@ import { ClosureNotice } from "@/components/marketing/closure-notice";
 import { getClosureNotice } from "@/lib/closures";
 import { getBusiness } from "@/lib/business";
 import { localBusinessJsonLd } from "@/lib/site";
+import { getServices } from "@/lib/services";
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -15,7 +16,11 @@ export default async function MarketingLayout({ children }: { children: React.Re
   // Contact details come from Settings so the owner can change the phone
   // number without a developer. `getBusiness` is request-cached, so fetching it
   // here for the header, the footer and the structured data is one query.
-  const [closure, contact] = await Promise.all([getClosureNotice(), getBusiness()]);
+  const [closure, contact, services] = await Promise.all([
+    getClosureNotice(),
+    getBusiness(),
+    getServices(),
+  ]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -27,7 +32,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
         {children}
       </main>
 
-      <SiteFooter contact={contact} />
+      <SiteFooter contact={contact} services={services} />
 
       {/*
         The only dangerouslySetInnerHTML in the application. The object is
@@ -37,7 +42,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
       */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd(siteUrl, contact)) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd(siteUrl, contact, services)).replace(/</g, "\\u003c") }}
       />
     </div>
   );

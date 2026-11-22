@@ -15,11 +15,18 @@ export default async function OwnerPortfolioPage() {
 
   // Unpublished rows included: this is the management view, and a hidden photo
   // the owner cannot see is a photo they cannot bring back.
-  const { data: items } = await supabase
-    .from("portfolio_items")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
+  const [{ data: items }, { data: categories }] = await Promise.all([
+    supabase
+      .from("portfolio_items")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("portfolio_categories")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+  ]);
 
   return (
     <>
@@ -41,7 +48,7 @@ export default async function OwnerPortfolioPage() {
       />
 
       <div className="mx-auto max-w-3xl">
-        <PortfolioManager items={items ?? []} />
+        <PortfolioManager items={items ?? []} categories={categories ?? []} />
       </div>
     </>
   );

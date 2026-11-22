@@ -5,7 +5,8 @@ import { RequestForm } from "@/components/request/request-form";
 import { ClosureNotice } from "@/components/marketing/closure-notice";
 import { getClosureNotice } from "@/lib/closures";
 import { getMyClient, getSessionUser } from "@/lib/auth";
-import { business, getService } from "@/lib/site";
+import { business } from "@/lib/site";
+import { getServices } from "@/lib/services";
 import { getBusiness } from "@/lib/business";
 
 export const metadata: Metadata = {
@@ -51,7 +52,8 @@ export default async function RequestPage({
   // Deep links from the home page arrive with a service and a problem
   // pre-filled. Both are validated here — `service` is only honoured if it
   // matches a real slug, and `problem` is passed to React as text, never HTML.
-  const service = params.service ? getService(params.service) : undefined;
+  const services = await getServices();
+  const service = params.service ? services.find((item) => item.slug === params.service) : undefined;
   const problem =
     typeof params.problem === "string" && params.problem.length <= 120
       ? params.problem
@@ -122,6 +124,7 @@ export default async function RequestPage({
 
             <div className="mt-9 rounded-2xl border border-line bg-surface-raised p-6 shadow-raised sm:p-9">
               <RequestForm
+                services={services}
                 initialServiceSlug={service?.slug}
                 initialProblem={problem}
                 contact={contact}

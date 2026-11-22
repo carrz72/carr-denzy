@@ -68,6 +68,8 @@ export type Settings = {
   invoice_footer_note: string | null;
   /** Everyone who gets new-enquiry alerts. Empty falls back to OWNER_NOTIFICATION_EMAIL. */
   notification_emails: string[];
+  /** The owner's own logo in the `branding` bucket. Null means the standard logo file. */
+  logo_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -80,9 +82,15 @@ export type Service = {
   description: string | null;
   icon: string | null;
   image_path: string | null;
+  /** Google's description for the service page; falls back to the blurb. */
+  meta_description: string | null;
+  examples: string[];
+  /** A guide price as the owner writes it, e.g. "£80". */
+  from_price: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -340,10 +348,19 @@ export type PortfolioItem = {
   before_path: string | null;
   caption: string;
   location: string | null;
+  category_id: string | null;
   sort_order: number;
   is_published: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** A heading on the "Our work" page, managed by the owner. */
+export type PortfolioCategory = {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
 }
 
 /**
@@ -575,6 +592,7 @@ export type Database = {
       >;
 
       portfolio_items: Table<PortfolioItem, "after_path" | "caption">;
+      portfolio_categories: Table<PortfolioCategory, "name">;
 
       closures: Table<Closure, "starts_on" | "ends_on">;
 

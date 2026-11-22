@@ -22,8 +22,22 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *     phone.
  */
 
-const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const privateKey = process.env.VAPID_PRIVATE_KEY;
+/**
+ * VAPID keys as pasted into the hosting dashboard. Copying them out of a
+ * terminal easily brings a stray space, line break, quote marks or a trailing
+ * "=", and web-push rejects all of those with an exception; so they are
+ * cleaned here rather than trusting the paste.
+ */
+function cleanKey(value: string | undefined): string | undefined {
+  const cleaned = value
+    ?.replace(/^\s*(public|private)\s*key\s*:\s*/i, "")
+    .replace(/["'\s]/g, "")
+    .replace(/=+$/, "");
+  return cleaned || undefined;
+}
+
+const publicKey = cleanKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+const privateKey = cleanKey(process.env.VAPID_PRIVATE_KEY);
 
 /** The `mailto:` the push services contact if this server misbehaves. */
 const contactEmail = process.env.OWNER_NOTIFICATION_EMAIL ?? "carrdenz@gmail.com";
@@ -34,13 +48,20 @@ function ensureConfigured(): boolean {
   if (configured) return true;
   if (!publicKey || !privateKey) return false;
 
-  webpush.setVapidDetails(`mailto:${contactEmail}`, publicKey, privateKey);
+  try {
+    webpush.setVapidDetails(`mailto:${contactEmail}`, publicKey, privateKey);
+  } catch (error) {
+    // A malformed key must not take down whatever triggered the push (an
+    // enquiry, a message, the test button). Log it and carry on without push.
+    console.error("[push] VAPID keys are not valid, push is off:", error instanceof Error ? error.message : error);
+    return false;
+  }
   configured = true;
   return true;
 }
 
 export function isPushConfigured(): boolean {
-  return Boolean(publicKey && privateKey);
+  return ensureConfigured();
 }
 
 export interface PushMessage {

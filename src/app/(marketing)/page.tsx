@@ -11,8 +11,11 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { buttonClasses } from "@/components/ui/button";
 import { BeforeAfter } from "@/components/marketing/before-after";
+import { GoogleReviewsSection } from "@/components/marketing/google-reviews";
+import { getGoogleReviews } from "@/lib/google-reviews";
 import { ServiceIcon } from "@/components/service-icon";
-import { business, services } from "@/lib/site";
+import { business } from "@/lib/site";
+import { getServices } from "@/lib/services";
 import { getBusiness } from "@/lib/business";
 import { createPublicClient } from "@/lib/supabase/public";
 import { portfolioImageUrl } from "@/lib/portfolio";
@@ -60,7 +63,11 @@ const steps = [
 ];
 
 export default async function HomePage() {
-  const contact = await getBusiness();
+  const [contact, googleReviews, services] = await Promise.all([
+    getBusiness(),
+    getGoogleReviews(),
+    getServices(),
+  ]);
 
   const [lead, ...rest] = services;
 
@@ -546,6 +553,8 @@ export default async function HomePage() {
           </ul>
         </div>
       </section>
+
+      <GoogleReviewsSection summary={googleReviews} />
 
       {/* ---------------------------------------------------------------
           Closing call to action: the van door again, full width. Replaced a

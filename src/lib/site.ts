@@ -76,20 +76,29 @@ export interface ServiceDefinition {
   name: string;
   /** One sentence for cards and the enquiry form. */
   blurb: string;
+  /**
+   * The page's description in Google results (about 120 to 155 characters):
+   * the job, the place, and why to pick us. Only claims the business makes.
+   */
+  metaDescription: string;
   /** Two or three sentences for the service page. */
   description: string;
   /** Concrete jobs, so a visitor can recognise their own problem in the list. */
   examples: string[];
   /** Phosphor icon name, rendered by `ServiceIcon`. */
   icon: string;
-  /** From the existing image library in /public/images. */
+  /** From the existing image library in /public/images, or an uploaded photo. */
   image: string;
+  /** A guide price as the owner writes it, e.g. "£80". Shown as "from". */
+  fromPrice?: string;
 }
 
 export const services: ServiceDefinition[] = [
   {
     slug: "leaks-and-repairs",
     name: "Leaks & repairs",
+    metaDescription:
+      "Leak and plumbing repairs in Nottingham. Burst pipes, dripping taps, running toilets and blocked drains fixed, often on the first visit.",
     blurb: "Dripping taps, burst pipes, blocked drains and the emergencies that will not wait.",
     description:
       "Most of what we do starts with something that has gone wrong. We carry the common parts on the van, so a large share of these are fixed on the first visit rather than booked back in for a second.",
@@ -107,6 +116,8 @@ export const services: ServiceDefinition[] = [
   {
     slug: "gas-and-boilers",
     name: "Gas & boilers",
+    metaDescription:
+      "Gas Safe registered boiler servicing, repairs and replacements in Nottingham, plus landlord gas safety certificates. Price agreed first.",
     blurb: "Gas Safe registered. Servicing, repairs, replacements and landlord certificates.",
     description:
       "All gas work is carried out by Gas Safe registered engineers, and we are accredited installers for Worcester and Bosch. If your boiler has locked out, we will diagnose it before quoting to replace it — a new boiler is not always the answer.",
@@ -124,6 +135,8 @@ export const services: ServiceDefinition[] = [
   {
     slug: "heating",
     name: "Heating",
+    metaDescription:
+      "Central heating in Nottingham: radiators fitted and swapped, underfloor heating, system flushing and heating controls. Free quote.",
     blurb: "Radiators, underfloor heating, system flushing and controls that actually work.",
     description:
       "Cold at the top, cold at the bottom, or one room that never warms up — each points at something different, and we will tell you which before doing any work. We balance and flush systems, replace radiators, and set controls so the heating runs when you are in.",
@@ -141,6 +154,8 @@ export const services: ServiceDefinition[] = [
   {
     slug: "bathrooms-and-kitchens",
     name: "Bathrooms & kitchens",
+    metaDescription:
+      "Bathroom and kitchen fitting in Nottingham, from first fix pipework to the last bead of sealant. One team, price agreed before work starts.",
     blurb: "Full fit-outs, from first fix pipework to the last bead of sealant.",
     description:
       "We install complete bathrooms and kitchens including tiling, waste runs and making good afterwards. If you are working to your own designer's drawings we will fit to them; if not, we will tell you plainly what will and will not fit the space you have.",
@@ -158,6 +173,8 @@ export const services: ServiceDefinition[] = [
   {
     slug: "electrical",
     name: "Electrical",
+    metaDescription:
+      "Electrical work in Nottingham: sockets, lighting, consumer units, fault-finding and EICR reports. Free quote, with the price agreed first.",
     blurb: "Sockets, lighting, consumer units, fault-finding and EICR reports.",
     description:
       "Electrical work runs alongside most of our bathroom and building jobs, so it rarely needs a separate trade booked in behind us. That keeps the job moving and stops two contractors blaming each other.",
@@ -175,6 +192,8 @@ export const services: ServiceDefinition[] = [
   {
     slug: "building-repairs",
     name: "Building repairs",
+    metaDescription:
+      "Building repairs in Nottingham: brickwork, plastering, damp and making good after a leak. One team for the pipe and the wall around it.",
     blurb: "Brickwork, plastering, damp, and making good after the pipe is fixed.",
     description:
       "A leak that has been running for a week rarely stops at the pipe. We repair the brickwork, plaster and flooring around what we have opened up, so you are not left arranging a second trade to finish someone else's hole.",
@@ -192,6 +211,8 @@ export const services: ServiceDefinition[] = [
   {
     slug: "maintenance-contracts",
     name: "Property maintenance",
+    metaDescription:
+      "Planned property maintenance for landlords, letting agents and small commercial sites across Nottingham. Gas checks, servicing and records.",
     blurb: "Planned maintenance for landlords, letting agents and small commercial sites.",
     description:
       "For landlords and agents with several properties we work to a schedule rather than a crisis. Every job, photograph and certificate stays on file against that address in your portal, so an accountant or a new tenant can be shown the history in a minute.",
@@ -209,6 +230,8 @@ export const services: ServiceDefinition[] = [
   {
     slug: "extensions-and-conversions",
     name: "Extensions & conversions",
+    metaDescription:
+      "Single-storey extensions, loft and garage conversions in Nottingham, managed end to end by one team. Free quote, price agreed first.",
     blurb: "Single-storey extensions, loft and garage conversions, managed end to end.",
     description:
       "Larger projects where we handle the trades, the sequencing and the site. You get one point of contact, a written schedule of works, and staged invoices tied to what has actually been completed rather than to a calendar.",
@@ -246,6 +269,13 @@ export function getService(slug: string): ServiceDefinition | undefined {
  * uses dangerouslySetInnerHTML, and it stays safe precisely because nothing
  * dynamic reaches it.
  */
+/**
+ * The Google Business Profile on Maps, by its customer ID (decoded from the
+ * profile's own review link). Ties the website and the profile together, so
+ * Google treats them as the same business.
+ */
+const GOOGLE_MAPS_URL = "https://maps.google.com/?cid=15984432167880173345";
+
 export function localBusinessJsonLd(
   siteUrl: string,
   /**
@@ -255,6 +285,8 @@ export function localBusinessJsonLd(
    * search, so a stale number here is a customer ringing nobody.
    */
   contact?: { name: string; phone: string; email: string },
+  /** The live list from the database; the built-in list if not given. */
+  serviceList: ServiceDefinition[] = services,
 ) {
   return {
     "@context": "https://schema.org",
@@ -264,6 +296,9 @@ export function localBusinessJsonLd(
     telephone: contact?.phone ?? business.phone,
     email: contact?.email ?? business.email,
     image: `${siteUrl}/images/work-33.webp`,
+    logo: `${siteUrl}/icons/icon-512.png`,
+    sameAs: [GOOGLE_MAPS_URL],
+    hasMap: GOOGLE_MAPS_URL,
     priceRange: "££",
     // Locality and region, no streetAddress. Schema.org permits this, and for a
     // service-area business it is the honest description.
@@ -289,9 +324,15 @@ export function localBusinessJsonLd(
         closes: "20:00",
       },
     ],
-    makesOffer: services.map((service) => ({
+    makesOffer: serviceList.map((service) => ({
       "@type": "Offer",
-      itemOffered: { "@type": "Service", name: service.name, description: service.blurb },
+      itemOffered: {
+        "@type": "Service",
+        name: service.name,
+        description: service.blurb,
+        url: `${siteUrl}/services/${service.slug}`,
+        areaServed: business.address.city,
+      },
     })),
   };
 }

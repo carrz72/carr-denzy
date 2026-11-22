@@ -131,25 +131,45 @@ function esc(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * The shell every email shares, and the Supabase sign-in emails copy
+ * (supabase/email-templates): the logo mark and name on white, a brick-red
+ * stripe, the message, then a footer with the hours, phone number and site.
+ * Tables and inline styles only, because that is what email apps render. The
+ * logo is a hosted image, so it must be an absolute URL.
+ */
 async function layout(heading: string, bodyHtml: string): Promise<string> {
+  const site = siteUrl();
+  const phone = await businessPhone();
+  const tel = `tel:${phone.replace(/[^\d+]/g, "").replace(/^0/, "+44")}`;
   return `<!doctype html>
 <html lang="en">
-  <body style="margin:0;padding:24px;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;">
+  <body style="margin:0;padding:24px 12px;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1714;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e6dfd5;">
       <tr>
-        <td style="padding:24px 28px;border-bottom:3px solid #be4a33;">
-          <span style="font-size:15px;font-weight:700;letter-spacing:-0.01em;">Carrdenzy Heating &amp; Gas</span>
+        <td style="padding:22px 32px 20px;">
+          <a href="${site}" style="text-decoration:none;color:#1a1714;">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td style="padding-right:12px;vertical-align:middle;"><img src="${site}/images/logo/logo-mark.png" width="27" height="40" alt="" style="display:block;width:27px;height:40px;border:0;outline:none;" /></td>
+              <td style="vertical-align:middle;font-size:17px;font-weight:800;letter-spacing:-0.01em;color:#1a1714;">Carrdenzy Heating &amp; Gas</td>
+            </tr></table>
+          </a>
         </td>
       </tr>
       <tr>
-        <td style="padding:28px;">
-          <h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;font-weight:700;">${esc(heading)}</h1>
+        <td height="4" style="background:#be4a33;height:4px;font-size:0;line-height:0;">&nbsp;</td>
+      </tr>
+      <tr>
+        <td style="padding:32px;">
+          <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;font-weight:800;letter-spacing:-0.01em;">${esc(heading)}</h1>
           ${bodyHtml}
         </td>
       </tr>
       <tr>
-        <td style="padding:18px 28px;background:#f9f7f4;font-size:12px;color:#6b6055;">
-          Carrdenzy Heating &amp; Gas · ${esc(await businessPhone())}
+        <td style="padding:22px 32px;background:#f9f7f4;border-top:1px solid #ece6dd;font-size:13px;line-height:1.7;color:#6b6055;">
+          <strong style="color:#1a1714;font-size:14px;">Carrdenzy Heating &amp; Gas</strong><br />
+          Gas Safe registered &middot; Monday to Saturday, 8am to 8pm &middot; Nottingham and surrounding areas<br />
+          <a href="${tel}" style="color:#be4a33;font-weight:700;text-decoration:none;">${esc(phone)}</a> &middot; <a href="${site}" style="color:#be4a33;text-decoration:none;">Visit the website</a>
         </td>
       </tr>
     </table>
@@ -158,8 +178,8 @@ async function layout(heading: string, bodyHtml: string): Promise<string> {
 }
 
 function button(href: string, label: string): string {
-  return `<p style="margin:24px 0;">
-    <a href="${href}" style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:8px;font-weight:600;font-size:15px;">${esc(label)}</a>
+  return `<p style="margin:26px 0;">
+    <a href="${href}" style="display:inline-block;background:#be4a33;color:#ffffff;text-decoration:none;padding:15px 28px;border-radius:10px;font-weight:700;font-size:16px;">${esc(label)}</a>
   </p>`;
 }
 
@@ -223,7 +243,12 @@ export async function sendOwnerEnquiryNotification(data: EnquiryEmailData): Prom
   // Resend accepts an array; one call, one send, everyone gets it.
   const to = recipients.length === 1 ? recipients[0]! : recipients;
 
-  const link = `${siteUrl()}/app/enquiries/${data.enquiryId}`;
+  // The Settings test sends a pretend enquiry with no real record behind it, so
+  // its button opens the enquiry list rather than a page that cannot exist.
+  const link =
+    data.enquiryId === "test"
+      ? `${siteUrl()}/app/enquiries`
+      : `${siteUrl()}/app/enquiries/${data.enquiryId}`;
 
   const contactLines = [
     data.phone ? `Phone: ${data.phone}` : null,

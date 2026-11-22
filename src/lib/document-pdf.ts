@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { renderInvoicePdf, renderQuotePdf } from "@/lib/invoice-pdf";
 import { businessForInvoice } from "@/lib/invoice-snapshot";
+import { loadLogoImage } from "@/lib/logo-server";
 import type { Database } from "@/types/database";
 
 /**
@@ -48,6 +49,7 @@ export async function buildQuotePdf(
   const address = quote.job?.property;
 
   return renderQuotePdf({
+    logo: await loadLogoImage(),
     reference: quote.reference,
     issueDate: quote.sent_at,
     dueDate: quote.valid_until,
@@ -126,6 +128,7 @@ export async function buildInvoicePdf(
 
   try {
     return await renderInvoicePdf({
+      logo: await loadLogoImage(),
       reference: invoice.reference,
       issueDate: invoice.issue_date,
       dueDate: invoice.due_date,

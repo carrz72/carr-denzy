@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowRightIcon, BellIcon, TagIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRightIcon, BellIcon, TagIcon, WrenchIcon } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
 import { SettingsForm } from "@/components/owner/settings-form";
+import { LogoSettings } from "@/components/owner/logo-settings";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
 import { cn } from "@/lib/cn";
@@ -69,6 +70,38 @@ export default async function SettingsPage() {
         </Link>
 
         <Link
+          href="/app/settings/services"
+          className={cn(
+            "group mt-3 flex items-center gap-4 rounded-lg border border-line bg-surface-raised p-5",
+            "shadow-subtle transition-[border-color,box-shadow,transform] duration-200",
+            "[transition-timing-function:var(--ease-standard)]",
+            "hover:-translate-y-0.5 hover:border-line-strong hover:shadow-float",
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className="flex size-11 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent"
+          >
+            <WrenchIcon size={22} weight="duotone" />
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium text-ink">Services</span>
+            <span className="mt-0.5 block text-sm leading-snug text-ink-muted">
+              Change what the website says you do, add a new service or hide one you no
+              longer offer.
+            </span>
+          </span>
+
+          <ArrowRightIcon
+            size={18}
+            weight="bold"
+            aria-hidden="true"
+            className="shrink-0 text-ink-subtle transition-transform duration-300 group-hover:translate-x-1 group-hover:text-accent"
+          />
+        </Link>
+
+        <Link
           href="/app/settings/notifications"
           className={cn(
             "group mt-3 flex items-center gap-4 rounded-lg border border-line bg-surface-raised p-5",
@@ -99,6 +132,8 @@ export default async function SettingsPage() {
             className="shrink-0 text-ink-subtle transition-transform duration-300 group-hover:translate-x-1 group-hover:text-accent"
           />
         </Link>
+
+        <LogoSettings logoPath={settings.logo_path ?? null} />
 
         <div className="mt-6">
           <SettingsForm settings={settings} />
