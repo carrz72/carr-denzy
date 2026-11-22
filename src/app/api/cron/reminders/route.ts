@@ -62,6 +62,7 @@ interface RunResult {
   nudgesAdded: number;
   nudgesClosed: number;
   skipped: number;
+  oldRequestsDeleted: number;
   orphanPhotosRemoved: number;
   failed: number;
   errors: string[];
@@ -122,6 +123,7 @@ export async function GET(request: NextRequest) {
     nudgesAdded: 0,
     nudgesClosed: 0,
     skipped: 0,
+    oldRequestsDeleted: 0,
     orphanPhotosRemoved: 0,
     failed: 0,
     errors: [],
@@ -266,6 +268,15 @@ export async function GET(request: NextRequest) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[cron] nudges failed", message);
     result.errors.push(`nudges: ${message}`);
+  }
+
+  // --- Old requests --------------------------------------------------------
+  try {
+    result.oldRequestsDeleted = await removeOldRequests(admin, now);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[cron] old request cleanup failed", message);
+    result.errors.push(`old requests: ${message}`);
   }
 
   // --- Orphan enquiry photos ------------------------------------------------
@@ -584,4 +595,59 @@ async function removeOrphanEnquiryPhotos(
   if (removeError) throw new Error(removeError.message);
 
   return orphans.length;
+}
+
+/**
+ * Deletes requests that never became a job once they are a year old, as the
+ * privacy policy promises: the request, its photo rows (cascade) and the photo
+ * files. Anything that became a job is kept, because the job, its photos and
+ * its invoice are records the business must keep.
+ *
+ * Rows go first, files second: if removing the files fails, they are simply
+ * orphans that removeOrphanEnquiryPhotos clears the next day, whereas the
+ * other order could leave requests pointing at missing photos.
+ */
+async function removeOldRequests(
+  admin: ReturnType<typeof createAdminClient>,
+  now: Date,
+): Promise<number> {
+  const cutoff = new Date(now);
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+
+  const { data: requests, error } = await admin
+    .from("enquiries")
+    .select("id, photos:job_photos(storage_path, job_id)")
+    .is("job_id", null)
+    .lt("created_at", cutoff.toISOString())
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (error) throw new Error(error.message);
+
+  type Photo = { storage_path: string; job_id: string | null };
+  // A photo that also belongs to a job is part of that job's record; leave the
+  // whole request alone rather than cascade it away.
+  const deletable = (requests ?? []).filter((request) =>
+    ((request.photos ?? []) as Photo[]).every((photo) => photo.job_id === null),
+  );
+  if (deletable.length === 0) return 0;
+
+  const { error: deleteError, count } = await admin
+    .from("enquiries")
+    .delete({ count: "exact" })
+    .in(
+      "id",
+      deletable.map((request) => request.id),
+    )
+    .is("job_id", null);
+  if (deleteError) throw new Error(deleteError.message);
+
+  const paths = deletable.flatMap((request) =>
+    ((request.photos ?? []) as Photo[]).map((photo) => photo.storage_path),
+  );
+  if (paths.length > 0) {
+    const { error: storageError } = await admin.storage.from("enquiry-photos").remove(paths);
+    if (storageError) console.error("[cron] old request photos not removed", storageError.message);
+  }
+
+  return count ?? 0;
 }
