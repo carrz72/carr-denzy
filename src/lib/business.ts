@@ -37,9 +37,9 @@ export interface BusinessContact {
   /** `tel:` href, derived from the phone number. */
   phoneHref: string;
   /**
-   * A wa.me chat link for the same number, or null when the number is not a
-   * mobile (a landline cannot have WhatsApp, and a dead chat link is worse
-   * than none).
+   * A wa.me chat link for the same number, or null when the owner has the
+   * WhatsApp button switched off in Settings, or the number is not a mobile
+   * (a landline cannot have WhatsApp, and a dead chat link is worse than none).
    */
   whatsappHref: string | null;
   email: string;
@@ -108,7 +108,8 @@ export const getBusiness = cache(async (): Promise<BusinessContact> => {
     shortName: fallback.shortName,
     phone: fallback.phone,
     phoneHref: fallback.phoneHref,
-    whatsappHref: toWhatsAppHref(fallback.phone),
+    // Off unless Settings says otherwise, so a failed lookup never shows it.
+    whatsappHref: null,
     email: fallback.email,
   };
 
@@ -117,7 +118,7 @@ export const getBusiness = cache(async (): Promise<BusinessContact> => {
 
     const { data } = await admin
       .from("settings")
-      .select("trading_name, phone, email")
+      .select("trading_name, phone, email, show_whatsapp")
       .maybeSingle();
 
     if (!data) return base;
@@ -131,7 +132,7 @@ export const getBusiness = cache(async (): Promise<BusinessContact> => {
       shortName: base.shortName,
       phone: phone || base.phone,
       phoneHref: phone ? toTelHref(phone) : base.phoneHref,
-      whatsappHref: phone ? toWhatsAppHref(phone) : base.whatsappHref,
+      whatsappHref: data.show_whatsapp ? toWhatsAppHref(phone || base.phone) : null,
       email: email || base.email,
     };
   } catch (error) {

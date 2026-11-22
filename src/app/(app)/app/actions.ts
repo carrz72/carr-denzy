@@ -2594,6 +2594,7 @@ export async function updateSettings(formData: FormData): Promise<ActionResult> 
     vat_number: formData.get("vat_number") ?? "",
     default_vat_rate_bp: formData.get("default_vat_rate_bp") ?? "2000",
     cis_enabled: formData.get("cis_enabled") === "on",
+    show_whatsapp: formData.get("show_whatsapp") === "on",
     cis_deduction_rate_bp: formData.get("cis_deduction_rate_bp") ?? "2000",
     utr: formData.get("utr") ?? "",
     bank_account_name: formData.get("bank_account_name") ?? "",

@@ -323,6 +323,7 @@ export const settingsSchema = z.object({
   vat_number: trimmed(20).optional(),
   default_vat_rate_bp: z.coerce.number().int().min(0).max(10000).default(2000),
   cis_enabled: z.coerce.boolean().default(false),
+  show_whatsapp: z.coerce.boolean().default(false),
   cis_deduction_rate_bp: z.coerce.number().int().min(0).max(10000).default(2000),
   utr: trimmed(20).optional(),
 

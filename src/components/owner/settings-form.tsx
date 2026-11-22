@@ -126,6 +126,13 @@ export function SettingsForm({ settings }: { settings: Settings }) {
               error={errors.email}
             />
           </div>
+
+          <CheckField
+            name="show_whatsapp"
+            label="Show a WhatsApp button on the website"
+            hint="A green button on every page that opens a WhatsApp chat with the phone number above. Only works if that number is a mobile with WhatsApp on it."
+            defaultChecked={settings.show_whatsapp ?? false}
+          />
         </div>
       </Card>
 

@@ -70,6 +70,8 @@ export type Settings = {
   notification_emails: string[];
   /** The owner's own logo in the `branding` bucket. Null means the standard logo file. */
   logo_path: string | null;
+  /** Whether the public site shows the WhatsApp button for the phone number. */
+  show_whatsapp: boolean;
   /** Automatic emails, each switchable for the whole business. */
   remind_invoices: boolean;
   /** Days between payment reminders on the same invoice. */
