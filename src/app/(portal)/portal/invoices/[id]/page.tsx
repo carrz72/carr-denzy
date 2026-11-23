@@ -12,6 +12,7 @@ import {
 } from "@/components/money-document";
 import { PrintButton } from "@/components/print-button";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, isPast } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { business } from "@/lib/site";
@@ -44,7 +45,9 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
-    supabase
+    // The business details shown here, read on the server: customers cannot
+    // read the settings row themselves (it holds the UTR and bank details).
+    createAdminClient()
       .from("settings")
       .select("phone, vat_registered, cis_enabled, cis_deduction_rate_bp")
       .maybeSingle(),

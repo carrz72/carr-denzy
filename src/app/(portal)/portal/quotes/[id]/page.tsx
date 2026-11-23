@@ -10,6 +10,7 @@ import { DocumentLines, TotalsPanel } from "@/components/money-document";
 import { QuoteResponse } from "@/components/portal/quote-response";
 import { PrintButton } from "@/components/print-button";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, formatDateTime, isPast } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { business } from "@/lib/site";
@@ -35,7 +36,9 @@ export default async function PortalQuotePage({ params }: { params: Promise<{ id
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
-    supabase.from("settings").select("trading_name, phone, vat_registered, cis_deduction_rate_bp").maybeSingle(),
+    // The business details shown here, read on the server: customers cannot
+    // read the settings row themselves (it holds the UTR and bank details).
+    createAdminClient().from("settings").select("trading_name, phone, vat_registered, cis_deduction_rate_bp").maybeSingle(),
   ]);
 
   if (!quote) notFound();
