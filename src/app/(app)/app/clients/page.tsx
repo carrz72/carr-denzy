@@ -54,6 +54,7 @@ export default async function ClientsPage() {
       <PageHeader
         title="Customers"
         description="Everyone you have worked for, and what is still open with them."
+        back={{ href: "/app", label: "Today" }}
       />
 
       {rows.length === 0 ? (
