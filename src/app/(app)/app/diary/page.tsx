@@ -16,7 +16,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { ClosuresPanel } from "@/components/owner/closures-panel";
 import { createClient } from "@/lib/supabase/server";
 import { closureDays } from "@/lib/closures";
-import { requireStaff } from "@/lib/auth";
+import { getAccess, requireStaff } from "@/lib/auth";
 import {
   addDays,
   dayAndMonth,
@@ -56,6 +56,7 @@ export default async function DiaryPage({
   searchParams: Promise<{ week?: string }>;
 }) {
   await requireStaff();
+  const isOwner = Boolean((await getAccess())?.owner);
   const supabase = await createClient();
 
   const { week } = await searchParams;
@@ -314,7 +315,7 @@ export default async function DiaryPage({
           })}
         </section>
 
-        <ClosuresPanel closures={allClosures ?? []} />
+        {isOwner ? <ClosuresPanel closures={allClosures ?? []} /> : null}
 
         {/* --- Agreed, but never given a date ---------------------------- */}
         {waiting.length > 0 ? (

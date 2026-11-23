@@ -17,10 +17,12 @@ import { buttonClasses } from "@/components/ui/button";
 import { JobNoteForm, JobStatusControl, ScheduleForm } from "@/components/owner/job-controls";
 import { JobNote } from "@/components/owner/job-note";
 import { DeleteJob } from "@/components/owner/delete-job";
+import { AssignJob } from "@/components/owner/assign-job";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { MessageThread } from "@/components/message-thread";
 import { createClient } from "@/lib/supabase/server";
 import { markMessagesRead } from "@/lib/unread";
-import { getSessionUser } from "@/lib/auth";
+import { getAccess, getSessionUser } from "@/lib/auth";
 import { formatDateTime, formatDuration, todayInLondon } from "@/lib/dates";
 import { ReminderSwitch, RemindMe } from "@/components/owner/reminders";
 import { formatPence } from "@/lib/money";
@@ -35,6 +37,8 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
 
   const user = await getSessionUser();
+  const access = await getAccess();
+  const can = access?.can;
   const supabase = await createClient();
 
   // Opening the thread is what makes it read, so the badge on the navigation
@@ -46,7 +50,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     .from("jobs")
     .select(
       `id, reference, title, description, status, urgency, scheduled_start,
-       duration_minutes, expected_days, expected_days_max, completed_at, private_notes, closed_reason, created_at,
+       duration_minutes, expected_days, expected_days_max, completed_at, private_notes, closed_reason, created_at, assigned_to,
        client:clients(id, full_name, email, phone, company_name, auto_reminders, notify_booking),
        property:properties(address_line1, address_line2, city, postcode, access_notes),
        service:services(name)`,
@@ -137,6 +141,26 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
     ? null
     : ((quotes ?? []).find((quote) => ["declined", "expired", "withdrawn"].includes(quote.status)) ?? null);
 
+  // The team, for "Who's doing it". Only worth showing once the owner has added
+  // somebody; read with the admin client because team members cannot read
+  // each other's profiles.
+  let team: { id: string; name: string }[] = [];
+  if (can?.manage_jobs) {
+    const admin = createAdminClient();
+    const { data: staffRows } = await admin.from("staff_permissions").select("profile_id");
+    const staffIds = (staffRows ?? []).map((row) => row.profile_id);
+    if (staffIds.length > 0) {
+      const { data: people } = await admin
+        .from("profiles")
+        .select("id, full_name, email, role")
+        .or(`role.eq.owner,id.in.(${staffIds.join(",")})`);
+      team = (people ?? []).map((person) => ({
+        id: person.id,
+        name: (person.full_name ?? person.email) + (person.role === "owner" ? " (owner)" : ""),
+      }));
+    }
+  }
+
   // Whether this job can be swept up as a mistake, or has to be cancelled
   // because the customer has already seen something. Worked out here so the
   // delete button is never offered and then refused — the same rule the action
@@ -169,7 +193,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
           <Card>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-label uppercase text-ink-subtle">The job</h2>
-              {user?.role === "owner" ? (
+              {can?.manage_jobs ? (
                 <Link
                   href={`/app/jobs/${job.id}/edit`}
                   className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-accent hover:underline hover:underline-offset-4"
@@ -285,9 +309,15 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             jobId={job.id}
             status={job.status}
             clientName={job.client?.full_name ?? null}
+            limitedTo={can?.manage_jobs ? undefined : ["in_progress", "completed"]}
+            canInvoice={Boolean(can?.manage_invoices)}
           />
 
-          {user?.role === "owner" ? (
+          {can?.manage_jobs && team.length > 0 ? (
+            <AssignJob jobId={job.id} assignedTo={job.assigned_to ?? null} team={team} />
+          ) : null}
+
+          {can?.manage_jobs ? (
             <NotGoingAhead jobId={job.id} status={job.status} closedReason={job.closed_reason} />
           ) : null}
 
@@ -342,15 +372,35 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             </Card>
           ) : null}
 
-          <ScheduleForm
-            jobId={job.id}
-            visits={visits ?? []}
-            expectedDays={job.expected_days}
-            expectedDaysMax={job.expected_days_max}
-            durationMinutes={job.duration_minutes}
-          />
+          {can?.manage_jobs ? (
+            <ScheduleForm
+              jobId={job.id}
+              visits={visits ?? []}
+              expectedDays={job.expected_days}
+              expectedDaysMax={job.expected_days_max}
+              durationMinutes={job.duration_minutes}
+            />
+          ) : (
+            // Team members who cannot book still need to know when they are due.
+            <Card>
+              <h2 className="text-label uppercase text-ink-subtle">Booked visits</h2>
+              {(visits ?? []).length === 0 ? (
+                <p className="mt-3 text-[0.9375rem] text-ink-muted">Not booked in yet.</p>
+              ) : (
+                <ul className="mt-3 flex flex-col gap-2">
+                  {(visits ?? []).map((visit) => (
+                    <li key={visit.id} className="text-[0.9375rem] text-ink">
+                      <span className="font-medium">{formatDateTime(visit.starts_at)}</span>
+                      <span className="text-ink-muted"> · {formatDuration(visit.duration_minutes)}</span>
+                      {visit.note ? <span className="block text-sm text-ink-muted">{visit.note}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
 
-          {jobOpen ? (
+          {jobOpen && can?.manage_jobs ? (
             <ReminderSwitch
               entity="job"
               entityId={job.id}
@@ -366,15 +416,19 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             today={today}
           />
 
+          {can?.see_prices ? (
+          <>
           <Card>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-label uppercase text-ink-subtle">Quotes</h2>
-              <Link
-                href={`/app/jobs/${job.id}/quote`}
-                className={buttonClasses({ variant: "secondary", size: "sm" })}
-              >
-                New quote
-              </Link>
+              {can.manage_quotes ? (
+                <Link
+                  href={`/app/jobs/${job.id}/quote`}
+                  className={buttonClasses({ variant: "secondary", size: "sm" })}
+                >
+                  New quote
+                </Link>
+              ) : null}
             </div>
 
             {(quotes ?? []).length === 0 ? (
@@ -409,7 +463,7 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
               </ul>
             )}
 
-            {lastClosedQuote && job.status !== "declined" ? (
+            {lastClosedQuote && job.status !== "declined" && can.manage_quotes ? (
               <Link
                 href={`/app/jobs/${job.id}/quote?from=${lastClosedQuote.id}`}
                 className={buttonClasses({ fullWidth: true, className: "mt-4" })}
@@ -423,12 +477,14 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
           <Card>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-label uppercase text-ink-subtle">Invoices</h2>
-              <Link
-                href={`/app/jobs/${job.id}/invoice${acceptedQuote ? `?from=${acceptedQuote.id}` : ""}`}
-                className={buttonClasses({ variant: "secondary", size: "sm" })}
-              >
-                New invoice
-              </Link>
+              {can.manage_invoices ? (
+                <Link
+                  href={`/app/jobs/${job.id}/invoice${acceptedQuote ? `?from=${acceptedQuote.id}` : ""}`}
+                  className={buttonClasses({ variant: "secondary", size: "sm" })}
+                >
+                  New invoice
+                </Link>
+              ) : null}
             </div>
 
             {(invoices ?? []).length === 0 ? (
@@ -465,13 +521,18 @@ export default async function OwnerJobPage({ params }: { params: Promise<{ id: s
             )}
           </Card>
 
+          </>
+          ) : null}
+
           {/* Last thing on the page, quiet, behind a confirm. Nobody opens a
               job meaning to press this. */}
-          <DeleteJob
-            jobId={job.id}
-            jobTitle={job.title}
-            blockedReason={deleteBlockedReason}
-          />
+          {access?.owner ? (
+            <DeleteJob
+              jobId={job.id}
+              jobTitle={job.title}
+              blockedReason={deleteBlockedReason}
+            />
+          ) : null}
         </div>
       </div>
     </>

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app-shell";
 import { InvoiceBuilder } from "@/components/owner/invoice-builder";
 import { linesFromItems, type DraftLine } from "@/lib/draft-lines";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "New invoice", robots: { index: false } };
 
@@ -19,7 +19,7 @@ export default async function NewInvoicePage({
   const { id } = await params;
   const { from } = await searchParams;
 
-  await requireOwner();
+  await requirePermission("manage_invoices");
   const supabase = await createClient();
 
   const [{ data: job }, { data: settings }, { data: priceItems }] = await Promise.all([

@@ -9,7 +9,7 @@ import {
   PropertyEditForm,
 } from "@/components/owner/client-edit-forms";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Edit customer", robots: { index: false } };
 
@@ -24,7 +24,7 @@ export const metadata: Metadata = { title: "Edit customer", robots: { index: fal
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  await requireOwner();
+  await requirePermission("manage_jobs");
   const supabase = await createClient();
 
   const [

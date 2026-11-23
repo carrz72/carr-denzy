@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/app-shell";
 import { InvoiceBuilder } from "@/components/owner/invoice-builder";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "New invoice", robots: { index: false } };
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "New invoice", robots: { index: false
  * a job to hang off — `invoices.job_id` has always been nullable.
  */
 export default async function NewInvoicePage() {
-  await requireOwner();
+  await requirePermission("manage_invoices");
   const supabase = await createClient();
 
   const [{ data: settings }, { data: priceItems }, { data: clients }] = await Promise.all([

@@ -8,12 +8,18 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { AppBadge } from "@/components/app-badge";
 import { PushResync } from "@/components/push-resync";
-import { requireStaff } from "@/lib/auth";
+import { getAccess, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { countUnreadMessages } from "@/lib/unread";
 
-export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
+export default async function OwnerLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const user = await requireStaff();
+  const access = await getAccess();
+  const can = access?.can;
   const supabase = await createClient();
 
   /*
@@ -31,20 +37,28 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
    */
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ count: newEnquiries }, unreadMessages, { count: overdueInvoices }] = await Promise.all([
-    supabase.from("enquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
+  const [{ count: newEnquiries }, unreadMessages, { count: overdueInvoices }] =
+    await Promise.all([
+      can?.manage_jobs
+        ? supabase
+            .from("enquiries")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "new")
+        : Promise.resolve({ count: 0 }),
 
-    countUnreadMessages(supabase, user.id),
+      countUnreadMessages(supabase, user.id),
 
-    // Money somebody owes and has not paid on time. The one number in this app
-    // that directly costs the business if nobody looks at it.
-    supabase
-      .from("invoices")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["sent", "part_paid", "overdue"])
-      .is("deleted_at", null)
-      .lt("due_date", today),
-  ]);
+      // Money somebody owes and has not paid on time. The one number in this app
+      // that directly costs the business if nobody looks at it.
+      can?.see_prices
+        ? supabase
+            .from("invoices")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["sent", "part_paid", "overdue"])
+            .is("deleted_at", null)
+            .lt("due_date", today)
+        : Promise.resolve({ count: 0 }),
+    ]);
 
   // What the home-screen icon shows: everything waiting, in one number. The
   // navigation says where it is; this only has to say that there is something.
@@ -65,13 +79,21 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
        */
       items={[
         { href: "/app", label: "Today", icon: <GaugeIcon size={21} /> },
+        ...(can?.manage_jobs
+          ? [
+              {
+                href: "/app/enquiries",
+                label: "Enquiries",
+                icon: <TrayIcon size={21} />,
+                badge: newEnquiries ?? 0,
+              },
+            ]
+          : []),
         {
-          href: "/app/enquiries",
-          label: "Enquiries",
-          icon: <TrayIcon size={21} />,
-          badge: newEnquiries ?? 0,
+          href: "/app/diary",
+          label: "Diary",
+          icon: <CalendarBlankIcon size={21} />,
         },
-        { href: "/app/diary", label: "Diary", icon: <CalendarBlankIcon size={21} /> },
         {
           href: "/app/jobs",
           label: "Jobs",
@@ -80,12 +102,16 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
           // under Jobs — which is where this badge sends you to find it.
           badge: unreadMessages,
         },
-        {
-          href: "/app/invoices",
-          label: "Money",
-          icon: <ReceiptIcon size={21} />,
-          badge: overdueInvoices ?? 0,
-        },
+        ...(can?.see_prices
+          ? [
+              {
+                href: "/app/invoices",
+                label: "Money",
+                icon: <ReceiptIcon size={21} />,
+                badge: overdueInvoices ?? 0,
+              },
+            ]
+          : []),
       ]}
     >
       <AppBadge count={waiting} />

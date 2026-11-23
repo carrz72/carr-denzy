@@ -87,15 +87,40 @@ export interface PushResult {
  * Deliberately not "to a user id" — the caller is reporting a business event,
  * not addressing a person, and who needs to know is a property of the business.
  */
-export async function pushToStaff(message: PushMessage): Promise<PushResult> {
+export async function pushToStaff(
+  message: PushMessage,
+  options: {
+    /** A team member needs this permission to be told. Default: sees every job. */
+    permission?: "see_all_jobs" | "manage_jobs" | "manage_quotes" | "manage_invoices" | "record_payments";
+    /** Also tell whoever this job is given to, even if they only see their own. */
+    jobId?: string | null;
+  } = {},
+): Promise<PushResult> {
   const admin = createAdminClient();
+  const permission = options.permission ?? "see_all_jobs";
 
-  const { data: staff } = await admin
-    .from("profiles")
-    .select("id")
-    .in("role", ["owner", "staff"]);
+  const [{ data: owners }, { data: team }, { data: job }] = await Promise.all([
+    admin.from("profiles").select("id").eq("role", "owner"),
+    admin.from("staff_permissions").select(`profile_id, ${permission}`).eq(permission, true),
+    options.jobId
+      ? admin.from("jobs").select("assigned_to").eq("id", options.jobId).maybeSingle()
+      : Promise.resolve({ data: null as { assigned_to: string | null } | null }),
+  ]);
 
-  return pushToProfiles((staff ?? []).map((profile) => profile.id), message);
+  const ids = new Set<string>((owners ?? []).map((profile) => profile.id));
+  for (const row of (team ?? []) as { profile_id: string }[]) ids.add(row.profile_id);
+  // The person a job is given to hears about their own job (a customer's
+  // reply) even on "only jobs given to them".
+  if (job?.assigned_to && permission === "see_all_jobs") ids.add(job.assigned_to);
+
+  return pushToProfiles([...ids], message);
+}
+
+/** The owner (and any other owner) only. */
+export async function pushToOwners(message: PushMessage): Promise<PushResult> {
+  const admin = createAdminClient();
+  const { data: owners } = await admin.from("profiles").select("id").eq("role", "owner");
+  return pushToProfiles((owners ?? []).map((profile) => profile.id), message);
 }
 
 /**

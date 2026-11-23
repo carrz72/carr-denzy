@@ -21,7 +21,7 @@ import { EmptyState } from "@/components/ui/states";
 import { JobStatusBadge, UrgencyBadge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth";
+import { getAccess, getSessionUser } from "@/lib/auth";
 import { formatPence } from "@/lib/money";
 import {
   addDays,
@@ -54,6 +54,8 @@ export const metadata: Metadata = { title: "Today", robots: { index: false } };
  */
 export default async function OwnerDashboard() {
   const user = await getSessionUser();
+  const access = await getAccess();
+  const can = access?.can;
   const supabase = await createClient();
 
   const today = todayInLondon();
@@ -247,7 +249,7 @@ export default async function OwnerDashboard() {
     <>
       <PageHeader
         title={firstName ? `Morning, ${firstName}` : "Today"}
-        description="What needs you today, and what is owed."
+        description={can?.see_prices ? "What needs you today, and what is owed." : "What needs you today."}
         action={
           // Neither of these is on the navigation bar: both are occasional, and
           // a fifth and sixth thumb target would cost every other screen space.
@@ -260,6 +262,8 @@ export default async function OwnerDashboard() {
               Customers
             </Link>
 
+            {access?.owner ? (
+            <>
             <Link
               href="/app/portfolio"
               className={buttonClasses({ variant: "secondary", size: "sm" })}
@@ -272,6 +276,8 @@ export default async function OwnerDashboard() {
               <GearSixIcon size={17} aria-hidden="true" />
               Settings
             </Link>
+            </>
+            ) : null}
           </div>
         }
       />
@@ -340,6 +346,7 @@ export default async function OwnerDashboard() {
           href="/app/diary"
           icon={<CalendarCheckIcon size={19} weight="duotone" />}
         />
+        {can?.manage_jobs ? (
         <StatTile
           label="New enquiries"
           value={String((newEnquiries ?? []).length)}
@@ -347,6 +354,9 @@ export default async function OwnerDashboard() {
           icon={<TrayIcon size={19} weight="duotone" />}
           emphasis={(newEnquiries ?? []).length > 0}
         />
+        ) : null}
+        {can?.see_prices ? (
+        <>
         <StatTile
           label="Quotes waiting"
           value={String((openQuotes ?? []).length)}
@@ -361,6 +371,8 @@ export default async function OwnerDashboard() {
           icon={<ClockIcon size={19} weight="duotone" />}
           alarm={overdueCount > 0}
         />
+        </>
+        ) : null}
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:gap-8">
@@ -463,6 +475,7 @@ export default async function OwnerDashboard() {
         <div className="flex flex-col gap-6">
           <TodoList items={todoItems} today={today} laterCount={laterCount ?? 0} />
 
+          {can?.manage_jobs ? (
           <Card>
             <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="font-display text-subheading text-ink">New enquiries</h2>
@@ -511,7 +524,9 @@ export default async function OwnerDashboard() {
               </ul>
             )}
           </Card>
+          ) : null}
 
+          {can?.see_prices ? (
           <Card>
             <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="font-display text-subheading text-ink">Quotes with no answer</h2>
@@ -551,6 +566,7 @@ export default async function OwnerDashboard() {
               </ul>
             )}
           </Card>
+          ) : null}
 
           {goneQuietJobs.length > 0 ? (
             <Card>

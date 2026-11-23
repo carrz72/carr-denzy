@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePermission } from "@/lib/auth";
 import type { Metadata } from "next";
 import {
   ArrowRightIcon,
@@ -44,6 +45,7 @@ const groups: { statuses: InvoiceStatus[]; heading: string; blurb: string }[] = 
 ];
 
 export default async function InvoicesPage() {
+  await requirePermission("see_prices");
   const supabase = await createClient();
 
   // The housekeeping write now runs ALONGSIDE the read rather than in front of

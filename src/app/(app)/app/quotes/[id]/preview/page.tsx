@@ -7,7 +7,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { BusinessBlock, DocumentLines, TotalsPanel } from "@/components/money-document";
 import { PrintButton } from "@/components/print-button";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import { getBusiness } from "@/lib/business";
@@ -36,7 +36,7 @@ export default async function QuotePreviewPage({
 
   const { id } = await params;
 
-  await requireOwner();
+  await requirePermission("see_prices");
   const supabase = await createClient();
 
   const [{ data: quote }, { data: settings }] = await Promise.all([

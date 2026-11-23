@@ -213,6 +213,30 @@ export type JobVisit = {
 export type ChaseEntity = "invoice" | "quote" | "job";
 
 /** the owner's say over the automatic reminders on one invoice, quote or job. Staff only. */
+export type StaffPermissionName =
+  | "see_all_jobs"
+  | "manage_jobs"
+  | "see_prices"
+  | "manage_quotes"
+  | "manage_invoices"
+  | "record_payments";
+
+export type StaffLevel = "jobs" | "jobs_quotes" | "office";
+
+export type StaffPermissions = {
+  profile_id: string;
+  level: StaffLevel;
+  see_all_jobs: boolean;
+  manage_jobs: boolean;
+  see_prices: boolean;
+  manage_quotes: boolean;
+  manage_invoices: boolean;
+  record_payments: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
 export type ChaseControl = {
   entity: ChaseEntity;
   entity_id: string;
@@ -674,6 +698,7 @@ export type Database = {
         ]
       >;
       job_keys: Table<{ name: string; key: string }, "name">;
+      staff_permissions: Table<StaffPermissions, "profile_id">;
     };
     Views: Record<string, never>;
     Functions: {

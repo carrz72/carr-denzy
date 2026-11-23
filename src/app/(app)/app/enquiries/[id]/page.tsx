@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { requirePermission } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
@@ -20,6 +21,7 @@ import { signedPhotoUrls } from "@/lib/storage";
 export const metadata: Metadata = { title: "Enquiry", robots: { index: false } };
 
 export default async function EnquiryPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission("manage_jobs");
   const { id } = await params;
   const supabase = await createClient();
 

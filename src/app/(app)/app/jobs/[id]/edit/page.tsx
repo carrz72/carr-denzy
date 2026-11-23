@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/app-shell";
 import { Card } from "@/components/ui/surface";
 import { JobEditForm } from "@/components/owner/job-edit-form";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Edit job", robots: { index: false } };
 
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Edit job", robots: { index: false } 
 export default async function EditJobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  await requireOwner();
+  await requirePermission("manage_jobs");
   const supabase = await createClient();
 
   const { data: job } = await supabase

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePermission } from "@/lib/auth";
 import type { Metadata } from "next";
 import { ArrowRightIcon, FileTextIcon } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
@@ -31,6 +32,7 @@ const groups: { statuses: QuoteStatus[]; heading: string; blurb: string }[] = [
 ];
 
 export default async function QuotesPage() {
+  await requirePermission("see_prices");
   const supabase = await createClient();
 
   // Expires anything past its valid_until, so nothing here reads as live when

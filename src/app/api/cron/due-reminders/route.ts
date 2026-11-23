@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pushToStaff } from "@/lib/push";
+import { pushToOwners, pushToProfiles } from "@/lib/push";
 
 /**
  * Buzzes the owner's phone for reminders that have come due.
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       due.map((row) => row.id),
     )
     .is("pushed_at", null)
-    .select("id, title, kind, job_id, client_id, enquiry_id, invoice_id, quote_id");
+    .select("id, title, kind, job_id, client_id, enquiry_id, invoice_id, quote_id, created_by");
 
   let pushed = 0;
   for (const reminder of claimed ?? []) {
@@ -76,12 +76,21 @@ export async function POST(request: NextRequest) {
               ? `/app/clients/${reminder.client_id}`
               : "/app#to-do";
 
-    const result = await pushToStaff({
+    const message = {
       title: reminder.kind === "manual" ? "Reminder" : "Don't forget",
       body: reminder.title,
       url,
       tag: `reminder-${reminder.id}`,
-    });
+    };
+    // A team member's own reminder goes to them; the owner's, and the automatic
+    // money nudges, go to the owner.
+    const { data: author } = reminder.created_by
+      ? await admin.from("profiles").select("role").eq("id", reminder.created_by).maybeSingle()
+      : { data: null };
+    const result =
+      author?.role === "staff" && reminder.created_by
+        ? await pushToProfiles([reminder.created_by], message)
+        : await pushToOwners(message);
     pushed += result.sent;
   }
 

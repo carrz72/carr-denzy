@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { hasPermission, requireOwner, requireStaff } from "@/lib/auth";
 import { clientSchema, fieldErrors, propertySchema } from "@/lib/validation";
 
 /**
@@ -14,6 +14,8 @@ import { clientSchema, fieldErrors, propertySchema } from "@/lib/validation";
  * invoices are unaffected: each carries its own copy of the customer and
  * address from the day it went out.
  */
+const NOT_ALLOWED = { ok: false, formError: "You do not have permission to do that. Ask the owner." } as const;
+
 export interface ClientActionResult {
   ok: boolean;
   errors?: Record<string, string>;
@@ -27,7 +29,8 @@ function revalidateClient(clientId: string): void {
 }
 
 export async function updateClientDetails(formData: FormData): Promise<ClientActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const clientId = String(formData.get("client_id") ?? "");
   if (!clientId) return { ok: false, formError: "Missing customer." };
@@ -113,7 +116,8 @@ function propertyRow(data: NonNullable<ReturnType<typeof parseProperty>["data"]>
 
 /** Corrects an address in place — a typo, a missing flat number, new access notes. */
 export async function updateProperty(formData: FormData): Promise<ClientActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const propertyId = String(formData.get("property_id") ?? "");
   if (!propertyId) return { ok: false, formError: "Missing address." };
@@ -143,7 +147,8 @@ export async function updateProperty(formData: FormData): Promise<ClientActionRe
 
 /** Adds another address — they have moved, or this is a second property. */
 export async function addProperty(formData: FormData): Promise<ClientActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const parsed = parseProperty(formData);
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };

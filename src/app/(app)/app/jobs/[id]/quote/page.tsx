@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/owner/quote-builder";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { linesFromItems, type DraftLine } from "@/lib/draft-lines";
 
 export const metadata: Metadata = { title: "New quote", robots: { index: false } };
@@ -24,7 +24,7 @@ export default async function NewQuotePage({
   const { id } = await params;
   const { from } = await searchParams;
 
-  await requireOwner();
+  await requirePermission("manage_quotes");
   const supabase = await createClient();
 
   const [{ data: job }, { data: settings }, { data: priceItems }] = await Promise.all([

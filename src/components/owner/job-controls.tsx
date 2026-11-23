@@ -95,11 +95,17 @@ export function JobStatusControl({
   jobId,
   status,
   clientName,
+  limitedTo,
+  canInvoice = true,
 }: {
   jobId: string;
   status: JobStatus;
   /** Named in the confirmation, so the owner sees who this reaches. */
   clientName?: string | null;
+  /** A helper without "add and change jobs" may only start or finish a job. */
+  limitedTo?: JobStatus[];
+  /** Shows the "Invoice it" shortcut on a finished job. */
+  canInvoice?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -110,8 +116,9 @@ export function JobStatusControl({
   const [note, setNote] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
-  const primary = primaryStep[status];
-  const options = nextSteps[status] ?? [];
+  const allowed = (to: JobStatus | undefined) => !limitedTo || (to !== undefined && limitedTo.includes(to));
+  const primary = allowed(primaryStep[status]?.to) ? primaryStep[status] : undefined;
+  const options = (nextSteps[status] ?? []).filter((to) => allowed(to));
 
   function move(to: JobStatus) {
     setError(null);
@@ -228,7 +235,7 @@ export function JobStatusControl({
 
       {/* A finished job's next move is an invoice, and the invoice moves the
           status. Tapping a status here used to say "Invoice sent" with none. */}
-      {status === "completed" && !confirming ? (
+      {status === "completed" && !confirming && canInvoice ? (
         <Link
           href={`/app/jobs/${jobId}/invoice`}
           className={cn(buttonClasses({ size: "lg" }), "mt-4 w-full")}

@@ -233,7 +233,7 @@ export async function postMessage(formData: FormData): Promise<ActionResult> {
           body: preview,
           url: `/app/jobs/${parsed.data.job_id}`,
           tag: `job-${parsed.data.job_id}`,
-        }),
+        }, { jobId: parsed.data.job_id }),
       ]);
     }
   } catch (notifyError) {

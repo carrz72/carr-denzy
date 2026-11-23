@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner, requireStaff } from "@/lib/auth";
+import { getSessionUser, hasPermission, requireOwner, requireStaff } from "@/lib/auth";
+import { pushToOwners } from "@/lib/push";
 import {
   convertEnquirySchema,
   emailSchema,
@@ -49,6 +50,23 @@ import {
   workingDaysFrom,
 } from "@/lib/dates";
 
+/**
+ * When a team member (not the owner) does one of the things that matter, his
+ * phone buzzes. Never fails the action it reports on.
+ */
+async function tellOwner(what: string, body: string, url: string): Promise<void> {
+  try {
+    const user = await getSessionUser();
+    if (user?.role !== "staff") return;
+    await pushToOwners({ title: `${user.fullName ?? user.email} ${what}`, body, url, tag: `team-${url}` });
+  } catch (error) {
+    console.error("[team] could not tell the owner", error);
+  }
+}
+
+/** A team member asked to do something their permissions do not cover. */
+const NOT_ALLOWED = { ok: false, formError: "You do not have permission to do that. Ask the owner." } as const;
+
 export interface ActionResult {
   ok: boolean;
   errors?: Record<string, string>;
@@ -87,7 +105,8 @@ function friendly(message: string | undefined, fallback: string): string {
 // cannot revalidate the tree you are in the middle of rendering.
 
 export async function declineEnquiry(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const enquiryId = String(formData.get("enquiry_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
@@ -155,7 +174,8 @@ export async function declineEnquiry(formData: FormData): Promise<ActionResult> 
  * be converted again, rather than an orphaned job with no customer.
  */
 export async function convertEnquiry(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const parsed = convertEnquirySchema.safeParse({
     enquiry_id: formData.get("enquiry_id") ?? "",
@@ -266,7 +286,8 @@ export async function convertEnquiry(formData: FormData): Promise<ActionResult> 
 // ---------------------------------------------------------------------------
 
 export async function createJob(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const parsed = jobSchema.safeParse({
     client_id: formData.get("client_id") ?? "",
@@ -317,7 +338,8 @@ export async function createJob(formData: FormData): Promise<ActionResult> {
  * anyway.
  */
 export async function createPhoneJob(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const parsed = phoneJobSchema.safeParse({
     client_id: formData.get("client_id") ?? "",
@@ -451,6 +473,14 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
   // through those inside a week. Each one instead asks for the thing that has
   // to exist for the status to be true at all.
 
+  // Someone who cannot manage jobs (a helper on "Jobs only") can say a job
+  // has started or is finished, nothing else: cancelling, booking and the
+  // money statuses are for the owner or the office.
+  const canManageJobs = await hasPermission("manage_jobs");
+  if (!canManageJobs && !["in_progress", "completed"].includes(parsed.data.status)) {
+    return { ok: false, formError: "You can mark a job as started or finished. Ask the owner for anything else." };
+  }
+
   if (parsed.data.status === "scheduled") {
     // "Booked in" with nothing booked was a lie the app told about itself: the
     // status changed, no date was ever set, and because the booking email only
@@ -479,16 +509,24 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
     };
   }
 
-  const { error } = await supabase
+  const { data: changed, error } = await supabase
     .from("jobs")
     .update({ status: parsed.data.status })
-    .eq("id", parsed.data.job_id);
+    .eq("id", parsed.data.job_id)
+    .select("id");
 
   if (error) {
     return {
       ok: false,
       formError: friendly(error.message, "Could not change the status. Try again."),
     };
+  }
+
+  // The database refuses quietly (no error, nothing changed) when this person
+  // may see the job but not change it. Without this check the customer would
+  // still be emailed "finished" for a job that is not.
+  if (!changed || changed.length === 0) {
+    return { ok: false, formError: "You can only update jobs that are given to you. Ask the owner." };
   }
 
   // --- Cancelling tidies up after itself ----------------------------------
@@ -500,14 +538,17 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
 
   if (parsed.data.status === "cancelled") {
     const nowIso = new Date().toISOString();
+    // Trusted: only someone who can manage jobs gets here (checked above), and
+    // they may not hold the quotes permission needed to withdraw them.
+    const trusted = createAdminClient();
     const [{ error: quoteError }, { error: visitError }, { data: unpaid }] = await Promise.all([
-      supabase
+      trusted
         .from("quotes")
         .update({ status: "withdrawn" })
         .eq("job_id", parsed.data.job_id)
         .eq("status", "sent")
         .is("deleted_at", null),
-      supabase
+      trusted
         .from("job_visits")
         .delete()
         .eq("job_id", parsed.data.job_id)
@@ -561,6 +602,9 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
   revalidatePath(`/app/jobs/${parsed.data.job_id}`);
   revalidatePath("/app", "layout");
 
+  if (parsed.data.status === "completed") {
+    await tellOwner("finished a job", completionNote.slice(0, 120) || "Marked as finished.", `/app/jobs/${parsed.data.job_id}`);
+  }
   return { ok: true, warning };
 }
 
@@ -570,7 +614,8 @@ export async function updateJobStatus(formData: FormData): Promise<ActionResult>
  * fixed — moving a job between customers is what merging customers is for.
  */
 export async function updateJobDetails(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const jobId = String(formData.get("job_id") ?? "");
   if (!jobId) return { ok: false, formError: "Missing job." };
@@ -643,7 +688,12 @@ export async function updateJobDetails(formData: FormData): Promise<ActionResult
  * every case they are the one who said so.
  */
 export async function closeJobNotGoingAhead(formData: FormData): Promise<ActionResult> {
-  const user = await requireOwner();
+  const user = await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
+  // Knock-on updates (job status, withdrawing quotes) run trusted: the
+  // permission for this action is already checked, and the caller may not
+  // hold the separate permission for the record being tidied.
+  const trusted = createAdminClient();
 
   const jobId = String(formData.get("job_id") ?? "");
   const reason = String(formData.get("reason") ?? "");
@@ -673,7 +723,7 @@ export async function closeJobNotGoingAhead(formData: FormData): Promise<ActionR
     };
   }
 
-  const { error: quoteError } = await supabase
+  const { error: quoteError } = await trusted
     .from("quotes")
     .update({ status: "declined", responded_at: new Date().toISOString(), decline_reason: reason })
     .eq("job_id", jobId)
@@ -701,7 +751,8 @@ export async function closeJobNotGoingAhead(formData: FormData): Promise<ActionR
  * be quoted afresh; the old quotes stay on file as they were.
  */
 export async function reopenJob(formData: FormData): Promise<ActionResult> {
-  const user = await requireOwner();
+  const user = await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const jobId = String(formData.get("job_id") ?? "");
   if (!jobId) return { ok: false, formError: "Missing job." };
@@ -744,6 +795,7 @@ export async function reopenJob(formData: FormData): Promise<ActionResult> {
 /** Books a job in. Overlaps warn but never block (spec FR-35, E-10). */
 export async function scheduleJob(formData: FormData): Promise<ActionResult> {
   await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const parsed = scheduleSchema.safeParse({
     job_id: formData.get("job_id") ?? "",
@@ -909,6 +961,7 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
 /** Takes a day back off a job. */
 export async function removeVisit(formData: FormData): Promise<ActionResult> {
   await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const visitId = String(formData.get("visit_id") ?? "");
   const jobId = String(formData.get("job_id") ?? "");
@@ -965,6 +1018,7 @@ export async function removeVisit(formData: FormData): Promise<ActionResult> {
  */
 export async function setExpectedDays(formData: FormData): Promise<ActionResult> {
   await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const jobId = String(formData.get("job_id") ?? "");
   const raw = String(formData.get("expected_amount") ?? "").trim();
@@ -1253,7 +1307,8 @@ export async function deleteJobNote(formData: FormData): Promise<ActionResult> {
  * operation, and because the owner cannot read `auth.users` any other way.
  */
 export async function inviteClientToPortal(formData: FormData): Promise<ActionResult> {
-  const owner = await requireOwner();
+  const owner = await requireStaff();
+  if (!(await hasPermission("manage_jobs"))) return NOT_ALLOWED;
 
   const clientId = String(formData.get("client_id") ?? "");
   const rawEmail = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -1360,7 +1415,8 @@ export async function inviteClientToPortal(formData: FormData): Promise<ActionRe
  * is always derived from the lines and never from the browser (spec FR-40).
  */
 export async function createQuote(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_quotes"))) return NOT_ALLOWED;
 
   const itemsRaw = String(formData.get("items") ?? "[]");
 
@@ -1450,7 +1506,8 @@ export async function createQuote(formData: FormData): Promise<ActionResult> {
  * dishonest. Changing a sent quote means issuing a new one.
  */
 export async function updateQuote(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_quotes"))) return NOT_ALLOWED;
 
   const quoteId = String(formData.get("quote_id") ?? "");
   if (!quoteId) return { ok: false, formError: "Missing quote." };
@@ -1552,7 +1609,8 @@ export async function updateQuote(formData: FormData): Promise<ActionResult> {
  * same way as a draft invoice: soft-deleted, out of every list.
  */
 export async function deleteDraftQuote(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_quotes"))) return NOT_ALLOWED;
 
   const quoteId = String(formData.get("quote_id") ?? "");
   if (!quoteId) return { ok: false, formError: "Missing quote." };
@@ -1591,7 +1649,12 @@ export async function deleteDraftQuote(formData: FormData): Promise<ActionResult
  * New, ready for the replacement.
  */
 export async function withdrawQuote(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_quotes"))) return NOT_ALLOWED;
+  // Knock-on updates (job status, withdrawing quotes) run trusted: the
+  // permission for this action is already checked, and the caller may not
+  // hold the separate permission for the record being tidied.
+  const trusted = createAdminClient();
 
   const quoteId = String(formData.get("quote_id") ?? "");
   if (!quoteId) return { ok: false, formError: "Missing quote." };
@@ -1626,7 +1689,7 @@ export async function withdrawQuote(formData: FormData): Promise<ActionResult> {
     .limit(1);
 
   if (!stillOpen?.length) {
-    await supabase
+    await trusted
       .from("jobs")
       .update({ status: "new" })
       .eq("id", quote.job_id)
@@ -1664,7 +1727,8 @@ export async function withdrawQuote(formData: FormData): Promise<ActionResult> {
  * a quote whose date has passed, for a customer whose price is being honoured.
  */
 export async function recordQuoteAnswer(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_quotes"))) return NOT_ALLOWED;
 
   const quoteId = String(formData.get("quote_id") ?? "");
   const answer = String(formData.get("answer") ?? "");
@@ -1707,7 +1771,12 @@ export async function recordQuoteAnswer(formData: FormData): Promise<ActionResul
 
 /** Sends a draft quote to the customer. */
 export async function sendQuote(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_quotes"))) return NOT_ALLOWED;
+  // Knock-on updates (job status, withdrawing quotes) run trusted: the
+  // permission for this action is already checked, and the caller may not
+  // hold the separate permission for the record being tidied.
+  const trusted = createAdminClient();
 
   const quoteId = String(formData.get("quote_id") ?? "");
   if (!quoteId) return { ok: false, formError: "Missing quote." };
@@ -1742,7 +1811,7 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
     return { ok: false, formError: friendly(error?.message, "Could not send that quote. Try again.") };
   }
 
-  await supabase.from("jobs").update({ status: "quoted" }).eq("id", quote.job_id);
+  await trusted.from("jobs").update({ status: "quoted" }).eq("id", quote.job_id);
 
   let warning: string | undefined;
 
@@ -1789,6 +1858,7 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
   revalidatePath(`/app/jobs/${quote.job_id}`);
   revalidatePath("/app", "layout");
 
+  await tellOwner("sent a quote", `${quote.reference} for ${formatPence(quote.total_pence)}`, `/app/quotes/${quote.id}`);
   return { ok: true, warning };
 }
 
@@ -1797,7 +1867,8 @@ export async function sendQuote(formData: FormData): Promise<ActionResult> {
 // ---------------------------------------------------------------------------
 
 export async function createInvoice(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_invoices"))) return NOT_ALLOWED;
 
   const itemsRaw = String(formData.get("items") ?? "[]");
 
@@ -1951,7 +2022,8 @@ export async function createInvoice(formData: FormData): Promise<ActionResult> {
  * line changes on anything issued.
  */
 export async function updateInvoice(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_invoices"))) return NOT_ALLOWED;
 
   const invoiceId = String(formData.get("invoice_id") ?? "");
   if (!invoiceId) return { ok: false, formError: "Missing invoice." };
@@ -2058,7 +2130,12 @@ export async function updateInvoice(formData: FormData): Promise<ActionResult> {
 }
 
 export async function sendInvoice(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_invoices"))) return NOT_ALLOWED;
+  // Knock-on updates (job status, withdrawing quotes) run trusted: the
+  // permission for this action is already checked, and the caller may not
+  // hold the separate permission for the record being tidied.
+  const trusted = createAdminClient();
 
   const invoiceId = String(formData.get("invoice_id") ?? "");
   if (!invoiceId) return { ok: false, formError: "Missing invoice." };
@@ -2117,7 +2194,7 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
   if (invoice.job_id) {
     // Logged rather than ignored: a refused status change here once left jobs
     // reading "New request" with a paid invoice on them, and nobody knew.
-    const { error: jobError } = await supabase
+    const { error: jobError } = await trusted
       .from("jobs")
       .update({ status: "invoiced" })
       .eq("id", invoice.job_id);
@@ -2162,6 +2239,7 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
   revalidatePath(`/app/invoices/${invoiceId}`);
   revalidatePath("/app", "layout");
 
+  await tellOwner("sent an invoice", `${invoice.reference} for ${formatPence(invoice.total_pence)}`, `/app/invoices/${invoice.id}`);
   return { ok: true, warning };
 }
 
@@ -2172,7 +2250,8 @@ export async function sendInvoice(formData: FormData): Promise<ActionResult> {
  * page) is what makes this land correctly.
  */
 export async function resendInvoice(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_invoices"))) return NOT_ALLOWED;
 
   const invoiceId = String(formData.get("invoice_id") ?? "");
   if (!invoiceId) return { ok: false, formError: "Missing invoice." };
@@ -2220,7 +2299,8 @@ export async function resendInvoice(formData: FormData): Promise<ActionResult> {
  * note instead.
  */
 export async function deleteDraftInvoice(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_invoices"))) return NOT_ALLOWED;
 
   const invoiceId = String(formData.get("invoice_id") ?? "");
   if (!invoiceId) return { ok: false, formError: "Missing invoice." };
@@ -2262,7 +2342,12 @@ export async function deleteDraftInvoice(formData: FormData): Promise<ActionResu
  * would leave a payment attached to an invoice that says nothing is owed.
  */
 export async function voidInvoice(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_invoices"))) return NOT_ALLOWED;
+  // Knock-on updates (job status, withdrawing quotes) run trusted: the
+  // permission for this action is already checked, and the caller may not
+  // hold the separate permission for the record being tidied.
+  const trusted = createAdminClient();
 
   const invoiceId = String(formData.get("invoice_id") ?? "");
   if (!invoiceId) return { ok: false, formError: "Missing invoice." };
@@ -2300,7 +2385,7 @@ export async function voidInvoice(formData: FormData): Promise<ActionResult> {
       .limit(1);
 
     if (!others?.length) {
-      await supabase
+      await trusted
         .from("jobs")
         .update({ status: "completed" })
         .eq("id", invoice.job_id)
@@ -2334,7 +2419,12 @@ export async function voidInvoice(formData: FormData): Promise<ActionResult> {
 }
 
 export async function recordPayment(formData: FormData): Promise<ActionResult> {
-  const user = await requireOwner();
+  const user = await requireStaff();
+  if (!(await hasPermission("record_payments"))) return NOT_ALLOWED;
+  // Knock-on updates (job status, withdrawing quotes) run trusted: the
+  // permission for this action is already checked, and the caller may not
+  // hold the separate permission for the record being tidied.
+  const trusted = createAdminClient();
 
   const parsed = paymentSchema.safeParse({
     invoice_id: formData.get("invoice_id") ?? "",
@@ -2391,7 +2481,7 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
     .maybeSingle();
 
   if (invoice?.status === "paid" && invoice.job_id) {
-    const { error: jobError } = await supabase
+    const { error: jobError } = await trusted
       .from("jobs")
       .update({ status: "paid" })
       .eq("id", invoice.job_id);
@@ -2443,6 +2533,7 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
   revalidatePath(`/app/invoices/${parsed.data.invoice_id}`);
   revalidatePath("/app", "layout");
 
+  await tellOwner("recorded a payment", formatPence(parsed.data.amount_pence), `/app/invoices/${parsed.data.invoice_id}`);
   return { ok: true };
 }
 
@@ -2454,7 +2545,12 @@ export async function recordPayment(formData: FormData): Promise<ActionResult> {
  * never disappears without trace.
  */
 export async function deletePayment(formData: FormData): Promise<ActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("record_payments"))) return NOT_ALLOWED;
+  // Knock-on updates (job status, withdrawing quotes) run trusted: the
+  // permission for this action is already checked, and the caller may not
+  // hold the separate permission for the record being tidied.
+  const trusted = createAdminClient();
 
   const paymentId = String(formData.get("payment_id") ?? "");
   if (!paymentId) return { ok: false, formError: "Missing payment." };
@@ -2515,7 +2611,7 @@ export async function deletePayment(formData: FormData): Promise<ActionResult> {
 
   // A job marked paid because of this payment is not paid any more.
   if (invoice?.job_id && invoice.status !== "paid") {
-    await supabase
+    await trusted
       .from("jobs")
       .update({ status: "invoiced" })
       .eq("id", invoice.job_id)

@@ -4,7 +4,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Client, Profile, UserRole } from "@/types/database";
+import type { Client, Profile, StaffPermissionName, StaffPermissions, UserRole } from "@/types/database";
 
 export interface SessionUser {
   id: string;
@@ -60,7 +60,81 @@ export async function requireStaff(): Promise<SessionUser> {
     redirect("/portal");
   }
 
+  // A removed team member keeps a "staff" token for a while; without their
+  // permissions row they are no longer on the team.
+  if (user.role === "staff" && !(await getAccess())) {
+    redirect("/portal");
+  }
+
   return user;
+}
+
+/**
+ * What the signed-in team member may do. The owner can do everything.
+ *
+ * The database enforces the same rules (see the team_permissions migration);
+ * this copy decides which pages and buttons to show, and lets server actions
+ * refuse early with a clear message.
+ */
+export interface Access {
+  owner: boolean;
+  can: Record<StaffPermissionName, boolean>;
+}
+
+const ALL_PERMISSIONS: StaffPermissionName[] = [
+  "see_all_jobs",
+  "manage_jobs",
+  "see_prices",
+  "manage_quotes",
+  "manage_invoices",
+  "record_payments",
+];
+
+export const getAccess = cache(async (): Promise<Access | null> => {
+  const user = await getSessionUser();
+  if (!user) return null;
+
+  if (user.role === "owner") {
+    return { owner: true, can: Object.fromEntries(ALL_PERMISSIONS.map((p) => [p, true])) as Access["can"] };
+  }
+  if (user.role !== "staff") return null;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("staff_permissions")
+    .select("*")
+    .eq("profile_id", user.id)
+    .maybeSingle<StaffPermissions>();
+  if (!data) return null;
+
+  const money = data.see_prices || data.manage_quotes || data.manage_invoices || data.record_payments;
+  return {
+    owner: false,
+    can: {
+      see_all_jobs: data.see_all_jobs,
+      manage_jobs: data.manage_jobs,
+      see_prices: money,
+      manage_quotes: data.manage_quotes,
+      manage_invoices: data.manage_invoices,
+      record_payments: data.record_payments,
+    },
+  };
+});
+
+/** Pages: the owner, or a team member allowed to do this. Others go to Today. */
+export async function requirePermission(permission: StaffPermissionName): Promise<SessionUser> {
+  const user = await requireStaff();
+  const access = await getAccess();
+  if (!access?.can[permission]) redirect("/app");
+  return user;
+}
+
+/** Server actions: same check, but returns false instead of redirecting. */
+export async function hasPermission(permission: StaffPermissionName): Promise<boolean> {
+  const user = await getSessionUser();
+  if (!user || (user.role !== "owner" && user.role !== "staff")) return false;
+  const access = await getAccess();
+  return Boolean(access?.can[permission]);
 }
 
 /** Owner only — anything touching money or settings. */

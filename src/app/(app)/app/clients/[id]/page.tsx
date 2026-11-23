@@ -15,7 +15,7 @@ import { ClientMembers } from "@/components/client-members";
 import { Card, DetailRow } from "@/components/ui/surface";
 import { InvoiceStatusBadge, JobStatusBadge, QuoteStatusBadge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
-import { requireStaff } from "@/lib/auth";
+import { getAccess, requireStaff } from "@/lib/auth";
 import { buttonClasses } from "@/components/ui/button";
 import { formatDate, formatRelative, todayInLondon } from "@/lib/dates";
 import { ClientRemindersSwitch, RemindMe } from "@/components/owner/reminders";
@@ -28,6 +28,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
 
   const viewer = await requireStaff();
+  const access = await getAccess();
+  const canManage = Boolean(access?.can.manage_jobs);
   const supabase = await createClient();
 
   const { data: client } = await supabase
@@ -98,7 +100,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         description={client.company_name ?? undefined}
         back={{ href: "/app/clients", label: "All customers" }}
         action={
-          viewer.role === "owner" ? (
+          canManage ? (
             <Link
               href={`/app/clients/${client.id}/edit`}
               className={buttonClasses({ variant: "secondary", size: "sm" })}
@@ -246,7 +248,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             clientName={client.full_name}
             members={members ?? []}
             audience="owner"
-            canManage
+            canManage={canManage}
           />
 
           <RemindMe
@@ -255,7 +257,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             today={todayInLondon()}
           />
 
-          <ClientRemindersSwitch clientId={client.id} on={client.auto_reminders !== false} />
+          {canManage ? (
+            <ClientRemindersSwitch clientId={client.id} on={client.auto_reminders !== false} />
+          ) : null}
 
           <Card>
             <h2 className="text-label uppercase text-ink-subtle">Addresses</h2>

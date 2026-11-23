@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner, requireStaff } from "@/lib/auth";
+import { hasPermission, requireOwner, requireStaff } from "@/lib/auth";
 import { sendInvoiceReminder } from "@/lib/email";
 import { addDays, londonWallTimeToIso, todayInLondon } from "@/lib/dates";
 import type { ChaseEntity } from "@/types/database";
@@ -132,7 +132,10 @@ export async function setClientAutoReminders(clientId: string, on: boolean): Pro
 
 /** Chases one invoice today rather than waiting for the automatic reminder. */
 export async function sendInvoiceReminderNow(invoiceId: string): Promise<ReminderActionResult> {
-  await requireOwner();
+  await requireStaff();
+  if (!(await hasPermission("manage_invoices")) && !(await hasPermission("record_payments"))) {
+    return { ok: false, formError: "You do not have permission to do that. Ask the owner." };
+  }
   if (!uuid.safeParse(invoiceId).success) return { ok: false, formError: "That invoice was not found." };
 
   const supabase = await createClient();

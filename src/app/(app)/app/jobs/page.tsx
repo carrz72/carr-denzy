@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getAccess } from "@/lib/auth";
 import type { Metadata } from "next";
 import {
   ArrowRightIcon,
@@ -52,6 +53,7 @@ const boardOrder: { status: JobStatus[]; heading: string; blurb: string }[] = [
 ];
 
 export default async function JobsPage() {
+  const canAdd = Boolean((await getAccess())?.can.manage_jobs);
   const supabase = await createClient();
 
   const { data: jobs } = await supabase
@@ -77,10 +79,12 @@ export default async function JobsPage() {
         title="Jobs"
         description="Grouped by what each one needs from you next."
         action={
-          <Link href="/app/jobs/new" className={buttonClasses({ size: "sm" })}>
-            <PhoneIcon size={17} weight="fill" aria-hidden="true" />
-            Job from a call
-          </Link>
+          canAdd ? (
+            <Link href="/app/jobs/new" className={buttonClasses({ size: "sm" })}>
+              <PhoneIcon size={17} weight="fill" aria-hidden="true" />
+              Job from a call
+            </Link>
+          ) : undefined
         }
       />
 
@@ -88,9 +92,9 @@ export default async function JobsPage() {
         <EmptyState
           icon={<BriefcaseIcon size={28} weight="duotone" />}
           title="No jobs yet"
-          description="Most work arrives by phone — take it down here and it goes straight in the diary. Jobs from the website form land in your enquiry inbox first."
-          action={{ label: "Job from a call", href: "/app/jobs/new" }}
-          secondaryAction={{ label: "Open enquiries", href: "/app/enquiries" }}
+          description={canAdd ? "Most work arrives by phone — take it down here and it goes straight in the diary. Jobs from the website form land in your enquiry inbox first." : "Jobs given to you show up here."}
+          action={canAdd ? { label: "Job from a call", href: "/app/jobs/new" } : undefined}
+          secondaryAction={canAdd ? { label: "Open enquiries", href: "/app/enquiries" } : undefined}
         />
       ) : (
         <div className="flex flex-col gap-10">

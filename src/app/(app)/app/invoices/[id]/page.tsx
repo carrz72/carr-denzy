@@ -23,7 +23,7 @@ import {
   SendInvoiceButton,
 } from "@/components/owner/invoice-actions";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { getAccess, requirePermission } from "@/lib/auth";
 import { formatDate, formatDateTime, isPast } from "@/lib/dates";
 import { formatPence } from "@/lib/money";
 import type { PaymentMethod } from "@/types/database";
@@ -44,7 +44,10 @@ const methodLabels: Record<PaymentMethod, string> = {
 export default async function OwnerInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  await requireOwner();
+  await requirePermission("see_prices");
+  const access = await getAccess();
+  const canInvoice = Boolean(access?.can.manage_invoices);
+  const canPay = Boolean(access?.can.record_payments);
   const supabase = await createClient();
 
   const [{ data: invoice }, { data: settings }] = await Promise.all([
@@ -245,10 +248,12 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
                     <span className="font-mono font-semibold tabular-nums text-ink">
                       {formatPence(payment.amount_pence)}
                     </span>
-                    <RemovePaymentButton
-                      paymentId={payment.id}
-                      amountLabel={formatPence(payment.amount_pence)}
-                    />
+                    {canPay ? (
+                      <RemovePaymentButton
+                        paymentId={payment.id}
+                        amountLabel={formatPence(payment.amount_pence)}
+                      />
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -257,7 +262,7 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
         </div>
 
         <div className="no-print order-first flex min-w-0 flex-col gap-6 lg:order-none">
-          {isDraft ? (
+          {isDraft && canInvoice ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Not sent yet</h2>
               <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
@@ -323,11 +328,11 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
             </Card>
           ) : null}
 
-          {!isDraft && invoice.status !== "void" ? (
+          {!isDraft && invoice.status !== "void" && canPay ? (
             <RecordPaymentForm invoiceId={invoice.id} outstandingPence={outstanding} />
           ) : null}
 
-          {canChase ? (
+          {canChase && (canInvoice || canPay) ? (
             <InvoiceReminders
               invoiceId={invoice.id}
               line={chaseSummary.line}
@@ -407,7 +412,7 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
               ) : null}
             </dl>
 
-            {invoice.sent_at && invoice.status !== "void" ? (
+            {invoice.sent_at && invoice.status !== "void" && canInvoice ? (
               <div className="mt-5 border-t border-line pt-4">
                 <ResendInvoiceButton
                   invoiceId={invoice.id}
@@ -432,7 +437,8 @@ export default async function OwnerInvoicePage({ params }: { params: Promise<{ i
             {/* Sent but nothing paid: the one state where cancelling is clean.
                 Drafts are deleted instead; once money is in, it stays. */}
             {(invoice.status === "sent" || invoice.status === "overdue") &&
-            invoice.paid_pence === 0 ? (
+            invoice.paid_pence === 0 &&
+            canInvoice ? (
               <div className="mt-5 border-t border-line pt-4">
                 <VoidInvoiceButton invoiceId={invoice.id} reference={invoice.reference} />
               </div>

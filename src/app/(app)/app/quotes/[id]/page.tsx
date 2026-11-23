@@ -15,7 +15,7 @@ import {
 } from "@/components/owner/quote-actions";
 import { ShareLink } from "@/components/owner/share-link";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { getAccess, requirePermission } from "@/lib/auth";
 import { addDays, formatDate, formatDateTime, isPast, todayInLondon } from "@/lib/dates";
 import { ReminderSwitch, RemindMe } from "@/components/owner/reminders";
 import { formatPence } from "@/lib/money";
@@ -25,7 +25,9 @@ export const metadata: Metadata = { title: "Quote", robots: { index: false } };
 export default async function OwnerQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  await requireOwner();
+  await requirePermission("see_prices");
+  // Read-only viewers (prices but not quotes) see the quote, not its buttons.
+  const canQuote = Boolean((await getAccess())?.can.manage_quotes);
   const supabase = await createClient();
 
   const [{ data: quote }, { data: settings }] = await Promise.all([
@@ -139,7 +141,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
         </div>
 
         <div className="order-first flex min-w-0 flex-col gap-6 lg:order-none">
-          {quote.status === "draft" ? (
+          {quote.status === "draft" && canQuote ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Ready to go?</h2>
               <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
@@ -193,7 +195,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
             handled: they have no email, so nothing was sent — the owner texts
             them this link and they can accept it from their phone.
           */}
-          {quote.status === "sent" ? (
+          {quote.status === "sent" && canQuote ? (
             <Card>
               <ShareLink
                 path={`/quotes/view/${quote.id}`}
@@ -220,7 +222,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
             </Card>
           ) : null}
 
-          {quote.status === "withdrawn" ? (
+          {quote.status === "withdrawn" && canQuote ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Withdrawn</h2>
               <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
@@ -237,7 +239,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
 
           {/* Ran out unanswered. The customer may still come back: start a
               fresh quote from this one rather than typing it all again. */}
-          {quote.status === "expired" ? (
+          {quote.status === "expired" && canQuote ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Ran out</h2>
               <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
@@ -255,7 +257,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
             </Card>
           ) : null}
 
-          {quote.status === "accepted" ? (
+          {quote.status === "accepted" && canQuote ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Accepted</h2>
               <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
@@ -287,7 +289,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
             </Card>
           ) : null}
 
-          {quote.status === "declined" ? (
+          {quote.status === "declined" && canQuote ? (
             <Card>
               <h2 className="text-label uppercase text-ink-subtle">Declined</h2>
               <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
@@ -314,7 +316,7 @@ export default async function OwnerQuotePage({ params }: { params: Promise<{ id:
             </Card>
           ) : null}
 
-          {quote.status === "sent" && !expired ? (
+          {quote.status === "sent" && !expired && canQuote ? (
             <ReminderSwitch
               entity="quote"
               entityId={quote.id}

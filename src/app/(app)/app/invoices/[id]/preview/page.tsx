@@ -14,7 +14,7 @@ import {
 import { PrintButton } from "@/components/print-button";
 import { businessForInvoice } from "@/lib/invoice-snapshot";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Invoice preview", robots: { index: false } };
@@ -38,7 +38,7 @@ export default async function InvoicePreviewPage({
 }) {
   const { id } = await params;
 
-  await requireOwner();
+  await requirePermission("see_prices");
   const supabase = await createClient();
 
   const [{ data: invoice }, { data: settings }] = await Promise.all([

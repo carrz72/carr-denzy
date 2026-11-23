@@ -55,7 +55,7 @@ export async function notifyOwnerOfQuoteResponse(
         // other jobs, so it is worth the screen. A decline is worth knowing and
         // not worth stopping for.
         urgent: accepted,
-      }),
+      }, { permission: "manage_quotes" }),
     ]);
   } catch (error) {
     console.error("[notify-owner] quote response failed", error);

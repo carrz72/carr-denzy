@@ -82,7 +82,7 @@ export async function sendTestNotification(): Promise<NotificationResult> {
 
   try {
     const { sendOwnerEnquiryNotification } = await import("@/lib/email");
-    const { pushToStaff, isPushConfigured } = await import("@/lib/push");
+    const { pushToOwners, isPushConfigured } = await import("@/lib/push");
 
     const [emailResult, pushResult] = await Promise.all([
       sendOwnerEnquiryNotification({
@@ -97,7 +97,7 @@ export async function sendTestNotification(): Promise<NotificationResult> {
         enquiryId: "test",
       }),
       isPushConfigured()
-        ? pushToStaff({
+        ? pushToOwners({
             title: "Test notification",
             body: "If you can see this, new enquiries will buzz your phone.",
             url: "/app/settings/notifications",

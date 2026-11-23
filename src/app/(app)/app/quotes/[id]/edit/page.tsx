@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/owner/quote-builder";
 import { linesFromItems } from "@/lib/draft-lines";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { isPast } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Edit quote", robots: { index: false } };
@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Edit quote", robots: { index: false 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  await requireOwner();
+  await requirePermission("manage_quotes");
   const supabase = await createClient();
 
   const [{ data: quote }, { data: settings }, { data: priceItems }] = await Promise.all([

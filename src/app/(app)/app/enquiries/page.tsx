@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePermission } from "@/lib/auth";
 import type { Metadata } from "next";
 import { ArrowRightIcon, TrayIcon } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
@@ -13,6 +14,7 @@ export const metadata: Metadata = { title: "Enquiries", robots: { index: false }
 const urgencyRank = { emergency: 0, soon: 1, flexible: 2 } as const;
 
 export default async function EnquiriesPage() {
+  await requirePermission("manage_jobs");
   const supabase = await createClient();
 
   const { data: enquiries } = await supabase

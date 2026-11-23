@@ -451,6 +451,42 @@ export async function sendPortalInvite(
   return send(to, "See your jobs with Carrdenzy online", html, text);
 }
 
+/** The owner has added someone to the team. They sign in with a code, no password. */
+export async function sendTeamInvite(to: string, fullName: string): Promise<SendResult> {
+  const firstName = addressName(fullName) || fullName;
+  const link = `${siteUrl()}/sign-in?next=%2Fapp`;
+
+  const html = await layout(
+    "You're on the team",
+    `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Hello ${esc(firstName)},</p>
+     <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">
+       You have been added to the Carrdenzy Heating &amp; Gas team, so you can see the jobs
+       shared with you on your phone.
+     </p>
+     ${button(link, "Sign in")}
+     <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#776c60;">
+       Use this email address (${esc(to)}). There is no password: we email you a code each
+       time you sign in.
+     </p>
+     <p style="margin:0;font-size:14px;line-height:1.6;color:#776c60;">
+       Tip: once you are in, add the page to your home screen and turn on notifications.
+     </p>`,
+  );
+
+  const text = [
+    `Hello ${firstName},`,
+    "",
+    "You have been added to the Carrdenzy Heating & Gas team, so you can see the jobs shared with you on your phone.",
+    "",
+    `Sign in here with this email address (${to}): ${link}`,
+    "There is no password: we email you a code each time you sign in.",
+    "",
+    `Carrdenzy Heating & Gas · ${await businessPhone()}`,
+  ].join("\n");
+
+  return send(to, "You've been added to the Carrdenzy team", html, text);
+}
+
 export async function sendQuoteToClient(
   to: string,
   clientName: string,

@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { buildInvoicePdf, pdfResponse } from "@/lib/document-pdf";
 import { createClient } from "@/lib/supabase/server";
 
 /** The owner's PDF of any invoice, drafts included, read under their own session. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireOwner();
+  await requirePermission("see_prices");
 
   const { id } = await params;
   const supabase = await createClient();

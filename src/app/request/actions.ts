@@ -216,7 +216,7 @@ export async function submitEnquiry(formData: FormData): Promise<EnquiryResult> 
         // An emergency overrides the phone's grouping and stays on screen
         // until dismissed. Everything else waits politely for the next unlock.
         urgent: input.urgency === "emergency",
-      }),
+      }, { permission: "manage_jobs" }),
     ]);
 
     if (input.email) {

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { hasPermission, requireUser } from "@/lib/auth";
 import { addMember } from "@/lib/members";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { emailSchema } from "@/lib/validation";
@@ -31,6 +31,13 @@ function revalidateBoth(clientId: string): void {
 
 export async function addClientMember(formData: FormData): Promise<MemberActionResult> {
   const user = await requireUser();
+
+  // Team members need "add and change jobs and customers". Without this, a
+  // helper who can see one customer could add themselves to that customer's
+  // account and read its invoices through the customer pages.
+  if (user.role === "staff" && !(await hasPermission("manage_jobs"))) {
+    return { ok: false, formError: "You do not have permission to do that. Ask the owner." };
+  }
 
   const clientId = String(formData.get("client_id") ?? "");
   const rawEmail = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -98,7 +105,14 @@ export async function addClientMember(formData: FormData): Promise<MemberActionR
 }
 
 export async function setMemberRole(formData: FormData): Promise<MemberActionResult> {
-  await requireUser();
+  const caller = await requireUser();
+
+  // Team members need "add and change jobs and customers". Without this, a
+  // helper who can see one customer could add themselves to that customer's
+  // account and read its invoices through the customer pages.
+  if (caller.role === "staff" && !(await hasPermission("manage_jobs"))) {
+    return { ok: false, formError: "You do not have permission to do that. Ask the owner." };
+  }
 
   const id = String(formData.get("id") ?? "");
   const clientId = String(formData.get("client_id") ?? "");
@@ -126,7 +140,14 @@ export async function setMemberRole(formData: FormData): Promise<MemberActionRes
 }
 
 export async function removeClientMember(formData: FormData): Promise<MemberActionResult> {
-  await requireUser();
+  const caller = await requireUser();
+
+  // Team members need "add and change jobs and customers". Without this, a
+  // helper who can see one customer could add themselves to that customer's
+  // account and read its invoices through the customer pages.
+  if (caller.role === "staff" && !(await hasPermission("manage_jobs"))) {
+    return { ok: false, formError: "You do not have permission to do that. Ask the owner." };
+  }
 
   const id = String(formData.get("id") ?? "");
   const clientId = String(formData.get("client_id") ?? "");

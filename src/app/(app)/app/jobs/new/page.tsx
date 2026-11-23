@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/app-shell";
 import { PhoneJobForm } from "@/components/owner/phone-job-form";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwner } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "New job", robots: { index: false } };
 
 export default async function NewJobPage() {
-  await requireOwner();
+  await requirePermission("manage_jobs");
   const supabase = await createClient();
 
   const [{ data: clients }, { data: services }] = await Promise.all([
