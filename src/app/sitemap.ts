@@ -18,8 +18,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/work`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/about`, lastModified, changeFrequency: "yearly", priority: 0.6 },
     { url: `${base}/contact`, lastModified, changeFrequency: "yearly", priority: 0.8 },
-    { url: `${base}/privacy`, lastModified, changeFrequency: "yearly", priority: 0.2 },
-    { url: `${base}/terms`, lastModified, changeFrequency: "yearly", priority: 0.2 },
+    // Privacy and terms are left out on purpose: they carry a noindex tag, and
+    // listing a noindex page here makes Search Console report it as an error.
   ];
 
   const serviceRoutes: MetadataRoute.Sitemap = services.map((service) => ({
