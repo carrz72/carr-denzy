@@ -252,7 +252,7 @@ export function InvoiceBuilder({
           Saves as a draft. Once you send it the figures are fixed.
         </p>
 
-        <Button
+        <Button data-help="save-invoice"
           type="submit"
           size="lg"
           loading={isPending}

@@ -7,6 +7,7 @@ import {
   MapPinIcon,
   PencilSimpleIcon,
   PhoneIcon,
+  PlusIcon,
   ReceiptIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/app-shell";
@@ -171,7 +172,20 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           </Card>
 
           <Card>
-            <h2 className="text-label uppercase text-ink-subtle">Invoices</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-label uppercase text-ink-subtle">Invoices</h2>
+              {access?.can.manage_invoices ? (
+                // Work that never went through the app still needs billing.
+                // Starting it here picks this customer for you.
+                <Link
+                  href={`/app/invoices/new?client=${client.id}`}
+                  className={buttonClasses({ variant: "secondary", size: "sm" })}
+                >
+                  <PlusIcon size={16} weight="bold" aria-hidden="true" />
+                  New invoice
+                </Link>
+              ) : null}
+            </div>
 
             {(invoices ?? []).length === 0 ? (
               <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-muted">

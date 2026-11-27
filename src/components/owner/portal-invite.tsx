@@ -99,7 +99,7 @@ export function PortalInvite({
 
           <FormError message={formError} />
 
-          <Button
+          <Button data-help="portal-invite"
             type="submit"
             variant={hasAccount ? "secondary" : "primary"}
             loading={isPending}

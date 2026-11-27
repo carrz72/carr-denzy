@@ -310,7 +310,7 @@ export function PhoneJobForm({
             : "Saves the job. It will show as needing a date until you give it one."}
         </p>
 
-        <Button
+        <Button data-help="save-job"
           type="submit"
           size="lg"
           loading={isPending}

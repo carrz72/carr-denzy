@@ -58,6 +58,12 @@ const kindLabels: Record<LineKind, string> = {
   other: "Other",
 };
 
+const placeholders: Record<LineKind, string> = {
+  labour: "Replace 15mm compression elbow under sink",
+  materials: "15mm copper pipe, 3 metres",
+  other: "Parking, skip hire, call-out charge",
+};
+
 function serialise(lines: DraftLine[]): SerialisedLine[] {
   return lines
     .map((line) => ({
@@ -162,9 +168,36 @@ export function LineItemEditor({
     });
   }, []);
 
-  function addBlank() {
-    setLines((current) => [...current, emptyLine(defaultVat)]);
+  /**
+   * "Add labour" and "Add materials" as separate buttons.
+   *
+   * There used to be one "Add a line", with the kind tucked away in a Type box
+   * on each line. Owners asked how to put materials on an invoice: the option
+   * was there, but nothing on screen said so. An untouched blank line is
+   * reused (switched to the kind asked for) rather than left stranded above.
+   */
+  function addLine(kind: LineKind) {
+    const blank = lines.find(isBlank);
+    if (blank) {
+      update(blank.key, { kind });
+      setFocusKey(blank.key);
+      return;
+    }
+    const line = emptyLine(defaultVat, newKey(), kind);
+    setLines((current) => [...current, line]);
+    setFocusKey(line.key);
   }
+
+  // Puts the cursor in the line just added, so pressing the button always
+  // visibly does something, even when it reused an empty line.
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusKey) return;
+    const input = document.querySelector<HTMLInputElement>(`[name="line-description-${focusKey}"]`);
+    input?.focus();
+    input?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setFocusKey(null);
+  }, [focusKey]);
 
   /**
    * A line the owner has not put anything in.
@@ -233,7 +266,7 @@ export function LineItemEditor({
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="text-label uppercase text-ink-subtle">
-                  Line {index + 1}
+                  {kindLabels[line.kind]} · line {index + 1}
                 </span>
 
                 <div className="flex items-center gap-1">
@@ -267,7 +300,7 @@ export function LineItemEditor({
                   name={`line-description-${line.key}`}
                   value={line.description}
                   onChange={(event) => update(line.key, { description: event.target.value })}
-                  placeholder="Replace 15mm compression elbow under sink"
+                  placeholder={placeholders[line.kind]}
                   autoComplete="off"
                   required
                 />
@@ -364,13 +397,21 @@ export function LineItemEditor({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3" data-help="add-lines">
         <Button
           variant="secondary"
-          onClick={addBlank}
+          onClick={() => addLine("labour")}
           icon={<PlusIcon size={18} weight="bold" />}
         >
-          Add a line
+          Add labour
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => addLine("materials")}
+          icon={<PlusIcon size={18} weight="bold" />}
+          data-help="add-materials"
+        >
+          Add materials
         </Button>
 
         {priceItems.length > 0 ? (

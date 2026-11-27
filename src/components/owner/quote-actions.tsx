@@ -107,7 +107,7 @@ export function SendQuoteButton({
           </div>
         </>
       ) : (
-        <Button
+        <Button data-help="send-quote"
           size="lg"
           fullWidth
           onClick={() => setConfirming(true)}

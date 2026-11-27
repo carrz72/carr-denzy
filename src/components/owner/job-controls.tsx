@@ -493,6 +493,7 @@ export function ScheduleForm({
 
                 <div className="flex shrink-0 gap-1">
                 <Button
+                  data-help="move-day"
                   variant="quiet"
                   size="sm"
                   disabled={isPending}
@@ -655,6 +656,7 @@ export function ScheduleForm({
 
       {booked.length > 0 && !showAdd ? (
         <Button
+          data-help="add-day"
           variant="secondary"
           fullWidth
           className="mt-4"
@@ -788,6 +790,7 @@ export function ScheduleForm({
 
         {!warning ? (
           <Button
+            data-help="book-day"
             type="submit"
             fullWidth
             loading={isPending}

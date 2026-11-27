@@ -6,6 +6,7 @@ import {
   TrayIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { AppShell } from "@/components/app-shell";
+import { HelpTour } from "@/components/help-tour";
 import { AppBadge } from "@/components/app-badge";
 import { PushResync } from "@/components/push-resync";
 import { getAccess, requireStaff } from "@/lib/auth";
@@ -69,6 +70,7 @@ export default async function OwnerLayout({
       brandHref="/app"
       brandLabel="Your business"
       userLabel={user.fullName ?? user.email}
+      helpHref="/app/help"
       /*
        * Five, because the mobile bar is five thumb targets wide and a sixth
        * makes every one of them too narrow to hit in a van.
@@ -116,6 +118,7 @@ export default async function OwnerLayout({
     >
       <AppBadge count={waiting} />
       <PushResync />
+      <HelpTour />
       <div className="container-page py-8 md:py-10">{children}</div>
     </AppShell>
   );

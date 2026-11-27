@@ -196,7 +196,7 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-label uppercase text-ink-subtle">People</h2>
           {open !== "new" ? (
-            <Button size="sm" variant="secondary" icon={<PlusIcon size={16} weight="bold" />} onClick={() => setOpen("new")}>
+            <Button data-help="add-staff" size="sm" variant="secondary" icon={<PlusIcon size={16} weight="bold" />} onClick={() => setOpen("new")}>
               Add someone
             </Button>
           ) : null}

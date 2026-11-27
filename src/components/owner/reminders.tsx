@@ -507,7 +507,7 @@ export function RemindMe({
         </>
       ) : (
         <div className="flex flex-col gap-3">
-          <Button
+          <Button data-help="remind-me"
             variant="secondary"
             fullWidth
             icon={<AlarmIcon size={18} weight="bold" />}
@@ -569,7 +569,7 @@ export function TodoList({
       <div className="mb-1.5 flex items-center justify-between gap-4">
         <h2 className="font-display text-subheading text-ink">To do</h2>
         {!adding ? (
-          <Button
+          <Button data-help="add-todo"
             variant="quiet"
             size="sm"
             icon={<PlusIcon size={16} weight="bold" />}
@@ -723,6 +723,7 @@ function TodoRow({ item, today }: { item: TodoItem; today: string }) {
         <button
           type="button"
           aria-label={`Edit: ${item.title}`}
+          data-help="edit-todo"
           disabled={pending}
           onClick={() => {
             setError(null);

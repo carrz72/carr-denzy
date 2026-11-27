@@ -103,10 +103,11 @@ export default async function InvoicesPage() {
         action={
           <Link
             href="/app/invoices/new"
-            className={buttonClasses({ variant: "secondary", size: "sm" })}
+            data-help="new-invoice"
+            className={buttonClasses({ variant: "primary", size: "sm" })}
           >
             <PlusIcon size={17} weight="bold" aria-hidden="true" />
-            Invoice, no job
+            New invoice
           </Link>
         }
       />
@@ -165,7 +166,7 @@ export default async function InvoicesPage() {
           title="No invoices yet"
           description="Invoices are usually raised from a job once the work is finished — if the customer accepted a quote, its lines come across for you. For work that never went through the app, raise one on its own."
           action={{ label: "Open jobs", href: "/app/jobs" }}
-          secondaryAction={{ label: "Invoice with no job", href: "/app/invoices/new" }}
+          secondaryAction={{ label: "New invoice", href: "/app/invoices/new" }}
         />
       ) : (
         <div className="flex flex-col gap-10">

@@ -55,7 +55,7 @@ export function ClosuresPanel({ closures }: { closures: Closure[] }) {
         </div>
 
         {!adding ? (
-          <Button
+          <Button data-help="book-time-off"
             variant="secondary"
             size="sm"
             onClick={() => {

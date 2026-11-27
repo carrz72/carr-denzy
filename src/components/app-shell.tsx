@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { SignOutIcon } from "@phosphor-icons/react/dist/ssr";
+import { QuestionIcon, SignOutIcon } from "@phosphor-icons/react/dist/ssr";
 import { OfflineIndicator } from "@/components/offline-indicator";
 import { cn } from "@/lib/cn";
 
@@ -30,9 +30,12 @@ export function AppShell({
   brandHref,
   brandLabel,
   userLabel,
+  helpHref,
   children,
 }: {
   items: NavItem[];
+  /** Puts a Help button in the top bar, on a phone as well as a computer. */
+  helpHref?: string;
   brandHref: string;
   brandLabel: string;
   userLabel: string;
@@ -62,7 +65,9 @@ export function AppShell({
               className="size-8 shrink-0 object-contain"
             />
 
-            <span className="flex flex-col leading-none">
+            {/* The words go at tablet widths, where the five sections, Help and
+                Sign out need the room; the logo still says whose app it is. */}
+            <span className="flex flex-col leading-none md:hidden lg:flex">
               <span className="sign whitespace-nowrap text-[0.8125rem] text-ink">
                 Carrdenzy
               </span>
@@ -78,7 +83,7 @@ export function AppShell({
                     href={item.href}
                     aria-current={isActive(item.href) ? "page" : undefined}
                     className={cn(
-                      "relative flex min-h-11 items-center gap-2 rounded-md px-3.5 text-[0.9375rem] font-medium",
+                      "relative flex min-h-11 items-center gap-2 rounded-md px-2.5 text-[0.9375rem] font-medium lg:px-3.5",
                       "transition-colors duration-200 [transition-timing-function:var(--ease-standard)]",
                       isActive(item.href)
                         ? "bg-accent-soft text-accent-ink"
@@ -95,9 +100,24 @@ export function AppShell({
           </nav>
 
           <div className="flex items-center gap-3">
-            <span className="hidden max-w-40 truncate text-sm text-ink-muted lg:inline">
+            <span className="hidden max-w-40 truncate text-sm text-ink-muted xl:inline">
               {userLabel}
             </span>
+
+            {helpHref ? (
+              <Link
+                href={helpHref}
+                aria-current={isActive(helpHref) ? "page" : undefined}
+                className={cn(
+                  "flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-ink-muted",
+                  "transition-colors duration-200 hover:bg-surface-sunken hover:text-ink",
+                  isActive(helpHref) && "bg-accent-soft text-accent-ink",
+                )}
+              >
+                <QuestionIcon size={19} aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only md:sr-only lg:not-sr-only">Help</span>
+              </Link>
+            ) : null}
 
             {/* A form, not a link: sign-out must not be triggerable by a
                 prefetch or an image request. */}
@@ -110,7 +130,7 @@ export function AppShell({
                 )}
               >
                 <SignOutIcon size={18} aria-hidden="true" />
-                <span className="hidden sm:inline">Sign out</span>
+                <span className="hidden sm:inline md:hidden lg:inline">Sign out</span>
               </button>
             </form>
           </div>

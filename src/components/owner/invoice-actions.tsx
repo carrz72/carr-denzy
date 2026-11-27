@@ -145,7 +145,7 @@ export function SendInvoiceButton({
           </div>
         </>
       ) : (
-        <Button
+        <Button data-help="send-invoice"
           size="lg"
           fullWidth
           onClick={() => setConfirming(true)}
@@ -480,7 +480,7 @@ export function RecordPaymentForm({
           </p>
         ) : null}
 
-        <Button
+        <Button data-help="record-payment"
           type="submit"
           fullWidth
           loading={isPending}

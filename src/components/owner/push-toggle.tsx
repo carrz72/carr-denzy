@@ -191,7 +191,7 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
             ) : null}
 
             {state === "off" || state === "working" ? (
-              <Button
+              <Button data-help="push-on"
                 loading={state === "working"}
                 loadingLabel="Switching on…"
                 onClick={enable}

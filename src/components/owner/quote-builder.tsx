@@ -154,7 +154,7 @@ export function QuoteBuilder({
             : "Saves as a draft. You will see it as the customer will before it goes."}
         </p>
 
-        <Button
+        <Button data-help="save-quote"
           type="submit"
           size="lg"
           loading={isPending}

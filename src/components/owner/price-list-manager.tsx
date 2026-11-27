@@ -68,7 +68,7 @@ export function PriceListManager({ items }: { items: PriceItem[] }) {
           </div>
 
           {!adding ? (
-            <Button
+            <Button data-help="add-price"
               variant="secondary"
               onClick={() => {
                 setAdding(true);

@@ -31,11 +31,11 @@ export function newKey(): string {
     : `line-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function emptyLine(vatRateBp = 0, key: string = newKey()): DraftLine {
+export function emptyLine(vatRateBp = 0, key: string = newKey(), kind: LineKind = "labour"): DraftLine {
   return {
     key,
     description: "",
-    kind: "labour",
+    kind,
     quantity: "1",
     unitPrice: "",
     vatRateBp,

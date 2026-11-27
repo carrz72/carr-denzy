@@ -119,6 +119,7 @@ export function PortfolioManager({
                 Add several photos
               </Button>
               <Button
+                data-help="add-work"
                 variant="quiet"
                 onClick={() => setAdding("job")}
                 icon={<PlusIcon size={18} weight="bold" />}

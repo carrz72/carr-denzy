@@ -15,8 +15,14 @@ export const metadata: Metadata = { title: "New invoice", robots: { index: false
  * into a bill. The invoice is a legal record in its own right and does not need
  * a job to hang off — `invoices.job_id` has always been nullable.
  */
-export default async function NewInvoicePage() {
+export default async function NewInvoicePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ client?: string }>;
+}) {
   await requirePermission("manage_invoices");
+  // "New invoice" on a customer's page arrives with that customer picked.
+  const { client: requestedClient } = await searchParams;
   const supabase = await createClient();
 
   const [{ data: settings }, { data: priceItems }, { data: clients }] = await Promise.all([
@@ -35,16 +41,19 @@ export default async function NewInvoicePage() {
 
   if (!settings) notFound();
 
+  const preselected = (clients ?? []).find((client) => client.id === requestedClient);
+
   return (
     <>
       <PageHeader
-        title="Invoice, no job"
-        description="For work that never went through the app. Pick the customer or add them here, then put the lines in."
+        title="New invoice"
+        description="For any customer, including work that never went through the app. Pick the customer or add them here, then add the labour and materials."
         back={{ href: "/app/invoices", label: "Money" }}
       />
 
       <div className="mx-auto max-w-4xl">
         <InvoiceBuilder
+          clientId={preselected?.id}
           quoteId={null}
           initialLines={[]}
           priceItems={priceItems ?? []}
