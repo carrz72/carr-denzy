@@ -25,6 +25,8 @@ const EVENT = "help-tour-change";
 interface TourState {
   id: string;
   step: number;
+  /** Arrived here with Back, so an "open this screen" step is not skipped again. */
+  back?: boolean;
 }
 
 function readState(): TourState | null {
@@ -88,14 +90,24 @@ export function HelpTour() {
   const total = article?.steps.length ?? 0;
   const onWrongPagePath = Boolean(step?.path && step.path !== pathname);
 
+  /**
+   * Moves the walkthrough on (or back). `from` is the step the caller saw:
+   * if the walkthrough has already moved past it, this does nothing.
+   *
+   * That matters on a phone. Tapping "Money" in "Open Money" both counts as
+   * the tap and lands you on Money, which counts as being there already. On a
+   * fast phone the page arrives before the tap's own move, so each would
+   * move one step and "Tap New invoice" was skipped.
+   */
   const go = useCallback(
-    (delta: number) => {
+    (delta: number, from?: number) => {
       const current = readState() ?? memory;
       if (!current) return;
+      if (from !== undefined && current.step !== from) return;
       const art = findArticle(current.id);
       const next = current.step + delta;
       if (!art || next >= art.steps.length) writeState(null);
-      else writeState({ id: current.id, step: Math.max(0, next) });
+      else writeState({ id: current.id, step: Math.max(0, next), back: delta < 0 });
     },
     [],
   );
@@ -105,11 +117,12 @@ export function HelpTour() {
   // A step that is only "open this screen" is done once you are on it, even
   // if the link to it is not on the page you are looking at.
   const linkTo = step?.target?.match(/a\[href="([^"]+)"\]/)?.[1];
-  const alreadyThere = Boolean(linkTo && linkTo === pathname && !step?.manual);
+  const alreadyThere = Boolean(linkTo && linkTo === pathname && !step?.manual && !state?.back);
   const onWrongPage = onWrongPagePath && !alreadyThere;
+  const currentStep = state?.step;
   useEffect(() => {
-    if (alreadyThere) go(1);
-  }, [alreadyThere, state?.step, go]);
+    if (alreadyThere && currentStep !== undefined) go(1, currentStep);
+  }, [alreadyThere, currentStep, go]);
 
   // The ring belongs to one step on one screen; a ring measured for an
   // earlier step is simply not drawn.
@@ -155,17 +168,17 @@ export function HelpTour() {
 
   // Tapping the highlighted button counts as doing the step.
   useEffect(() => {
-    if (!step || step.manual) return;
+    if (!step || step.manual || currentStep === undefined) return;
     const onTap = (event: Event) => {
       const element = targetRef.current;
       if (element && event.target instanceof Node && element.contains(event.target)) {
         // After the tap has done its own work (opened a form, changed page).
-        window.setTimeout(() => go(1), 50);
+        window.setTimeout(() => go(1, currentStep), 50);
       }
     };
     document.addEventListener("click", onTap, true);
     return () => document.removeEventListener("click", onTap, true);
-  }, [step, go]);
+  }, [step, currentStep, go]);
 
   useEffect(() => {
     if (!step) return;
