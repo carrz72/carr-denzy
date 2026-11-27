@@ -215,6 +215,8 @@ export default async function OwnerDashboard() {
         : dueDay === today
           ? `Today at ${formatTime(row.due_at)}`
           : `Tomorrow at ${formatTime(row.due_at)}`,
+      dueDate: dueDay,
+      dueTime: formatTime(row.due_at),
       due,
       automatic: row.kind !== "manual",
     };

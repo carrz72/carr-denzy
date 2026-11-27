@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import {
+  ArrowsLeftRightIcon,
   CalendarPlusIcon,
   CheckIcon,
   NotePencilIcon,
@@ -30,7 +31,9 @@ import { queueOutboxItem, isOnline } from "@/lib/outbox";
 import {
   formatDateTime,
   formatDuration,
+  formatTime,
   formatWorkingDayRange,
+  londonDateOf,
   todayInLondon,
 } from "@/lib/dates";
 import { cn } from "@/lib/cn";
@@ -347,6 +350,19 @@ export function ScheduleForm({
   const [notifyRemoval, setNotifyRemoval] = useState(true);
   const [saved, setSaved] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(visits.length === 0);
+  /** The day being moved, when the form below is moving one rather than adding. */
+  const [moving, setMoving] = useState<Visit | null>(null);
+  const [notifyMove, setNotifyMove] = useState(true);
+
+  function closeForm() {
+    setMoving(null);
+    setShowAdd(false);
+    setWarning(null);
+    setWarningKind(null);
+    setConfirmed([]);
+    setErrors({});
+    setError(null);
+  }
 
   const booked = [...visits].sort(
     (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
@@ -411,6 +427,7 @@ export function ScheduleForm({
 
       setSaved(result.warning ?? "Added to the job.");
       setShowAdd(false);
+      setMoving(null);
     });
   }
 
@@ -474,11 +491,32 @@ export function ScheduleForm({
                   </p>
                 </div>
 
+                <div className="flex shrink-0 gap-1">
                 <Button
                   variant="quiet"
                   size="sm"
                   disabled={isPending}
                   onClick={() => {
+                    setRemoving(null);
+                    setSaved(null);
+                    setWarning(null);
+                    setWarningKind(null);
+                    setConfirmed([]);
+                    setMoving(visit);
+                    setNotifyMove(!past);
+                    setShowAdd(true);
+                  }}
+                >
+                  <ArrowsLeftRightIcon size={16} aria-hidden="true" />
+                  Move
+                  <span className="sr-only"> {formatDateTime(visit.starts_at)}</span>
+                </Button>
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => {
+                    if (moving?.id === visit.id) closeForm();
                     setRemoving(visit.id);
                     // Worth telling them about a day still to come; a past day is just tidying.
                     setNotifyRemoval(new Date(visit.starts_at).getTime() > Date.now());
@@ -489,6 +527,7 @@ export function ScheduleForm({
                     Remove {formatDateTime(visit.starts_at)}
                   </span>
                 </Button>
+                </div>
 
                 {removing === visit.id ? (
                   <div className="flex w-full flex-col gap-2 rounded-md bg-surface-sunken p-3">
@@ -607,6 +646,13 @@ export function ScheduleForm({
         </form>
       )}
 
+      {saved && !showAdd ? (
+        <p role="status" className="mt-4 flex items-center gap-2 text-[0.9375rem] font-medium text-positive">
+          <CheckIcon size={17} weight="bold" aria-hidden="true" />
+          {saved}
+        </p>
+      ) : null}
+
       {booked.length > 0 && !showAdd ? (
         <Button
           variant="secondary"
@@ -620,11 +666,20 @@ export function ScheduleForm({
       ) : null}
 
       <form
+        // A fresh form for each day moved, so its boxes start on that day.
+        key={moving?.id ?? "new"}
         action={(formData) => handleSubmit(formData)}
         className={cn("flex flex-col gap-4", showAdd ? "mt-4" : "hidden")}
         id={`schedule-${jobId}`}
       >
         <input type="hidden" name="job_id" value={jobId} />
+        {moving ? (
+          <>
+            <input type="hidden" name="visit_id" value={moving.id} />
+            {notifyMove ? <input type="hidden" name="notify" value="on" /> : null}
+            <p className="font-medium text-ink">Move {formatDateTime(moving.starts_at)} to:</p>
+          </>
+        ) : null}
 
         <TextField
           name="date"
@@ -632,7 +687,11 @@ export function ScheduleForm({
           type="date"
           required
           min={todayInLondon()}
-          defaultValue={todayInLondon()}
+          defaultValue={
+            moving && londonDateOf(moving.starts_at) >= todayInLondon()
+              ? londonDateOf(moving.starts_at)
+              : todayInLondon()
+          }
           error={errors.date}
         />
 
@@ -657,7 +716,7 @@ export function ScheduleForm({
             type="time"
             required
             step={900}
-            defaultValue="09:00"
+            defaultValue={moving ? formatTime(moving.starts_at) : "09:00"}
             error={errors.time}
           />
 
@@ -671,10 +730,18 @@ export function ScheduleForm({
             min={15}
             step={15}
             required
-            defaultValue={String(durationMinutes ?? 60)}
+            defaultValue={String(moving?.duration_minutes ?? durationMinutes ?? 60)}
             error={errors.duration_minutes}
           />
         </div>
+
+        {moving ? (
+          <NotifyToggle
+            checked={notifyMove}
+            onChange={setNotifyMove}
+            label="Email the customer the new time"
+          />
+        ) : null}
 
         {/* An overlap warns and offers to proceed. It never blocks — two jobs
             at the same time is sometimes exactly right (spec E-10). */}
@@ -719,24 +786,20 @@ export function ScheduleForm({
 
         <FormError message={error} />
 
-        {saved ? (
-          <p
-            role="status"
-            className="flex items-center gap-2 text-[0.9375rem] font-medium text-positive"
-          >
-            <CheckIcon size={17} weight="bold" aria-hidden="true" />
-            Booked in
-          </p>
-        ) : null}
-
         {!warning ? (
           <Button
             type="submit"
             fullWidth
             loading={isPending}
-            icon={<CalendarPlusIcon size={19} />}
+            icon={moving ? <ArrowsLeftRightIcon size={19} /> : <CalendarPlusIcon size={19} />}
           >
-            {booked.length === 0 ? "Book it in" : "Add this day"}
+            {moving ? "Move this day" : booked.length === 0 ? "Book it in" : "Add this day"}
+          </Button>
+        ) : null}
+
+        {booked.length > 0 ? (
+          <Button variant="quiet" fullWidth onClick={closeForm} disabled={isPending}>
+            Cancel
           </Button>
         ) : null}
       </form>

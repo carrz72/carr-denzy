@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { PlusIcon, SunHorizonIcon, TrashIcon } from "@phosphor-icons/react/dist/ssr";
+import { PencilSimpleIcon, PlusIcon, SunHorizonIcon, TrashIcon } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/surface";
 import { CheckField, FormError, TextField } from "@/components/ui/field";
-import { addClosure, removeClosure } from "@/app/(app)/app/diary/actions";
+import { addClosure, removeClosure, updateClosure } from "@/app/(app)/app/diary/actions";
 import { formatDate, todayInLondon } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import type { Closure } from "@/types/database";
@@ -22,32 +22,17 @@ import type { Closure } from "@/types/database";
  */
 export function ClosuresPanel({ closures }: { closures: Closure[] }) {
   const [adding, setAdding] = useState(false);
+  // The time off being changed, if any. Only one form is open at a time.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   const today = todayInLondon();
 
-  function handleAdd(formData: FormData) {
-    setErrors({});
-    setFormError(null);
-
-    startTransition(async () => {
-      const result = await addClosure(formData);
-
-      if (!result.ok) {
-        setErrors(result.errors ?? {});
-        setFormError(result.formError ?? null);
-        return;
-      }
-
-      setAdding(false);
-    });
-  }
-
   function handleRemove(id: string) {
     const formData = new FormData();
     formData.set("id", id);
+    setFormError(null);
 
     startTransition(async () => {
       const result = await removeClosure(formData);
@@ -73,7 +58,10 @@ export function ClosuresPanel({ closures }: { closures: Closure[] }) {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setAdding(true)}
+            onClick={() => {
+              setEditingId(null);
+              setAdding(true);
+            }}
             icon={<PlusIcon size={16} weight="bold" />}
           >
             Book time off
@@ -82,56 +70,9 @@ export function ClosuresPanel({ closures }: { closures: Closure[] }) {
       </div>
 
       {adding ? (
-        <form action={handleAdd} className="mt-5 flex flex-col gap-4 border-t border-line pt-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
-              name="starts_on"
-              label="First day away"
-              type="date"
-              required
-              min={today}
-              defaultValue={today}
-              error={errors.starts_on}
-            />
-
-            <TextField
-              name="ends_on"
-              label="Last day away"
-              type="date"
-              required
-              min={today}
-              defaultValue={today}
-              hint="You are back the day after."
-              error={errors.ends_on}
-            />
-          </div>
-
-          <TextField
-            name="reason"
-            label="What to tell customers"
-            hint="Shown on the website. Leave it blank and it just says you are away."
-            placeholder="Family holiday"
-            error={errors.reason}
-          />
-
-          <CheckField
-            name="emergencies_only"
-            label="Still taking genuine emergencies"
-            hint="The website tells them to ring rather than send a request. Turn this off and it says you are not available at all."
-            defaultChecked
-          />
-
-          <FormError message={formError} />
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" loading={isPending}>
-              Save
-            </Button>
-            <Button variant="quiet" onClick={() => setAdding(false)} disabled={isPending}>
-              Cancel
-            </Button>
-          </div>
-        </form>
+        <div className="mt-5 border-t border-line pt-5">
+          <ClosureForm today={today} onDone={() => setAdding(false)} />
+        </div>
       ) : null}
 
       {closures.length > 0 ? (
@@ -139,6 +80,14 @@ export function ClosuresPanel({ closures }: { closures: Closure[] }) {
           {closures.map((closure) => {
             const over = closure.ends_on < today;
             const on = closure.starts_on <= today && closure.ends_on >= today;
+
+            if (editingId === closure.id) {
+              return (
+                <li key={closure.id} className="rounded-md border border-line bg-surface-sunken p-4">
+                  <ClosureForm today={today} closure={closure} onDone={() => setEditingId(null)} />
+                </li>
+              );
+            }
 
             return (
               <li
@@ -163,25 +112,35 @@ export function ClosuresPanel({ closures }: { closures: Closure[] }) {
                   </span>
                 </span>
 
-                <button
-                  type="button"
+                {!over ? (
+                  <IconButton
+                    label="Change this time off"
+                    onClick={() => {
+                      setAdding(false);
+                      setFormError(null);
+                      setEditingId(closure.id);
+                    }}
+                    disabled={isPending}
+                  >
+                    <PencilSimpleIcon size={17} aria-hidden="true" />
+                  </IconButton>
+                ) : null}
+
+                <IconButton
+                  label="Remove this time off"
+                  danger
                   onClick={() => handleRemove(closure.id)}
                   disabled={isPending}
-                  title="Remove this time off"
-                  className={cn(
-                    "flex size-11 shrink-0 items-center justify-center rounded-md text-ink-subtle",
-                    "transition-colors duration-200 hover:bg-critical-soft hover:text-critical",
-                    "active:translate-y-px disabled:pointer-events-none disabled:opacity-40",
-                  )}
                 >
                   <TrashIcon size={17} aria-hidden="true" />
-                  <span className="sr-only">Remove this time off</span>
-                </button>
+                </IconButton>
               </li>
             );
           })}
         </ul>
       ) : null}
+
+      <FormError message={formError} />
 
       {!adding && closures.length === 0 ? (
         <p className="mt-4 text-[0.9375rem] text-ink-muted">
@@ -189,5 +148,117 @@ export function ClosuresPanel({ closures }: { closures: Closure[] }) {
         </p>
       ) : null}
     </Card>
+  );
+}
+
+function IconButton({
+  label,
+  onClick,
+  disabled,
+  danger = false,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      className={cn(
+        "flex size-11 shrink-0 items-center justify-center rounded-md text-ink-subtle",
+        "transition-colors duration-200",
+        danger ? "hover:bg-critical-soft hover:text-critical" : "hover:bg-surface-sunken hover:text-ink",
+        "active:translate-y-px disabled:pointer-events-none disabled:opacity-40",
+      )}
+    >
+      {children}
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
+/** Booking new time off, or changing time off already booked. */
+function ClosureForm({ today, closure, onDone }: { today: string; closure?: Closure; onDone: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  function submit(formData: FormData) {
+    setErrors({});
+    setFormError(null);
+    if (closure) formData.set("id", closure.id);
+
+    startTransition(async () => {
+      const result = closure ? await updateClosure(formData) : await addClosure(formData);
+
+      if (!result.ok) {
+        setErrors(result.errors ?? {});
+        setFormError(result.formError ?? null);
+        return;
+      }
+
+      onDone();
+    });
+  }
+
+  return (
+    <form action={submit} className="flex flex-col gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          name="starts_on"
+          label="First day away"
+          type="date"
+          required
+          // Time off that has already started keeps its real first day.
+          min={closure && closure.starts_on < today ? closure.starts_on : today}
+          defaultValue={closure?.starts_on ?? today}
+          error={errors.starts_on}
+        />
+
+        <TextField
+          name="ends_on"
+          label="Last day away"
+          type="date"
+          required
+          min={today}
+          defaultValue={closure?.ends_on ?? today}
+          hint="You are back the day after."
+          error={errors.ends_on}
+        />
+      </div>
+
+      <TextField
+        name="reason"
+        label="What to tell customers"
+        hint="Shown on the website. Leave it blank and it just says you are away."
+        placeholder="Family holiday"
+        defaultValue={closure?.reason ?? ""}
+        error={errors.reason}
+      />
+
+      <CheckField
+        name="emergencies_only"
+        label="Still taking genuine emergencies"
+        hint="The website tells them to ring rather than send a request. Turn this off and it says you are not available at all."
+        defaultChecked={closure ? closure.emergencies_only : true}
+      />
+
+      <FormError message={formError} />
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" loading={isPending}>
+          Save
+        </Button>
+        <Button variant="quiet" onClick={onDone} disabled={isPending}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }

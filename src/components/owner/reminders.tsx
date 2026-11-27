@@ -11,6 +11,7 @@ import {
   ClockIcon,
   PaperPlaneTiltIcon,
   PauseIcon,
+  PencilSimpleIcon,
   PlayIcon,
   PlusIcon,
   XIcon,
@@ -29,6 +30,7 @@ import {
   setClientAutoReminders,
   setStopped,
   snoozeReminder,
+  updateReminder,
   type WhenPreset,
 } from "@/app/(app)/app/reminder-actions";
 import type { ChaseEntity, Settings } from "@/types/database";
@@ -362,26 +364,52 @@ const WHEN_OPTIONS: { value: WhenPreset; label: string }[] = [
   { value: "custom", label: "Pick a time" },
 ];
 
+type FormWhen = WhenPreset | "keep";
+
+/** An existing reminder being changed: its id and when it is set for now. */
+interface EditingReminder {
+  id: string;
+  whenLabel: string;
+  dueDate: string;
+  dueTime: string;
+}
+
 function ReminderForm({
   links,
   defaultTitle,
   onDone,
   today,
+  editing,
 }: {
   links: ReminderLinks;
   defaultTitle: string;
   onDone: (message: string) => void;
   today: string;
+  editing?: EditingReminder;
 }) {
-  const [when, setWhen] = useState<WhenPreset>("tomorrow");
+  const [when, setWhen] = useState<FormWhen>(editing ? "keep" : "tomorrow");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const options: { value: FormWhen; label: string }[] = editing
+    ? [{ value: "keep", label: `Keep: ${editing.whenLabel.toLowerCase()}` }, ...WHEN_OPTIONS]
+    : WHEN_OPTIONS;
+
   function submit(formData: FormData) {
     formData.set("when", when);
-    for (const [key, value] of Object.entries(links)) if (value) formData.set(key, value);
     setError(null);
     startTransition(async () => {
+      if (editing) {
+        const result = await updateReminder(editing.id, formData);
+        if (!result.ok) {
+          setError(result.formError ?? "That did not save.");
+          return;
+        }
+        onDone("Reminder updated.");
+        return;
+      }
+
+      for (const [key, value] of Object.entries(links)) if (value) formData.set(key, value);
       const result = await createReminder(formData);
       if (!result.ok) {
         setError(result.formError ?? "That reminder did not save.");
@@ -392,6 +420,11 @@ function ReminderForm({
     });
   }
 
+  // Changing an existing reminder starts the day and time pickers on its
+  // current time (or today, if that has already gone).
+  const startDate = editing && editing.dueDate >= today ? editing.dueDate : today;
+  const startTime = editing && editing.dueDate >= today ? editing.dueTime : "09:00";
+
   return (
     <form action={submit} className="flex flex-col gap-3">
       <TextField name="title" label="What for?" defaultValue={defaultTitle} maxLength={200} required autoFocus />
@@ -399,7 +432,7 @@ function ReminderForm({
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 font-medium text-ink">When?</legend>
         <div className="flex flex-wrap gap-2">
-          {WHEN_OPTIONS.map((option) => (
+          {options.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -420,8 +453,8 @@ function ReminderForm({
 
       {when === "custom" ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField name="date" type="date" label="Day" min={today} defaultValue={today} required />
-          <TextField name="time" type="time" label="Time" defaultValue="09:00" required />
+          <TextField name="date" type="date" label="Day" min={today} defaultValue={startDate} required />
+          <TextField name="time" type="time" label="Time" defaultValue={startTime} required />
         </div>
       ) : null}
 
@@ -429,7 +462,7 @@ function ReminderForm({
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" loading={pending} icon={<AlarmIcon size={18} weight="bold" />}>
-          Set reminder
+          {editing ? "Save" : "Set reminder"}
         </Button>
         <Button type="button" variant="quiet" onClick={() => onDone("")} disabled={pending}>
           Cancel
@@ -511,6 +544,9 @@ export interface TodoItem {
   href: string | null;
   /** "Due now", "Tomorrow at 08:00". Worked out on the server. */
   whenLabel: string;
+  /** When it is set for, in London: "2026-11-28" and "08:00". For Edit. */
+  dueDate: string;
+  dueTime: string;
   due: boolean;
   automatic: boolean;
 }
@@ -576,7 +612,7 @@ export function TodoList({
       ) : (
         <ul className="mt-3 flex flex-col gap-2">
           {items.map((item) => (
-            <TodoRow key={item.id} item={item} />
+            <TodoRow key={item.id} item={item} today={today} />
           ))}
         </ul>
       )}
@@ -591,9 +627,10 @@ export function TodoList({
   );
 }
 
-function TodoRow({ item }: { item: TodoItem }) {
+function TodoRow({ item, today }: { item: TodoItem; today: string }) {
   const [pending, startTransition] = useTransition();
   const [gone, setGone] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function act(task: () => Promise<{ ok: boolean; formError?: string }>) {
@@ -608,6 +645,20 @@ function TodoRow({ item }: { item: TodoItem }) {
   }
 
   if (gone) return null;
+
+  if (editing) {
+    return (
+      <li className="rounded-md border border-line bg-surface-sunken p-4">
+        <ReminderForm
+          links={{}}
+          defaultTitle={item.title}
+          today={today}
+          editing={{ id: item.id, whenLabel: item.whenLabel, dueDate: item.dueDate, dueTime: item.dueTime }}
+          onDone={() => setEditing(false)}
+        />
+      </li>
+    );
+  }
 
   return (
     <li
@@ -668,6 +719,19 @@ function TodoRow({ item }: { item: TodoItem }) {
           className="min-h-9 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-ink-muted hover:border-line-strong hover:text-ink"
         >
           Tomorrow
+        </button>
+        <button
+          type="button"
+          aria-label={`Edit: ${item.title}`}
+          disabled={pending}
+          onClick={() => {
+            setError(null);
+            setEditing(true);
+          }}
+          className="flex min-h-9 items-center gap-1 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-ink-muted hover:border-line-strong hover:text-ink"
+        >
+          <PencilSimpleIcon size={13} weight="bold" aria-hidden="true" />
+          Edit
         </button>
         <button
           type="button"

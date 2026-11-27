@@ -865,6 +865,60 @@ export async function scheduleJob(formData: FormData): Promise<ActionResult> {
     }
   }
 
+  // Moving a day already booked: change that row rather than adding one, and
+  // send the customer one "your booking has moved" email instead of the
+  // "please do not expect us" plus "booked in" pair that remove-and-re-add sent.
+  const movingId = String(formData.get("visit_id") ?? "");
+  if (movingId) {
+    const { data: before } = await supabase
+      .from("job_visits")
+      .select("starts_at, job:jobs(title, client:clients(full_name, email))")
+      .eq("id", movingId)
+      .eq("job_id", parsed.data.job_id)
+      .maybeSingle();
+
+    if (!before) return { ok: false, formError: "That day was not found. It may have been removed." };
+
+    const changed = new Date(before.starts_at).getTime() !== startMs;
+
+    const { error: moveError } = await supabase
+      .from("job_visits")
+      .update({
+        starts_at: startsAt,
+        duration_minutes: parsed.data.duration_minutes,
+        // A new time gets its own "see you tomorrow" reminder.
+        ...(changed ? { reminder_sent_at: null } : {}),
+      })
+      .eq("id", movingId);
+
+    if (moveError) {
+      if (moveError.code === "23505") {
+        return { ok: false, formError: "That day and time is already booked on this job." };
+      }
+      return { ok: false, formError: friendly(moveError.message, "Could not move that day. Try again.") };
+    }
+
+    const client = before.job?.client;
+    if (formData.get("notify") === "on" && changed && startMs > Date.now() && client?.email) {
+      const notice = await sendDocumentNotice(
+        client.email,
+        client.full_name,
+        `Your booking has moved to ${formatDateTime(startsAt)}`,
+        "A change to your booking",
+        [
+          `We have moved ${formatDateTime(before.starts_at)} for ${before.job?.title ?? "your job"} to ${formatDateTime(startsAt)}.`,
+          "If the new time does not suit you, reply to this email or give us a ring.",
+        ],
+      );
+      if (!notice.sent) console.error("[visit] move notice did not send", notice.error);
+    }
+
+    revalidatePath(`/app/jobs/${parsed.data.job_id}`);
+    revalidatePath("/app", "layout");
+
+    return { ok: true, warning: "Moved." };
+  }
+
   // A day on site is a row in `job_visits`. `jobs.scheduled_start` is kept in
   // step by a trigger, so the diary and the Today screen carry on reading the
   // one column they always read, and nothing here has to remember to update it.

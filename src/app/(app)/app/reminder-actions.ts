@@ -352,6 +352,57 @@ export async function snoozeReminder(id: string, preset: WhenPreset): Promise<Re
   return { ok: true };
 }
 
+const reminderEditSchema = z.object({
+  title: reminderSchema.shape.title,
+  // "keep" leaves the time alone, so a title fix on an overdue reminder
+  // does not trip the "that time has gone" check.
+  when: z.enum(["keep", "hour", "afternoon", "evening", "tomorrow", "custom"]),
+  date: z.string().optional(),
+  time: z.string().optional(),
+});
+
+/** Changes what a reminder says, when it goes off, or both. */
+export async function updateReminder(id: string, formData: FormData): Promise<ReminderActionResult> {
+  await requireStaff();
+  if (!uuid.safeParse(id).success) return { ok: false, formError: "That reminder was not found." };
+
+  const value = (name: string) => {
+    const raw = formData.get(name);
+    return typeof raw === "string" && raw !== "" ? raw : undefined;
+  };
+
+  const parsed = reminderEditSchema.safeParse({
+    title: formData.get("title") ?? "",
+    when: formData.get("when") ?? "",
+    date: value("date"),
+    time: value("time"),
+  });
+  if (!parsed.success) {
+    return { ok: false, formError: parsed.error.issues[0]?.message ?? "Check the reminder and try again." };
+  }
+
+  const changes: { title: string; due_at?: string; pushed_at?: null } = { title: parsed.data.title };
+  if (parsed.data.when !== "keep") {
+    const dueAt = resolveWhen(parsed.data.when, parsed.data.date, parsed.data.time);
+    if (!dueAt) return { ok: false, formError: "Pick a day and time that has not gone yet." };
+    // A new time buzzes the phone again, even if the old one already had.
+    changes.due_at = dueAt;
+    changes.pushed_at = null;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("owner_reminders").update(changes).eq("id", id).select("id");
+
+  if (error) {
+    console.error("[reminders] update failed", error.message);
+    return { ok: false, formError: "That did not save. Try again." };
+  }
+  if (!data?.length) return { ok: false, formError: "That reminder was not found. It may have been deleted." };
+
+  refresh();
+  return { ok: true };
+}
+
 export async function deleteReminder(id: string): Promise<ReminderActionResult> {
   await requireStaff();
   if (!uuid.safeParse(id).success) return { ok: false, formError: "That reminder was not found." };

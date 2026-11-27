@@ -56,6 +56,46 @@ export async function addClosure(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
+/** Changes the dates, the wording or the emergencies setting of booked time off. */
+export async function updateClosure(formData: FormData): Promise<ActionResult> {
+  await requireOwner();
+
+  const id = String(formData.get("id") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, formError: "That time off was not found." };
+
+  const parsed = closureSchema.safeParse({
+    starts_on: formData.get("starts_on") ?? "",
+    ends_on: formData.get("ends_on") ?? "",
+    reason: formData.get("reason") ?? "",
+    emergencies_only: formData.get("emergencies_only") === "on",
+  });
+
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("closures")
+    .update({
+      starts_on: parsed.data.starts_on,
+      ends_on: parsed.data.ends_on,
+      reason: parsed.data.reason || null,
+      emergencies_only: parsed.data.emergencies_only,
+    })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    console.error("[closures] update failed", error.message);
+    return { ok: false, formError: "Could not save that. Try again." };
+  }
+  if (!data?.length) return { ok: false, formError: "That time off was not found. It may have been removed." };
+
+  revalidateEverywhere();
+
+  return { ok: true };
+}
+
 export async function removeClosure(formData: FormData): Promise<ActionResult> {
   await requireOwner();
 
